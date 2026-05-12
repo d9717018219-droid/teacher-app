@@ -95,7 +95,7 @@ export default function App() {
   const [alertsInitialTab, setAlertsInitialTab] = useState<'feed' | 'support' | 'setup'>('feed');
 
   const mainScrollRef = useRef<HTMLDivElement>(null);
-
+  useNotifications();
   useEffect(() => {
     localStorage.setItem('userCity', cityFilter);
   }, [cityFilter]);

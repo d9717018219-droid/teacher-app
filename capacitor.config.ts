@@ -5,6 +5,9 @@ const config: CapacitorConfig = {
   appName: 'DoAble India',
   webDir: 'dist',
   plugins: {
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
     CapacitorHttp: {
       enabled: true,
     },
