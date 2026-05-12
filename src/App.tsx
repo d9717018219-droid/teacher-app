@@ -14,6 +14,7 @@ import AlertsView from './components/AlertsView';
 import AdminPanel from './components/AdminPanel';
 import SupportView from './components/SupportView';
 import HomeView from './components/HomeView';
+import useNotifications from './hooks/useNotifications';
 import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId } from './utils';
 import { 
   CITIES_LIST, 
@@ -95,7 +96,16 @@ export default function App() {
   const [alertsInitialTab, setAlertsInitialTab] = useState<'feed' | 'support' | 'setup'>('feed');
 
   const mainScrollRef = useRef<HTMLDivElement>(null);
-  useNotifications();
+  useNotifications(userCity, userGender || 'All', userClasses, userType || 'all');
+
+  useEffect(() => {
+    const handleNav = (e: any) => {
+      if (e.detail) setActiveTab(e.detail);
+    };
+    window.addEventListener('navigateToTab', handleNav);
+    return () => window.removeEventListener('navigateToTab', handleNav);
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('userCity', cityFilter);
   }, [cityFilter]);

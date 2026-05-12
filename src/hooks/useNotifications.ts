@@ -7,39 +7,42 @@ import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 import {
   getFCMToken,
   setupMessageHandler,
   requestNotificationPermission
 } from '../firebase';
 
-export const useNotifications = () => {
+export const useNotifications = (
+  userCity: string,
+  userGender: string,
+  userClasses: string[],
+  userType: string
+) => {
   useEffect(() => {
     const initializeNotifications = async () => {
       console.log('🔔 Initializing notifications...');
 
       try {
-        // Request notification permission
-        const permissionGranted = await requestNotificationPermission();
-        if (!permissionGranted) {
-          console.warn('⚠️ Notification permission not granted');
-          return;
+        // 1. Web-Push Initialization (Only if not native)
+        if (!Capacitor.isNativePlatform()) {
+           const permissionGranted = await requestNotificationPermission();
+           if (permissionGranted) {
+              setupMessageHandler();
+              const fcmToken = await getFCMToken();
+              if (fcmToken) {
+                console.log('✅ Web FCM Token:', fcmToken);
+                localStorage.setItem('fcmToken', fcmToken);
+                await saveTokenToFirestore(fcmToken, 'web', userCity, userGender, userClasses, userType);
+              }
+           }
         }
 
-        // Setup Firebase Cloud Messaging
-        setupMessageHandler();
-
-        // Get and log FCM token
-        const fcmToken = await getFCMToken();
-        if (fcmToken) {
-          console.log('✅ FCM Token:', fcmToken);
-          // Store token in localStorage for backend use
-          localStorage.setItem('fcmToken', fcmToken);
-        }
-
-        // Setup Capacitor Push Notifications for native
+        // 2. Native Push Initialization
         if (Capacitor.isNativePlatform()) {
-          await setupCapacitorPushNotifications();
+          await setupCapacitorPushNotifications(userCity, userGender, userClasses, userType);
         }
 
         console.log('✅ Notifications initialized successfully');
@@ -49,13 +52,48 @@ export const useNotifications = () => {
     };
 
     initializeNotifications();
-  }, []);
+  }, [userCity, userGender, userClasses, userType]);
 };
+
+/**
+ * Save token to Firestore with user preferences
+ */
+async function saveTokenToFirestore(
+  token: string, 
+  platform: string,
+  city: string,
+  gender: string,
+  classes: string[],
+  userType: string
+) {
+  try {
+    const tokenData = {
+      token,
+      platform,
+      lastUpdated: serverTimestamp(),
+      city: city || 'All',
+      gender: gender || 'Any',
+      targetClass: classes.length > 0 ? classes.join(', ') : 'All',
+      targetUserType: userType || 'all',
+      appVersion: '1.0.121_ULTIMATE'
+    };
+
+    await setDoc(doc(db, 'fcm_tokens', token), tokenData, { merge: true });
+    console.log('💾 Token saved to Firestore:', platform);
+  } catch (e) {
+    console.error('❌ Error saving token to Firestore:', e);
+  }
+}
 
 /**
  * Setup Capacitor Push Notifications for native platforms
  */
-async function setupCapacitorPushNotifications() {
+async function setupCapacitorPushNotifications(
+  city: string,
+  gender: string,
+  classes: string[],
+  userType: string
+) {
   try {
     // Request push notifications permission
     const result = await PushNotifications.requestPermissions();
@@ -64,9 +102,14 @@ async function setupCapacitorPushNotifications() {
       // Subscribe to push notifications
       await PushNotifications.addListener(
         'registration',
-        (token) => {
-          console.log('✅ Capacitor Push Token:', token.value);
-          localStorage.setItem('capacitorPushToken', token.value);
+        async (token) => {
+          let cleanToken = token.value;
+          if (cleanToken.includes(':')) {
+            cleanToken = cleanToken.split(':')[1].trim();
+          }
+          console.log('✅ Native FCM Token:', cleanToken);
+          localStorage.setItem('fcmToken', cleanToken);
+          await saveTokenToFirestore(cleanToken, 'android', city, gender, classes, userType);
         }
       );
 
@@ -87,13 +130,13 @@ async function setupCapacitorPushNotifications() {
         'pushNotificationActionPerformed',
         (notification) => {
           console.log('👆 Push action performed:', notification);
-          // Handle notification tap/action
           const data = notification.notification.data;
           handleNotificationAction(data);
         }
       );
 
-      console.log('✅ Capacitor Push Notifications setup complete');
+      await PushNotifications.register();
+      console.log('✅ Capacitor Push Notifications registered');
     } else {
       console.warn('⚠️ Push notification permission denied');
     }
@@ -115,7 +158,9 @@ async function showLocalNotification(title: string, body: string) {
           id: Math.floor(Math.random() * 10000),
           schedule: {
             at: new Date(Date.now() + 1000)
-          }
+          },
+          sound: 'blackberry.mp3',
+          channelId: 'doable_channel_v6'
         }
       ]
     });
@@ -129,23 +174,10 @@ async function showLocalNotification(title: string, body: string) {
  */
 function handleNotificationAction(data: any) {
   console.log('Handling notification action with data:', data);
-
-  // Handle different notification types
-  if (data?.type === 'job') {
-    // Navigate to job detail
-    window.dispatchEvent(
-      new CustomEvent('navigateToJob', { detail: { jobId: data.jobId } })
-    );
-  } else if (data?.type === 'tutor') {
-    // Navigate to tutor detail
-    window.dispatchEvent(
-      new CustomEvent('navigateToTutor', { detail: { tutorId: data.tutorId } })
-    );
+  if (data?.type === 'job' || data?.jobId) {
+    window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'jobs' }));
   } else if (data?.type === 'alert') {
-    // Navigate to alerts
-    window.dispatchEvent(
-      new CustomEvent('navigateToAlerts')
-    );
+    window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'alerts' }));
   }
 }
 
