@@ -276,10 +276,10 @@ export default function App() {
       const isNative = Capacitor.isNativePlatform();
       const LEADS_URL = isNative 
         ? 'https://doableindia.com/api_data.php' 
-        : 'https://doableindia.com/api_data.php';
+        : '/api/leads';
       const TUTORS_URL = isNative 
         ? 'https://doableindia.com/api_data_copy.php' 
-        : 'https://doableindia.com/api_data_copy.php';
+        : '/api/tutors';
 
       const [leadsRes, tutorsRes] = await Promise.all([fetch(LEADS_URL), fetch(TUTORS_URL)]);
       const [leadsJson, tutorsJson] = await Promise.all([leadsRes.json(), tutorsRes.json()]);
