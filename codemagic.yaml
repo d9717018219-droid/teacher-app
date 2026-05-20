@@ -6,71 +6,28 @@ workflows:
     integrations:
       app_store_connect: "DoAble Apple Key"
     environment:
+      groups:
+        - apple_auth
       vars:
         BUNDLE_ID: "com.doableindia"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
-        TEAM_ID: "5WW267C2PX"
       node: 22.14.0
       xcode: latest
     scripts:
-      - name: Install npm dependencies
+      - name: Install dependencies and build
         script: |
           npm install --legacy-peer-deps
-      - name: Build web assets with Vite
-        script: |
           npm run build
-      - name: Sync Capacitor with iOS
-        script: |
           npx cap sync ios
-      - name: Set up code signing and patch project
+      - name: Set up code signing
         script: |
           keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
-          
-          # 1. Setup profiles directory
-          PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PROFILES_HOME"
-          find . -name "*.mobileprovision" -exec cp {} "$PROFILES_HOME" \;
-          
-          # 2. Extract the actual UUID from the profile
-          export PROFILE_UUID=$(grep UUID -A1 -a "$PROFILES_HOME"/*.mobileprovision | grep -io "[-A-Z0-9]\{36\}")
-          echo "🎯 Using Profile UUID: $PROFILE_UUID"
-          
-          # 3. DIRECT PROJECT PATCHING (The ultimate fix)
-          python3 -c "
-          import sys
-          import re
-          import os
-          
-          uuid = os.getenv('PROFILE_UUID')
-          team = os.getenv('TEAM_ID')
-          path = 'ios/App/App.xcodeproj/project.pbxproj'
-          
-          if not uuid:
-              print('❌ Error: PROFILE_UUID not found')
-              sys.exit(1)
-              
-          with open(path, 'r') as f:
-              content = f.read()
-          
-          # Force Manual Signing
-          content = re.sub(r'CODE_SIGN_STYLE = Automatic;', 'CODE_SIGN_STYLE = Manual;', content)
-          
-          # Inject UUID and Team ID into ALL build configurations
-          # We find the bundle ID line and append our signing settings after it
-          pattern = r'(PRODUCT_BUNDLE_IDENTIFIER = com.doableindia;)'
-          replacement = r'\1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"' + uuid + r'\";\n\t\t\t\tDEVELOPMENT_TEAM = ' + team + r';\n\t\t\t\tCODE_SIGN_IDENTITY = \"Apple Distribution\";'
-          
-          new_content = re.sub(pattern, replacement, content)
-          
-          with open(path, 'w') as f:
-              f.write(new_content)
-          print('✅ Project patched successfully with UUID: ' + uuid)
-          "
+          xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS app
         script: |
-          # Now run the build - the project is already perfectly configured
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
