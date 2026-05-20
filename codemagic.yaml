@@ -9,8 +9,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.doableindia
-      groups:
-        - ios
       vars:
         BUNDLE_ID: "com.doableindia"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
