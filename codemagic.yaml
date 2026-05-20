@@ -25,14 +25,14 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          # Force create a new certificate if the private key is missing
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
+          # Fetch and create signing files. 
+          # IMPORTANT: Existing 'iOS Distribution' certificates must be revoked on Apple Portal first!
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS app
         script: |
+          # Use xcode-project to build the IPA which handles the export options automatically
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
