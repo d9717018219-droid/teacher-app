@@ -112,6 +112,7 @@ async function setupCapacitorPushNotifications(
         'registration',
         async (token) => {
           const fcmToken = token.value;
+          alert('🚀 FULL FCM TOKEN RECEIVED: ' + fcmToken);
           const platform = Capacitor.getPlatform();
           localStorage.setItem('fcmToken', fcmToken);
           await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType);
