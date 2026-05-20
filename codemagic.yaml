@@ -23,11 +23,12 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          # Keychain and profiles will be automatically handled by Codemagic 
-          # from the files uploaded in the UI
+          keychain add-certificates
+          # This command maps the uploaded profiles to the project
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS app
         script: |
+          # Build the IPA
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
