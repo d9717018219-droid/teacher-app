@@ -23,39 +23,54 @@ workflows:
       - name: Sync Capacitor with iOS
         script: |
           npx cap sync ios
-      - name: Set up code signing
+      - name: Set up code signing and patch project
         script: |
           keychain initialize
           keychain add-certificates
           
-          # Force copy profiles to the correct location
+          # 1. Setup profiles directory
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
           find . -name "*.mobileprovision" -exec cp {} "$PROFILES_HOME" \;
           
-          # Extract UUID from the profile
+          # 2. Extract the actual UUID from the profile
           export PROFILE_UUID=$(grep UUID -A1 -a "$PROFILES_HOME"/*.mobileprovision | grep -io "[-A-Z0-9]\{36\}")
           echo "🎯 Using Profile UUID: $PROFILE_UUID"
           
-          # Save for next step
-          echo "export PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
+          # 3. DIRECT PROJECT PATCHING (The ultimate fix)
+          python3 -c "
+          import sys
+          import re
+          import os
           
-          # Apply to project
-          xcode-project use-profiles --project "$XCODE_PROJECT"
+          uuid = os.getenv('PROFILE_UUID')
+          team = os.getenv('TEAM_ID')
+          path = 'ios/App/App.xcodeproj/project.pbxproj'
+          
+          if not uuid:
+              print('❌ Error: PROFILE_UUID not found')
+              sys.exit(1)
+              
+          with open(path, 'r') as f:
+              content = f.read()
+          
+          # Force Manual Signing
+          content = re.sub(r'CODE_SIGN_STYLE = Automatic;', 'CODE_SIGN_STYLE = Manual;', content)
+          
+          # Inject UUID and Team ID into ALL build configurations
+          # We find the bundle ID line and append our signing settings after it
+          pattern = r'(PRODUCT_BUNDLE_IDENTIFIER = com.doableindia;)'
+          replacement = r'\1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"' + uuid + r'\";\n\t\t\t\tDEVELOPMENT_TEAM = ' + team + r';\n\t\t\t\tCODE_SIGN_IDENTITY = \"Apple Distribution\";'
+          
+          new_content = re.sub(pattern, replacement, content)
+          
+          with open(path, 'w') as f:
+              f.write(new_content)
+          print('✅ Project patched successfully with UUID: ' + uuid)
+          "
       - name: Build iOS app
         script: |
-          # Use explicit signing arguments to bypass all errors
-          xcodebuild -project "$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -archivePath build/ios/xcarchive/App.xcarchive \
-            archive \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            COMPILER_INDEX_STORE_ENABLE=NO | xcbeautify
-          
-          # Convert archive to IPA
+          # Now run the build - the project is already perfectly configured
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
