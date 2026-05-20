@@ -18,7 +18,7 @@ workflows:
           npm install --legacy-peer-deps
           npm run build
           npx cap sync ios
-      - name: Code signing
+      - name: Setup Signing
         script: |
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
@@ -26,6 +26,7 @@ workflows:
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS IPA
         script: |
+          xcodebuild clean -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME"
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
