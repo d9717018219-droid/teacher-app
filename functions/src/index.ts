@@ -200,6 +200,9 @@ export const sendAlertNotification = onDocumentCreated({
             tokens: registrationTokens,
         };
 
+        // Add logging to see what exactly we are sending
+        console.log("📤 Sending payload to APNS with sound: blackberry.caf (and default fallback)");
+
         const response = await admin.messaging().sendEachForMulticast(payload);
         console.log(`✅ Sent ${response.successCount} messages, ${response.failureCount} failed.`);
         
