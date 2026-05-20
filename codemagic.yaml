@@ -5,39 +5,37 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       groups:
-        environment:
-          groups:
-            - ios
-          vars:
-            BUNDLE_ID: "com.doableindia"
-            XCODE_PROJECT: "ios/App/App.xcodeproj"
-            XCODE_SCHEME: "App"
-          node: 22.14.0
-          xcode: latest
-        scripts:
-          - name: Install npm dependencies
-            script: |
-              npm install --legacy-peer-deps
-          - name: Build web assets with Vite
-            script: |
-              npm run build
-          - name: Sync Capacitor with iOS
-            script: |
-              npx cap sync ios
-          - name: Set up code signing
-            script: |
-              keychain initialize
-              # Force create a new certificate if the private key is missing
-              app-store-connect fetch-signing-files "$BUNDLE_ID" \
-                --type IOS_APP_STORE \
-                --create
-              keychain add-certificates
-              xcode-project use-profiles --project "$XCODE_PROJECT"
-          - name: Build iOS app
-            script: |
-              xcode-project build-ipa \
-                --project "$XCODE_PROJECT" \
-                --scheme "$XCODE_SCHEME"
-        artifacts:
-          - build/ios/ipa/*.ipa
-          - /tmp/xcodebuild_logs/*.log
+        - ios
+      vars:
+        BUNDLE_ID: "com.doableindia"
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
+        XCODE_SCHEME: "App"
+      node: 22.14.0
+      xcode: latest
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm install --legacy-peer-deps
+      - name: Build web assets with Vite
+        script: |
+          npm run build
+      - name: Sync Capacitor with iOS
+        script: |
+          npx cap sync ios
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          # Force create a new certificate if the private key is missing
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles --project "$XCODE_PROJECT"
+      - name: Build iOS app
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
