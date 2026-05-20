@@ -23,16 +23,12 @@ export const useNotifications = (
 ) => {
   useEffect(() => {
     const initializeNotifications = async () => {
-      if (Capacitor.isNativePlatform()) {
-        alert('DEBUG: Starting v1.0.134-B7');
-      }
-
       try {
         if (Capacitor.isNativePlatform()) {
-          // 1. Setup Push Notifications First (Most Important)
+          // 1. Setup Push Notifications
           await setupCapacitorPushNotifications(userCity, userGender, userClasses, userType);
           
-          // 2. Setup Local Channels (Optional, mostly for Android)
+          // 2. Setup Local Channels (Android focus)
           try {
             await LocalNotifications.createChannel({
               id: 'doable_channel_v6',
@@ -43,12 +39,9 @@ export const useNotifications = (
               visibility: 1,
               vibration: true,
             });
-            console.log('✅ Local Channel Created');
-          } catch (channelError) {
-            console.warn('⚠️ Channel Creation Error:', channelError);
-          }
+          } catch (e) {}
         } else {
-           // Web-Push Initialization
+           // Web-Push
            const permissionGranted = await requestNotificationPermission();
            if (permissionGranted) {
               initForegroundMessaging();
@@ -59,7 +52,6 @@ export const useNotifications = (
            }
         }
       } catch (error) {
-        alert('❌ GLOBAL ERROR: ' + String(error));
         console.error('❌ Error initializing notifications:', error);
       }
     };
@@ -68,9 +60,6 @@ export const useNotifications = (
   }, [userCity, userGender, userClasses, userType]);
 };
 
-/**
- * Save token to Firestore with user preferences
- */
 async function saveTokenToFirestore(
   token: string, 
   platform: string,
@@ -91,24 +80,18 @@ async function saveTokenToFirestore(
       gender: gender || 'Any',
       targetClass: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All',
       targetUserType: userType || 'all',
-      appVersion: '1.0.134-DIAGNOSTIC-B7',
+      appVersion: '1.1.0-PRODUCTION',
       lastSeen: new Date().toISOString()
     };
 
     const sanitizedId = token.replace(/[\/\.]/g, '_');
     await setDoc(doc(db, 'fcm_tokens', sanitizedId), tokenData, { merge: true });
-    
-    // Dispatch event to update UI with token
     window.dispatchEvent(new CustomEvent('fcmTokenUpdated', { detail: token }));
   } catch (e) {
-    console.error('❌ Error saving token to Firestore:', e);
-    window.dispatchEvent(new CustomEvent('fcmRegistrationError', { detail: String(e) }));
+    console.error('❌ Error saving token:', e);
   }
 }
 
-/**
- * Setup Capacitor Push Notifications for native platforms
- */
 async function setupCapacitorPushNotifications(
   city: string,
   gender: string,
@@ -116,22 +99,19 @@ async function setupCapacitorPushNotifications(
   userType: string
 ) {
   try {
-    alert('DEBUG: Requesting Push Permissions...');
     const result = await PushNotifications.requestPermissions();
-    alert('DEBUG: Permission Result = ' + result.receive);
 
     if (result.receive === 'granted') {
       await PushNotifications.removeAllListeners();
 
       await PushNotifications.addListener('registrationError', (error) => {
-        alert('❌ Push Reg Error: ' + JSON.stringify(error));
+        console.error('❌ Push Registration Error:', error);
       });
 
       await PushNotifications.addListener(
         'registration',
         async (token) => {
           const fcmToken = token.value;
-          alert('✅ Token Received: ' + fcmToken.substring(0, 10) + '...');
           const platform = Capacitor.getPlatform();
           localStorage.setItem('fcmToken', fcmToken);
           await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType);
@@ -141,7 +121,6 @@ async function setupCapacitorPushNotifications(
       await PushNotifications.addListener(
         'pushNotificationReceived',
         (notification) => {
-          // Foreground notification handling
           window.dispatchEvent(new CustomEvent('firebaseNotification', { detail: notification }));
           showLocalNotification(
             notification.title || 'New Job Alert 🆕',
@@ -158,18 +137,12 @@ async function setupCapacitorPushNotifications(
       );
 
       await PushNotifications.register();
-      alert('DEBUG: Push Registered Successfully');
-    } else {
-      alert('⚠️ Push Permission Denied by User');
     }
   } catch (error) {
-    alert('❌ Push Setup Crash: ' + String(error));
+    console.error('❌ Push Setup Error:', error);
   }
 }
 
-/**
- * Show local notification
- */
 async function showLocalNotification(title: string, body: string) {
   try {
     await LocalNotifications.schedule({
@@ -178,22 +151,15 @@ async function showLocalNotification(title: string, body: string) {
           title,
           body,
           id: Math.floor(Math.random() * 10000),
-          schedule: {
-            at: new Date(Date.now() + 500)
-          },
+          schedule: { at: new Date(Date.now() + 500) },
           sound: 'blackberry.mp3',
           channelId: 'doable_channel_v6'
         }
       ]
     });
-  } catch (error) {
-    console.error('Error showing local notification:', error);
-  }
+  } catch (e) {}
 }
 
-/**
- * Handle notification action/tap
- */
 function handleNotificationAction(data: any) {
   if (data?.type === 'job' || data?.jobId) {
     window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'jobs' }));
