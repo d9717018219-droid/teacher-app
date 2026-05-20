@@ -3,6 +3,8 @@ workflows:
     name: DoAble India iOS Build
     max_build_duration: 90
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: "DoAble Apple Key"
     environment:
       vars:
         BUNDLE_ID: "com.doableindia"
@@ -24,11 +26,14 @@ workflows:
         script: |
           keychain initialize
           keychain add-certificates
-          # This command maps the uploaded profiles to the project
+          # Manually find and use the provisioning profile
+          PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_HOME"
+          find . -name "*.mobileprovision" -exec cp {} "$PROFILES_HOME" \;
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS app
         script: |
-          # Build the IPA
+          # Final build command
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
