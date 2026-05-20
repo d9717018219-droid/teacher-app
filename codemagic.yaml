@@ -25,8 +25,8 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          # Fetch signing files and capture output
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --project "$XCODE_PROJECT" --type IOS_APP_STORE --create
+          # Fetch signing files for the bundle ID
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
           echo "🔍 Verifying Provisioning Profiles..."
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
