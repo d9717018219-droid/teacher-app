@@ -62,3 +62,4 @@ export interface Alert {
 }
 
 export type UserType = 'parent' | 'teacher';
+export type UserGender = 'Male' | 'Female' | 'All';

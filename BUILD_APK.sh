@@ -37,11 +37,19 @@ if [ -z "$ANDROID_HOME" ]; then
 fi
 
 # Build project
+echo "🔨 Building Web Project..."
+npm run build
+
+echo "🔄 Syncing with Capacitor..."
+npx cap copy android
+
 echo "🔨 Building Android APK..."
 echo "This may take 2-5 minutes..."
 echo ""
 
-cd /Users/deepak/Downloads/DoAble-India-App/android
+# Get the directory of the script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR/android"
 
 # Make gradlew executable
 chmod +x ./gradlew

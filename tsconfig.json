@@ -22,5 +22,6 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": ["src_1215_backup", "src_backup", "src_backup_temp", "src_notifications_v119", "node_modules"]
 }

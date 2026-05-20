@@ -98,3 +98,14 @@ export function getTutorId(tutor: any): string {
   if (!tutor) return 'N/A';
   return (tutor['Tutor ID'] || tutor.tutorId || tutor.id || tutor.ID || 'N/A').toString();
 }
+
+/**
+ * Robust WhatsApp redirection for mobile apps
+ */
+export function openWhatsApp(text: string) {
+  const phone = '9971969197';
+  const url = `https://wa.me/91${phone}?text=${encodeURIComponent(text)}`;
+  
+  // '_system' tells Capacitor to open the URL in the system browser/app
+  window.open(url, '_system');
+}

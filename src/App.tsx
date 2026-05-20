@@ -1,21 +1,28 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe } from 'lucide-react';
+import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle } from 'lucide-react';
 import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db, auth, auth as firebaseAuth } from './firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
-import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { Capacitor } from '@capacitor/core';
+import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { motion, AnimatePresence } from 'framer-motion';
 import { JobLead, TutorProfile, Alert, UserType } from './types';
-import { JobCard } from './components/JobCard';
-import { TutorCard } from './components/TutorCard';
 import AlertsView from './components/AlertsView';
 import AdminPanel from './components/AdminPanel';
+import PasscodeLogin from './components/PasscodeLogin';
 import SupportView from './components/SupportView';
 import HomeView from './components/HomeView';
-import useNotifications from './hooks/useNotifications';
-import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId } from './utils';
+import { JobsView } from './components/JobsView';
+import { TutorsView } from './components/TutorsView';
+import { EarningsView } from './components/EarningsView';
+import { ParentHubView } from './components/ParentHubView';
+
+import { requestNotificationPermission } from './firebase';
+import { useNotifications } from './hooks/useNotifications';
+import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp } from './utils';
 import { 
   CITIES_LIST, 
   CLASSES_LIST,
@@ -76,47 +83,88 @@ export default function App() {
   const [userSubjects, setUserSubjects] = useState<string[]>(JSON.parse(localStorage.getItem('userSubjects') || '[]'));
   const [userLocalities, setUserLocalities] = useState<string[]>(JSON.parse(localStorage.getItem('userLocalities') || '[]'));
 
-  // Separate states for active list filters (so profile settings don't restrict browsing)
-  const [filterClasses, setFilterClasses] = useState<string[]>([]);
-  const [filterGender, setFilterGender] = useState<string>('All');
-  const [filterLocalities, setFilterLocalities] = useState<string[]>([]);
+  // Job Filters
+  const [jobFilterClasses, setJobFilterClasses] = useState<string[]>([]);
+  const [jobFilterGender, setJobFilterGender] = useState<string>('All');
+  const [jobFilterLocalities, setJobFilterLocalities] = useState<string[]>([]);
+  const [jobCityFilter, setJobCityFilter] = useState(localStorage.getItem('userCity') || 'all');
+  const [jobSearchQuery, setJobSearchQuery] = useState('');
+  const [jobSortBy, setJobSortBy] = useState<'newest' | 'fee_high' | 'fee_low' | 'verified'>('newest');
+
+  // Tutor Filters
+  const [tutorFilterClasses, setTutorFilterClasses] = useState<string[]>([]);
+  const [tutorFilterGender, setTutorFilterGender] = useState<string>('All');
+  const [tutorFilterLocalities, setTutorFilterLocalities] = useState<string[]>([]);
+  const [tutorCityFilter, setTutorCityFilter] = useState(localStorage.getItem('userCity') || 'all');
+  const [tutorSearchQuery, setTutorSearchQuery] = useState('');
+  const [tutorSortBy, setTutorSortBy] = useState<'newest' | 'fee_high' | 'fee_low' | 'verified'>('newest');
 
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cityFilter, setCityFilter] = useState(localStorage.getItem('userCity') || 'all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'fee_high'>('newest');
   
   const [showAdvancedFilterDrawer, setShowAdvancedFilterDrawer] = useState(false);
   const [showQuickPicker, setShowQuickPicker] = useState<'city' | 'locality' | 'class' | 'gender' | null>(null);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [formType, setFormType] = useState<'teacher' | 'parent'>('teacher');
-  const [activeTab, setActiveTab] = useState<'home' | 'jobs' | 'tutors' | 'alerts' | 'payments' | 'support' | 'admin'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'jobs' | 'tutors' | 'alerts' | 'support' | 'admin' | 'earnings' | 'concierge'>('home');
   const [alertsInitialTab, setAlertsInitialTab] = useState<'feed' | 'support' | 'setup'>('feed');
+  const [unseenAlertsCount, setUnseenAlertsCount] = useState(0);
+  const [activeToast, setActiveToast] = useState<{ title: string, body: string } | null>(null);
+  const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [tutorStatus, setTutorStatus] = useState<'registered' | 'new' | null>(null);
+  
+  // Profile Auto-fill Logic
+  const [tutorIdInput, setTutorIdInput] = useState('');
+  const [isFetchingTutor, setIsFetchingTutor] = useState(false);
+  const [tutorFetchError, setTutorFetchError] = useState<string | null>(null);
+  const [isTutorFetched, setIsTutorFetched] = useState(false);
+
+  const fetchTutorDetails = () => {
+    if (!tutorIdInput.trim()) return;
+    setIsFetchingTutor(true);
+    setTutorFetchError(null);
+
+    setTimeout(() => {
+      const tutor = tutors.find(t => {
+        const tid = (t['Tutor ID'] || (t as any).tutorId || (t as any).id || '').toString().toLowerCase().trim();
+        return tid === tutorIdInput.toLowerCase().trim();
+      });
+
+      if (tutor) {
+        playTapSound();
+        const name = (tutor['Full Name'] || (tutor as any).fullName || tutor.Name || '').toString();
+        const gender = (tutor.Gender || (tutor as any).gender || 'Male').toString();
+        const city = (tutor['Preferred City'] || (tutor as any).preferredCity || (tutor as any).City || 'Ghaziabad').toString();
+        const classGroup = (tutor['Preferred Class Group'] || (tutor as any).preferredClassGroup || (tutor as any).classGroup || '').toString();
+
+        setUserName(toTitleCase(name));
+        setUserGender(toTitleCase(gender));
+        setUserCity(toTitleCase(city));
+        
+        // Match Class Groups
+        const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
+        const matchedGroups = groups.filter(g => classGroup.toLowerCase().includes(g.toLowerCase().replace('class ', '')));
+        if (matchedGroups.length > 0) setUserClasses(matchedGroups);
+        
+        // Save to LocalStorage
+        localStorage.setItem('userName', toTitleCase(name));
+        localStorage.setItem('userGender', toTitleCase(gender));
+        localStorage.setItem('userCity', toTitleCase(city));
+        if (matchedGroups.length > 0) localStorage.setItem('userClasses', JSON.stringify(matchedGroups));
+        
+        setIsTutorFetched(true);
+        setTutorIdInput('');
+      } else {
+        setTutorFetchError('Tutor ID not found.');
+      }
+      setIsFetchingTutor(false);
+    }, 800);
+  };
 
   const mainScrollRef = useRef<HTMLDivElement>(null);
-  useNotifications(userCity, userGender || 'All', userClasses, userType || 'all');
-
-  useEffect(() => {
-    const handleNav = (e: any) => {
-      if (e.detail) setActiveTab(e.detail);
-    };
-    window.addEventListener('navigateToTab', handleNav);
-    return () => window.removeEventListener('navigateToTab', handleNav);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('userCity', cityFilter);
-  }, [cityFilter]);
-
-  const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [unseenAlertsCount, setUnseenAlertsCount] = useState(0);
-  const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
-  
-  const ALERT_JINGLE = '/blackberry.mp3';
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const isFirstAlertLoad = useRef(true);
   const audioUnlocked = useRef(false);
 
   useEffect(() => {
@@ -139,30 +187,121 @@ export default function App() {
     };
   }, []);
 
+  // Notifications are handled by the useNotifications hook below
+  useNotifications(userCity, userGender || 'All', userClasses, userType || 'all');
+
   useEffect(() => {
-    const qAlerts = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(1));
-    const unsubAlerts = onSnapshot(qAlerts, (snap) => {
-      if (isFirstAlertLoad.current) {
-        isFirstAlertLoad.current = false;
-        return;
-      }
-      if (!snap.empty) {
-        // Play sound in foreground (both web and native)
-        if (audioRef.current) {
-          audioRef.current.src = ALERT_JINGLE;
-          audioRef.current.load();
-          audioRef.current.play().catch(e => console.log('In-app audio play failed:', e));
-        }
-        setUnseenAlertsCount(prev => prev + 1);
-      }
-    });
-    return () => unsubAlerts();
+    const handleNav = (e: any) => {
+      if (e.detail) setActiveTab(e.detail);
+    };
+    window.addEventListener('navigateToTab', handleNav);
+    return () => window.removeEventListener('navigateToTab', handleNav);
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('userCity', userCity);
+  }, [userCity]);
+
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
+
+  const isAlertsInitialLoad = useRef(true);
+
+  useEffect(() => {
+    console.log('🔄 Starting Global Alerts Listener...');
+    setAlertsError(null);
+    
+    try {
+      const q = query(collection(db, 'alerts'), limit(150));
+      const unsub = onSnapshot(q, (snapshot) => {
+        console.log(`📡 Alerts Update: ${snapshot.size} docs received`);
+        if (snapshot.empty) {
+          console.log('⚠️ Alerts collection is EMPTY on server.');
+        }
+        const alertsData = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .sort((a: any, b: any) => {
+            const tA = a.timestamp?.toMillis?.() ?? (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+            const tB = b.timestamp?.toMillis?.() ?? (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
+            return tB - tA;
+          }) as Alert[];
+        
+        // Handle unseen count for new additions
+        if (!isAlertsInitialLoad.current) {
+          const newAlerts = snapshot.docChanges().filter(change => change.type === 'added');
+          if (newAlerts.length > 0) {
+            newAlerts.forEach(change => {
+               const data = change.doc.data();
+               const alertCity = (data.city || data.City || 'All').toLowerCase();
+               const currentUserCity = (userCity || 'all').toLowerCase();
+               
+               if (currentUserCity === 'all' || alertCity === 'all' || alertCity === currentUserCity) {
+                 setUnseenAlertsCount(prev => prev + 1);
+                 playTapSound(); // Or blackberry sound if available
+               }
+            });
+          }
+        } else {
+          isAlertsInitialLoad.current = false;
+        }
+
+        setAlerts(alertsData);
+        setAlertsLoading(false);
+        setAlertsError(null);
+      }, (err) => {
+        setDbStatus('Error');
+        console.error('❌ Firestore Alerts Error:', err);
+        setAlertsError(`${err.code}: ${err.message}`);
+        setAlertsLoading(false);
+      });
+      return () => unsub();
+    } catch (e: any) {
+      setAlertsError(e.message);
+      setAlertsLoading(false);
+    }
+  }, [userCity]); // Re-subscribe if userCity changes for filtering logic within listener if needed
+
   const [debugClicks, setDebugClicks] = useState(0);
-  const [fcmToken, setFcmToken] = useState<string>('Not registered');
+  const [fcmToken, setFcmToken] = useState<string>(localStorage.getItem('fcmToken') || 'Initializing...');
   const [registrationStatus, setRegistrationStatus] = useState<string>('Initializing...');
   const [dbStatus, setDbStatus] = useState<'Checking...' | 'Connected' | 'Error'>('Checking...');
+  const [isServerData, setIsServerData] = useState(false);
+
+  useEffect(() => {
+    const handleTokenUpdate = (e: any) => {
+      setFcmToken(e.detail);
+      setRegistrationStatus('Registered ✅');
+    };
+
+    const playBlackberrySound = () => {
+      if (audioRef.current) {
+        audioRef.current.src = '/blackberry.mp3';
+        audioRef.current.play().catch(err => console.error('Audio play error:', err));
+      }
+    };
+
+    const handleForegroundPush = (e: any) => {
+      console.log('🔔 Foreground Notification Event:', e.detail);
+      setUnseenAlertsCount(prev => prev + 1);
+
+      const payload = e.detail;
+      const title = payload.notification?.title || payload.data?.title || 'New Alert 📢';
+      const body = payload.notification?.body || payload.data?.body || 'A new update is available in the network.';
+
+      setActiveToast({ title, body });
+      setTimeout(() => setActiveToast(null), 6000);
+      playBlackberrySound();
+    };
+
+    window.addEventListener('fcmTokenUpdated', handleTokenUpdate);
+    window.addEventListener('firebaseNotification', handleForegroundPush);
+
+    return () => {
+      window.removeEventListener('fcmTokenUpdated', handleTokenUpdate);
+      window.removeEventListener('firebaseNotification', handleForegroundPush);
+    };
+  }, [userCity]);
 
   const testAlertSound = async () => {
     try {
@@ -188,93 +327,6 @@ export default function App() {
     }
   };
 
-  const registerPushNotifications = async () => {
-    if (!Capacitor.isNativePlatform()) {
-      setFcmToken('Web (Not supported for push)');
-      setRegistrationStatus('Web Mode');
-      return;
-    }
-    try {
-      setRegistrationStatus('Checking Permissions...');
-      let perm = await PushNotifications.checkPermissions();
-      if (perm.receive !== 'granted') {
-        setRegistrationStatus('Requesting Permissions...');
-        perm = await PushNotifications.requestPermissions();
-      }
-
-      if (perm.receive === 'granted') {
-        setRegistrationStatus('Creating Channel...');
-        await PushNotifications.createChannel({
-          id: 'doable_channel_v6',
-          name: 'Tuition Alerts',
-          description: 'Custom sound alerts for tuition jobs',
-          sound: 'blackberry',
-          importance: 5,
-          visibility: 1,
-          vibration: true,
-        });
-
-        setRegistrationStatus('Registering...');
-        await PushNotifications.register();
-
-        PushNotifications.removeAllListeners();
-
-        PushNotifications.addListener('registration', async (token) => {
-          let cleanToken = token.value;
-          if (cleanToken.includes(':')) {
-            cleanToken = cleanToken.split(':')[1].trim();
-          }
-          console.log('Cleaned FCM Token:', cleanToken);
-          setFcmToken(cleanToken);
-          setRegistrationStatus('Registered ✅');
-          
-          const tokenData = {
-            token: cleanToken,
-            lastUpdated: serverTimestamp(),
-            platform: 'android',
-            city: userCity || 'All',
-            gender: userGender || 'Any',
-            targetClass: Array.isArray(userClasses) && userClasses.length > 0 ? userClasses.join(', ') : 'All',
-            targetUserType: userType || 'all',
-            appVersion: '1.0.121_v95_compat'
-          };
-
-          // Save to named database
-          await setDoc(doc(db, 'fcm_tokens', cleanToken), tokenData, { merge: true });
-        });
-        PushNotifications.addListener('registrationError', (error) => {
-          console.error('Push Registration Error:', error);
-          setFcmToken('Error: ' + JSON.stringify(error));
-          setRegistrationStatus('Registration Failed ❌');
-        });
-
-        PushNotifications.addListener('pushNotificationReceived', (notification) => {
-          console.log('Push received in foreground:', notification);
-          setUnseenAlertsCount(prev => prev + 1);
-          if (audioRef.current) {
-            audioRef.current.src = '/blackberry.mp3';
-            audioRef.current.play().catch(() => {});
-          }
-        });
-
-        PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-          setActiveTab('alerts');
-        });
-      } else {
-        setRegistrationStatus('Permission Denied');
-      }
-    } catch (e) {
-      console.error('Push Setup Error:', e);
-      setFcmToken('Init Error: ' + e);
-      setRegistrationStatus('Setup Error ❌');
-    }
-  };
-
-  useEffect(() => {
-    registerPushNotifications();
-    // Check DB connection
-    getDoc(doc(db, 'test', 'connection')).then(() => setDbStatus('Connected')).catch(() => setDbStatus('Connected'));
-  }, []);
   const [selectedJob, setSelectedJob] = useState<JobLead | null>(null);
   const [selectedTutor, setSelectedTutor] = useState<TutorProfile | null>(null);
 
@@ -282,8 +334,8 @@ export default function App() {
     try {
       if (leads.length === 0 && tutors.length === 0) setLoading(true);
       
-      // Use proxy in development, direct URL on native/production
       const isNative = Capacitor.isNativePlatform();
+
       const LEADS_URL = isNative 
         ? 'https://doableindia.com/api_data.php' 
         : '/api/leads';
@@ -291,30 +343,110 @@ export default function App() {
         ? 'https://doableindia.com/api_data_copy.php' 
         : '/api/tutors';
 
-      const [leadsRes, tutorsRes] = await Promise.all([fetch(LEADS_URL), fetch(TUTORS_URL)]);
-      const [leadsJson, tutorsJson] = await Promise.all([leadsRes.json(), tutorsRes.json()]);
-      if (leadsJson.status === 'success') setLeads(leadsJson.data);
-      if (tutorsJson.status === 'success') setTutors(tutorsJson.data);
+      if (isNative) {
+        // Use native fetch to bypass CORS
+        const [leadsRes, tutorsRes] = await Promise.all([
+          CapacitorHttp.get({ url: LEADS_URL }),
+          CapacitorHttp.get({ url: TUTORS_URL })
+        ]);
+        
+        if (leadsRes.data) {
+           const data = typeof leadsRes.data === 'string' ? JSON.parse(leadsRes.data) : leadsRes.data;
+           if (data.status === 'success') setLeads(data.data);
+           else if (Array.isArray(data)) setLeads(data);
+        }
+
+        if (tutorsRes.data) {
+           const data = typeof tutorsRes.data === 'string' ? JSON.parse(tutorsRes.data) : tutorsRes.data;
+           if (data.status === 'success') setTutors(data.data);
+           else if (Array.isArray(data)) setTutors(data);
+        }
+      } else {
+        const [leadsRes, tutorsRes] = await Promise.all([fetch(LEADS_URL), fetch(TUTORS_URL)]);
+        const [leadsJson, tutorsJson] = await Promise.all([leadsRes.json(), tutorsRes.json()]);
+        if (leadsJson.status === 'success') setLeads(leadsJson.data);
+        if (tutorsJson.status === 'success') setTutors(tutorsJson.data);
+      }
     } catch (err) {
-      console.error('Error loading data:', err);
+      console.error('❌ Error loading data:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize({
+        clientId: '237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com',
+        scopes: ['profile', 'email'],
+      });
+    }
     loadData();
     const qLeads = query(collection(db, 'leads'), orderBy('Updated Time', 'desc'), limit(50));
     const unsubscribeLeads = onSnapshot(qLeads, (snapshot) => {
+      setDbStatus('Connected');
+      setIsServerData(!snapshot.metadata.fromCache);
       const leadsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown as JobLead[];
       setFirestoreLeads(leadsData);
+    }, (err) => {
+      console.error('❌ Leads Firestore Error:', err);
+      setDbStatus('Error');
     });
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => { setCurrentUser(user); });
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => { 
+      console.log('Auth State Changed:', user ? user.email : 'No User');
+      setCurrentUser(user); 
+    });
     return () => { unsubscribeLeads(); unsubscribeAuth(); };
   }, []);
 
+  const handleSignIn = async () => {
+    try {
+      playTapSound();
+      console.log('🔄 handleSignIn started...');
+      
+      if (Capacitor.isNativePlatform()) {
+        console.log('📱 Native Platform: Initializing GoogleAuth.signIn()...');
+        const user = await GoogleAuth.signIn();
+        console.log('✅ GoogleAuth.signIn() Success:', JSON.stringify(user));
+        
+        if (!user.authentication.idToken) {
+          console.error('❌ No idToken in user.authentication');
+          alert('Error: idToken missing from Google response.');
+          return;
+        }
+
+        console.log('🔥 Firebase: signInWithCredential starting...');
+        const credential = GoogleAuthProvider.credential(user.authentication.idToken);
+        const result = await signInWithCredential(auth, credential);
+        console.log('🎉 Firebase: Login Success!', result.user.email);
+        alert('Welcome! Signed in as: ' + result.user.email);
+      } else {
+        console.log('🌐 Web Platform: signInWithPopup starting...');
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        console.log('🎉 Firebase: Web Login Success!', result.user.email);
+      }
+    } catch (err: any) {
+      console.error('❌ Sign-in Error:', err);
+      let errorMsg = 'Unknown Error';
+      
+      if (typeof err === 'object') {
+        errorMsg = err.message || err.error || JSON.stringify(err);
+      } else {
+        errorMsg = String(err);
+      }
+      
+      alert('Sign-in failed!\n\nError: ' + errorMsg);
+      
+      if (errorMsg.includes('10:') || errorMsg.includes('DEVELOPER_ERROR')) {
+        alert('DEBUG HINT: This is usually a SHA-1 or Client ID mismatch in Firebase/Google Console.');
+      }
+    }
+  };
+
   const isAdminUser = useMemo(() => {
-    return currentUser?.email === 'd9717018219@gmail.com' || currentUser?.email === 'doableindia@gmail.com';
+    const email = currentUser?.email?.toLowerCase().trim();
+    return email === 'd9717018219@gmail.com' || email === 'doableindia@gmail.com';
   }, [currentUser]);
 
   const toggleShortlist = useCallback((id: string, e?: React.MouseEvent) => {
@@ -327,15 +459,26 @@ export default function App() {
     });
   }, []);
 
-  const clearFilters = () => {
+  const clearJobsFilters = () => {
     playTapSound();
-    setCityFilter('all');
-    setFilterLocalities([]);
-    setFilterClasses([]);
-    setFilterGender('All');
-    setSearchQuery('');
-    resetCounts();
+    setJobCityFilter('all');
+    setJobFilterLocalities([]);
+    setJobFilterClasses([]);
+    setJobFilterGender('All');
+    setJobSearchQuery('');
+    setVisibleJobsCount(10);
   };
+
+  const clearTutorsFilters = () => {
+    playTapSound();
+    setTutorCityFilter('all');
+    setTutorFilterLocalities([]);
+    setTutorFilterClasses([]);
+    setTutorFilterGender('All');
+    setTutorSearchQuery('');
+    setVisibleTutorsCount(10);
+  };
+
   const isCityMatch = useCallback((city: string | undefined, filter: string) => {
     if (!city || filter.toLowerCase() === 'all') return true;
     const c = city.toString().toLowerCase().trim();
@@ -349,70 +492,96 @@ export default function App() {
   const finalJobs = useMemo(() => {
     const combined = [...firestoreLeads, ...leads];
     const unique = new Map<string, JobLead>();
-    combined.forEach(l => { 
-      const id = l['Order ID'] || (l as any).id; 
-      if (id && !unique.has(id)) unique.set(id, l); 
+    combined.forEach(l => {
+      const id = l['Order ID'] || (l as any).id;
+      if (id && !unique.has(id)) unique.set(id, l);
     });
     let result = Array.from(unique.values());
-    
+
     return result.filter(l => {
       if ((l['Internal Remark'] || '').trim().toLowerCase() !== 'searching') return false;
-      if (!isCityMatch(l.City, cityFilter)) return false;
-      
+      if (!isCityMatch(l.City, jobCityFilter)) return false;
+
       // Localities Filter
-      if (filterLocalities.length > 0) {
+      if (jobFilterLocalities.length > 0) {
         const jobLocs = (l.Locations || '').toLowerCase();
-        if (!filterLocalities.some(loc => jobLocs.includes(loc.toLowerCase()))) return false;
+        if (!jobFilterLocalities.some(loc => jobLocs.includes(loc.toLowerCase()))) return false;
       }
 
       // Classes Filter
-      if (filterClasses.length > 0) {
+      if (jobFilterClasses.length > 0) {
         const jobClass = (l.Class || '').toLowerCase();
-        if (!filterClasses.some(cls => jobClass.includes(cls.toLowerCase()))) return false;
+        if (!jobFilterClasses.some(cls => jobClass.includes(cls.toLowerCase()))) return false;
       }
 
       // Gender Filter
-      if (filterGender !== 'All') {
+      if (jobFilterGender !== 'All') {
         const jobGender = (l.Gender || '').toLowerCase();
-        if (!jobGender.includes(filterGender.toLowerCase()) && !jobGender.includes('any')) return false;
+        if (!jobGender.includes(jobFilterGender.toLowerCase()) && !jobGender.includes('any')) return false;
       }
 
-      if (searchQuery) {
-        const sl = searchQuery.toLowerCase();
+      if (jobSearchQuery) {
+        const sl = jobSearchQuery.toLowerCase();
         const jName = (l.Name || '').toLowerCase();
         const jID = (l['Order ID'] || '').toString().toLowerCase();
         const subjects = (l.subjects || '').toLowerCase();
         if (!(jName.includes(sl) || jID.includes(sl) || subjects.includes(sl))) return false;
       }
       return true;
+    }).sort((a, b) => {
+      if (jobSortBy === 'fee_high' || jobSortBy === 'fee_low') {
+        const fA = parseInt((a.Fee || (a as any)['Fee/Month'] || '0').toString().replace(/[^0-9]/g, '')) || 0;
+        const fB = parseInt((b.Fee || (b as any)['Fee/Month'] || '0').toString().replace(/[^0-9]/g, '')) || 0;
+        return jobSortBy === 'fee_high' ? fB - fA : fA - fB;
+      }
+      if (jobSortBy === 'verified') {
+        const vA = (a as any).verified === 'yes' ? 1 : 0;
+        const vB = (b as any).verified === 'yes' ? 1 : 0;
+        return vB - vA;
+      }
+      
+      const parseJobDate = (d: any) => {
+        if (!d) return 0;
+        if (typeof d === 'string') {
+          if (d === '0000-00-00 00:00:00') return 0;
+          return new Date(d.replace(/-/g, "/")).getTime() || 0;
+        }
+        if (d && typeof d === 'object' && 'seconds' in d) return d.seconds * 1000;
+        return new Date(d).getTime() || 0;
+      };
+
+      const dateA = parseJobDate(a['Updated Time'] || a['Record Added']);
+      const dateB = parseJobDate(b['Updated Time'] || b['Record Added']);
+      
+      return dateB - dateA;
     });
-  }, [leads, firestoreLeads, cityFilter, searchQuery, isCityMatch, filterLocalities, filterClasses, filterGender]);
+  }, [leads, firestoreLeads, jobCityFilter, jobSearchQuery, isCityMatch, jobFilterLocalities, jobFilterClasses, jobFilterGender, jobSortBy]);
 
   const finalTutors = useMemo(() => {
     return tutors.filter(t => {
       const cityVal = (t['Preferred City'] || (t as any).preferredCity || (t as any).City || (t as any).city || 'India').toString().toLowerCase();
-      if (!isCityMatch(cityVal, cityFilter)) return false;
-      
+      if (!isCityMatch(cityVal, tutorCityFilter)) return false;
+
       // Localities Filter
-      if (filterLocalities.length > 0) {
+      if (tutorFilterLocalities.length > 0) {
         const tutorLocs = (t['Preferred Location(s)'] || '').toLowerCase();
-        if (!filterLocalities.some(loc => tutorLocs.includes(loc.toLowerCase()))) return false;
+        if (!tutorFilterLocalities.some(loc => tutorLocs.includes(loc.toLowerCase()))) return false;
       }
 
       // Classes Filter
-      if (filterClasses.length > 0) {
+      if (tutorFilterClasses.length > 0) {
         const tutorClass = (t['Preferred Class Group'] || '').toLowerCase();
-        if (!filterClasses.some(cls => tutorClass.includes(cls.toLowerCase()))) return false;
+        if (!tutorFilterClasses.some(cls => tutorClass.includes(cls.toLowerCase()))) return false;
       }
 
       // Gender Filter
-      if (filterGender !== 'All') {
+      if (tutorFilterGender !== 'All') {
         const tutorGender = (t.Gender || '').toLowerCase();
-        if (!tutorGender.includes(filterGender.toLowerCase())) return false;
+        if (!tutorGender.includes(tutorFilterGender.toLowerCase())) return false;
       }
 
-      if (searchQuery) {
-        const sl = searchQuery.toLowerCase();
+      if (tutorSearchQuery) {
+        const sl = tutorSearchQuery.toLowerCase();
         const tName = (t['Full Name'] || (t as any).fullName || (t.Name || '')).toLowerCase();
         const tID = (t['Tutor ID'] || (t as any).tutorId || '').toString().toLowerCase();
         const skills = (t.Skills || '').toLowerCase();
@@ -420,15 +589,51 @@ export default function App() {
       }
       return true;
     }).sort((a, b) => {
-      const dateA = new Date(a['Record Added'] || 0).getTime();
-      const dateB = new Date(b['Record Added'] || 0).getTime();
+      if (tutorSortBy === 'verified') {
+        const vA = a.Verified === 'Yes' ? 1 : 0;
+        const vB = b.Verified === 'Yes' ? 1 : 0;
+        if (vA !== vB) return vB - vA;
+      }
+
+      if (tutorSortBy === 'fee_high' || tutorSortBy === 'fee_low') {
+        const fA = parseInt(a['Fee/Month']?.replace(/[^0-9]/g, '') || '0');
+        const fB = parseInt(b['Fee/Month']?.replace(/[^0-9]/g, '') || '0');
+        return tutorSortBy === 'fee_high' ? fB - fA : fA - fB;
+      }
+
+      const idA = parseInt((a['Tutor ID'] || a.tutorId || '0').toString().replace(/[^0-9]/g, ''));
+      const idB = parseInt((b['Tutor ID'] || b.tutorId || '0').toString().replace(/[^0-9]/g, ''));
+      if (idB !== idA) return idB - idA;
+
+      const parseTutorDate = (d: any) => {
+        if (!d) return 0;
+        if (typeof d === 'string') {
+          if (d === '0000-00-00 00:00:00') return 0;
+          return new Date(d.replace(/-/g, "/")).getTime() || 0;
+        }
+        if (d && typeof d === 'object' && 'seconds' in d) return d.seconds * 1000;
+        return new Date(d).getTime() || 0;
+      };
+
+      const dateA = parseTutorDate(a['Record Added']);
+      const dateB = parseTutorDate(b['Record Added']);
       return dateB - dateA;
     });
-  }, [tutors, cityFilter, searchQuery, isCityMatch, filterLocalities, filterClasses, filterGender]);
-
+  }, [tutors, tutorCityFilter, tutorSearchQuery, isCityMatch, tutorFilterLocalities, tutorFilterClasses, tutorFilterGender, tutorSortBy]);
   const [visibleJobsCount, setVisibleJobsCount] = useState(10);
   const [visibleTutorsCount, setVisibleTutorsCount] = useState(10);
   const resetCounts = () => { setVisibleJobsCount(10); setVisibleTutorsCount(10); };
+
+  const isJobs = activeTab === 'jobs';
+  const currentCityFilter = isJobs ? jobCityFilter : tutorCityFilter;
+  const setCityFilter = isJobs ? setJobCityFilter : setTutorCityFilter;
+  const currentFilterLocalities = isJobs ? jobFilterLocalities : tutorFilterLocalities;
+  const setFilterLocalities = isJobs ? setJobFilterLocalities : setTutorFilterLocalities;
+  const currentFilterClasses = isJobs ? jobFilterClasses : tutorFilterClasses;
+  const setFilterClasses = isJobs ? setJobFilterClasses : setTutorFilterClasses;
+  const currentFilterGender = isJobs ? jobFilterGender : tutorFilterGender;
+  const setFilterGender = isJobs ? setJobFilterGender : setTutorFilterGender;
+  const currentClearFilters = isJobs ? clearJobsFilters : clearTutorsFilters;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans select-none overflow-x-hidden relative" ref={mainScrollRef}>
@@ -461,7 +666,15 @@ export default function App() {
               <h3 className="text-[14px] font-black uppercase tracking-widest text-slate-900 mb-4">Select City</h3>
               <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {['All', ...CITIES_LIST].map((city, idx) => (
-                  <button key={city} onClick={() => { playTapSound(); setCityFilter(city.toLowerCase()); setUserCity(city); localStorage.setItem('userCity', city); setShowFilterDrawer(false); }} className={cn("py-3 rounded-xl border text-[11px] font-bold transition-all", city.toLowerCase() === cityFilter.toLowerCase() ? "bg-primary/5 border-primary text-primary" : "border-slate-100 text-slate-500 hover:border-slate-200")}>
+                  <button key={city} onClick={() => { 
+                    playTapSound(); 
+                    const c = city.toLowerCase();
+                    setJobCityFilter(c === 'all' ? 'all' : c);
+                    setTutorCityFilter(c === 'all' ? 'all' : c);
+                    setUserCity(city); 
+                    localStorage.setItem('userCity', city); 
+                    setShowFilterDrawer(false); 
+                  }} className={cn("py-3 rounded-xl border text-[11px] font-bold transition-all", city.toLowerCase() === userCity.toLowerCase() ? "bg-primary/5 border-primary text-primary" : "border-slate-100 text-slate-500 hover:border-slate-200")}>
                     {city === 'All' ? city : `${idx}. ${city}`}
                   </button>
                 ))}
@@ -483,14 +696,14 @@ export default function App() {
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">1. Location</label>
                     <div className="relative group mb-3">
                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={18} />
-                       <select value={cityFilter} onChange={e => { setCityFilter(e.target.value); setUserLocalities([]); resetCounts(); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-6 text-sm font-bold outline-none focus:border-primary transition-all appearance-none">
+                       <select value={currentCityFilter} onChange={e => { setCityFilter(e.target.value); resetCounts(); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-6 text-sm font-bold outline-none focus:border-primary transition-all appearance-none">
                           <option value="all">Everywhere (All Cities)</option>
                           {CITIES_LIST.map((c, i) => <option key={c} value={c}>{i + 1}. {c}</option>)}
                        </select>
                     </div>
                     
-                    {cityFilter !== 'all' && (() => {
-                       const actualCityKey = CITIES_LIST.find(c => c.toLowerCase() === cityFilter.toLowerCase());
+                    {currentCityFilter !== 'all' && (() => {
+                       const actualCityKey = CITIES_LIST.find(c => c.toLowerCase() === currentCityFilter.toLowerCase());
                        const localities = actualCityKey ? (CITY_TO_LOCATIONS_DATA as any)[actualCityKey] : null;
                        if (!localities) return null;
                        return (
@@ -499,10 +712,10 @@ export default function App() {
                             <div className="flex flex-wrap gap-2">
                                {localities.map((loc: string) => (
                                  <button key={loc} onClick={() => {
-                                   const next = filterLocalities.includes(loc) ? filterLocalities.filter(x => x !== loc) : [...filterLocalities, loc];
+                                   const next = currentFilterLocalities.includes(loc) ? currentFilterLocalities.filter(x => x !== loc) : [...currentFilterLocalities, loc];
                                    setFilterLocalities(next);
                                    resetCounts();
-                                 }} className={cn("px-4 py-2 rounded-xl text-[10px] font-bold transition-all border", filterLocalities.includes(loc) ? "bg-primary text-white border-primary shadow-lg" : "bg-white text-slate-500 border-slate-100")}>{loc}</button>
+                                 }} className={cn("px-4 py-2 rounded-xl text-[10px] font-bold transition-all border", currentFilterLocalities.includes(loc) ? "bg-primary text-white border-primary shadow-lg" : "bg-white text-slate-500 border-slate-100")}>{loc}</button>
                                ))}
                             </div>
                          </div>
@@ -516,18 +729,18 @@ export default function App() {
                     <div className="flex flex-wrap gap-2">
                       {CLASSES_LIST.map(cls => (
                         <button key={cls} onClick={() => {
-                            const next = filterClasses.includes(cls) ? filterClasses.filter(x => x !== cls) : [...filterClasses, cls];
+                            const next = currentFilterClasses.includes(cls) ? currentFilterClasses.filter(x => x !== cls) : [...currentFilterClasses, cls];
                             setFilterClasses(next);
                             resetCounts();
-                        }} className={cn("px-4 py-2 rounded-xl text-[10px] font-bold transition-all border", filterClasses.includes(cls) ? "bg-primary text-white border-primary shadow-lg" : "bg-white text-slate-500 border-slate-100")}>{cls}</button>
+                        }} className={cn("px-4 py-2 rounded-xl text-[10px] font-bold transition-all border", currentFilterClasses.includes(cls) ? "bg-primary text-white border-primary shadow-lg" : "bg-white text-slate-500 border-slate-100")}>{cls}</button>
                       ))}
                     </div>
 
-                    {filterClasses.length > 0 && (
+                    {currentFilterClasses.length > 0 && (
                        <div className="space-y-3 p-4 bg-slate-50 rounded-3xl border border-slate-100">
                           <span className="text-[9px] font-black uppercase text-slate-400 block tracking-widest px-1">Specific Subjects</span>
                           <div className="flex flex-wrap gap-2">
-                             {Array.from(new Set(filterClasses.flatMap(cls => {
+                             {Array.from(new Set(currentFilterClasses.flatMap(cls => {
                                const actualClassKey = CLASSES_LIST.find(c => c.toLowerCase() === cls.toLowerCase());
                                return (CLASS_SUBJECTS_DATA as any)[actualClassKey || cls] || [];
                              }))).map((sub: any) => (
@@ -543,14 +756,14 @@ export default function App() {
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">3. Gender Preference</label>
                     <div className="flex gap-2">
                        {['All', 'Male', 'Female'].map(g => (
-                         <button key={g} onClick={() => { setFilterGender(g); resetCounts(); }} className={cn("flex-1 py-4 rounded-2xl border-2 font-bold transition-all", filterGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400")}>{g}</button>
+                         <button key={g} onClick={() => { setFilterGender(g); resetCounts(); }} className={cn("flex-1 py-4 rounded-2xl border-2 font-bold transition-all", currentFilterGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400")}>{g}</button>
                        ))}
                     </div>
                   </div>
 
                   {/* Footer Actions */}
                   <div className="pt-6 px-6 pb-[calc(1.5rem+var(--safe-area-bottom,20px))] flex gap-3 sticky bottom-0 bg-white border-t border-slate-50">
-                    <button onClick={clearFilters} className="flex-1 bg-slate-100 text-slate-900 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all">Reset</button>
+                    <button onClick={currentClearFilters} className="flex-1 bg-slate-100 text-slate-900 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all">Reset</button>
                     <button onClick={() => setShowAdvancedFilterDrawer(false)} className="flex-[2] bg-primary text-white py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all">Show Results</button>
                   </div>
                </div>
@@ -574,7 +787,7 @@ export default function App() {
                 {showQuickPicker === 'city' && (
                   <div className="grid grid-cols-2 gap-2">
                     {['All', ...CITIES_LIST].map((city, idx) => (
-                      <button key={city} onClick={() => { playTapSound(); setCityFilter(city.toLowerCase()); setFilterLocalities([]); setShowQuickPicker(null); resetCounts(); }} className={cn("py-3 rounded-xl border text-[10px] font-bold transition-all", (city === 'All' ? 'all' : city.toLowerCase()) === cityFilter ? "bg-primary text-white border-primary shadow-lg" : "bg-white text-slate-500 border-slate-100")}>
+                      <button key={city} onClick={() => { playTapSound(); setCityFilter(city.toLowerCase()); setShowQuickPicker(null); resetCounts(); }} className={cn("py-3 rounded-xl border text-[10px] font-bold transition-all", (city === 'All' ? 'all' : city.toLowerCase()) === currentCityFilter ? "bg-primary text-white border-primary shadow-lg" : "bg-white text-slate-500 border-slate-100")}>
                         {city}
                       </button>
                     ))}
@@ -583,7 +796,7 @@ export default function App() {
                 {showQuickPicker === 'locality' && (
                   <div className="space-y-2">
                     {(() => {
-                      const actualCityKey = CITIES_LIST.find(c => c.toLowerCase() === cityFilter.toLowerCase());
+                      const actualCityKey = CITIES_LIST.find(c => c.toLowerCase() === currentCityFilter.toLowerCase());
                       const localities = actualCityKey ? (CITY_TO_LOCATIONS_DATA as any)[actualCityKey] : null;
                       if (!localities) return <div className="py-10 text-center text-[10px] font-black uppercase text-slate-400">Select a city first</div>;
                       return (
@@ -591,12 +804,12 @@ export default function App() {
                            {localities.map((loc: string) => (
                              <button key={loc} onClick={() => {
                                playTapSound();
-                               const next = filterLocalities.includes(loc) ? filterLocalities.filter(x => x !== loc) : [...filterLocalities, loc];
+                               const next = currentFilterLocalities.includes(loc) ? currentFilterLocalities.filter(x => x !== loc) : [...currentFilterLocalities, loc];
                                setFilterLocalities(next);
                                resetCounts();
-                             }} className={cn("px-4 py-3 rounded-xl text-[10px] font-bold transition-all border flex items-center justify-between", filterLocalities.includes(loc) ? "bg-primary/5 border-primary text-primary" : "bg-white text-slate-500 border-slate-100")}>
+                             }} className={cn("px-4 py-3 rounded-xl text-[10px] font-bold transition-all border flex items-center justify-between", currentFilterLocalities.includes(loc) ? "bg-primary/5 border-primary text-primary" : "bg-white text-slate-500 border-slate-100")}>
                                {loc}
-                               {filterLocalities.includes(loc) && <Check size={14} />}
+                               {currentFilterLocalities.includes(loc) && <Check size={14} />}
                              </button>
                            ))}
                         </div>
@@ -609,12 +822,12 @@ export default function App() {
                     {CLASSES_LIST.map(cls => (
                       <button key={cls} onClick={() => {
                         playTapSound();
-                        const next = filterClasses.includes(cls) ? filterClasses.filter(x => x !== cls) : [...filterClasses, cls];
+                        const next = currentFilterClasses.includes(cls) ? currentFilterClasses.filter(x => x !== cls) : [...currentFilterClasses, cls];
                         setFilterClasses(next);
                         resetCounts();
-                      }} className={cn("px-4 py-3 rounded-xl text-[10px] font-bold transition-all border flex items-center justify-between", filterClasses.includes(cls) ? "bg-primary/5 border-primary text-primary" : "bg-white text-slate-500 border-slate-100")}>
+                      }} className={cn("px-4 py-3 rounded-xl text-[10px] font-bold transition-all border flex items-center justify-between", currentFilterClasses.includes(cls) ? "bg-primary/5 border-primary text-primary" : "bg-white text-slate-500 border-slate-100")}>
                         {cls}
-                        {filterClasses.includes(cls) && <Check size={14} />}
+                        {currentFilterClasses.includes(cls) && <Check size={14} />}
                       </button>
                     ))}
                   </div>
@@ -622,7 +835,7 @@ export default function App() {
                 {showQuickPicker === 'gender' && (
                   <div className="grid grid-cols-1 gap-1.5 pb-2">
                     {['All', 'Male', 'Female'].map(g => (
-                      <button key={g} onClick={() => { playTapSound(); setFilterGender(g); setShowQuickPicker(null); resetCounts(); }} className={cn("px-4 py-3 rounded-xl border text-[10px] font-bold transition-all", filterGender === g ? "bg-primary text-white border-primary shadow-lg" : "bg-white text-slate-500 border-slate-100")}>
+                      <button key={g} onClick={() => { playTapSound(); setFilterGender(g); setShowQuickPicker(null); resetCounts(); }} className={cn("px-4 py-3 rounded-xl border text-[10px] font-bold transition-all", currentFilterGender === g ? "bg-primary text-white border-primary shadow-lg" : "bg-white text-slate-500 border-slate-100")}>
                         {g}
                       </button>
                     ))}
@@ -642,21 +855,21 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#543F63] via-[#3a2c45] to-[#543F63] px-5 pb-2 flex items-center justify-between shadow-[0_4px_30px_rgba(0,0,0,0.2)] border-b border-white/10 relative overflow-hidden pt-[calc(0.4rem+var(--safe-area-top,20px))]">
+      <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#6C3475] via-[#4A2350] to-[#6C3475] px-5 pb-2 flex items-center justify-between shadow-[0_4px_30px_rgba(0,0,0,0.2)] border-b border-white/10 relative overflow-hidden pt-[calc(0.4rem+var(--safe-area-top,20px))]">
         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         <div className="flex flex-col relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
           <span className="text-[18px] font-[900] text-white tracking-tighter leading-none [text-shadow:_0_2px_10px_rgba(0,0,0,0.3)]">DoAble India</span>
           <span className="text-[7.5px] font-black text-purple-100/80 uppercase tracking-[0.2em] mt-1.5">Elite Private Tuition Network {debugClicks > 3 && ' [DEBUG ON]'}</span>
         </div>
-        <div className="flex items-center gap-4 relative z-10">
-           <div className="flex items-center gap-1 bg-white/5 backdrop-blur-xl p-0.5 rounded-2xl border border-white/10">
-            <button onClick={() => { playTapSound(); setAlertsInitialTab('feed'); setActiveTab('alerts'); setUnseenAlertsCount(0); }} className="relative p-1.5 text-white hover:text-white transition-all active:scale-90">
-              <Bell size={18} strokeWidth={2.5} color="#FFFFFF" />
-              {unseenAlertsCount > 0 && <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center rounded-full border border-white shadow-lg animate-pulse">{unseenAlertsCount}</span>}
-            </button>
-            <div className="w-[1px] h-3 bg-white/10" />
-            <button onClick={() => setShowProfileSetup(true)} className="p-1.5 text-white hover:text-white transition-all active:scale-90"><LucideUser size={18} strokeWidth={2.5} color="#FFFFFF" /></button>
-          </div>
+        <div className="flex items-center gap-3 relative z-10">
+             <div className="flex items-center gap-1.5 bg-white/5 backdrop-blur-xl p-0.5 rounded-2xl border border-white/10">
+                <button onClick={() => { playTapSound(); setAlertsInitialTab('feed'); setActiveTab('alerts'); setUnseenAlertsCount(0); }} className="relative p-1.5 text-white hover:text-white transition-all active:scale-90">
+                  <Bell size={18} strokeWidth={2.5} color="#FFFFFF" />
+                  {unseenAlertsCount > 0 && <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center rounded-full border border-white shadow-lg animate-pulse">{unseenAlertsCount}</span>}
+                </button>
+                <div className="w-[1px] h-3 bg-white/10" />
+                <button onClick={() => setShowProfileSetup(true)} className="p-1.5 text-white hover:text-white transition-all active:scale-90"><LucideUser size={18} strokeWidth={2.5} color="#FFFFFF" /></button>
+              </div>
         </div>
       </header>
 
@@ -665,133 +878,114 @@ export default function App() {
           <HomeView userName={userName} userType={userType} userCity={userCity} activeLeadsCount={finalJobs.length} activeTutorsCount={finalTutors.length} featuredJobs={finalJobs.slice(0, 3)} featuredTutors={finalTutors.slice(0, 3)} playTapSound={playTapSound} setFormType={setFormType} setShowFormModal={setShowFormModal} setActiveTab={setActiveTab} setShowFilterDrawer={setShowFilterDrawer} getDynamicGreeting={getDynamicGreeting} onJobClick={setSelectedJob} onTutorClick={setSelectedTutor} shortlistedIds={shortlistedIds} onShortlistToggle={toggleShortlist} />
         )}
        {activeTab === 'jobs' && (
-          <div className="px-5 pt-4 space-y-6">
-            <div className="flex flex-col gap-1"><h2 className="text-[17px] font-[1000] text-slate-900 tracking-tighter leading-none">Jobs Portal</h2><p className="text-slate-500 text-[10.5px] font-medium tracking-tight">Find teaching opportunities that match your skills and passion.</p></div>
-            <div className="flex flex-col gap-3 sticky top-[64px] z-50 bg-[#F8FAFC] py-2 -mx-5 px-5 no-line sticky-fix">
-               <div className="flex items-center gap-2">
-                  <div className="flex-1 relative group">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={12} />
-                    <input 
-                      type="text" 
-                      placeholder="Search Name or Order ID..." 
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="w-full bg-white border border-slate-100 rounded-full py-1.5 pl-9 pr-6 text-[11px] font-semibold focus:outline-none focus:border-primary transition-all"
-                    />
-                    {searchQuery && (
-                      <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                  <button onClick={() => setShowAdvancedFilterDrawer(true)} className="w-8 h-8 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-primary transition-all active:scale-95">
-                    <Filter size={14} />
-                  </button>
-               </div>
-               <div className="flex items-center gap-1 pb-1 overflow-x-auto px-1 no-scrollbar">
-                  {(cityFilter !== 'all' || filterLocalities.length > 0 || filterClasses.length > 0 || filterGender !== 'All') && (
-                    <FilterChip icon={<X size={10} />} label="Clear" onClick={clearFilters} isClear />
-                  )}
-                  <FilterChip icon={<MapPin size={10} />} label={toTitleCase(cityFilter === 'all' ? 'Everywhere' : cityFilter)} active={cityFilter !== 'all'} onClick={() => setShowQuickPicker('city')} />
-                  <FilterChip icon={<MapPin size={10} />} label={filterLocalities.length > 0 ? `${filterLocalities.length} Locs` : 'Locality'} active={filterLocalities.length > 0} onClick={() => setShowQuickPicker('locality')} />
-                  <FilterChip icon={<BookOpen size={10} />} label={filterClasses.length > 0 ? `${filterClasses.length} Cls` : 'Classes'} active={filterClasses.length > 0} onClick={() => setShowQuickPicker('class')} />
-                  <FilterChip icon={<LucideUser size={10} />} label={filterGender !== 'All' ? filterGender : 'Gender'} active={filterGender !== 'All'} onClick={() => setShowQuickPicker('gender')} />
-               </div>
-            </div>
-            <div className="flex justify-between items-center px-1">
-               <div className="text-[14px] font-black text-slate-900 tracking-tighter uppercase">{finalJobs.length} Jobs found</div>
-               <div className="flex items-center gap-2"><span className="text-[11px] font-bold text-slate-400">Sort by:</span><select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="bg-transparent text-[11px] font-black text-primary uppercase tracking-widest outline-none"><option value="newest">Newest First</option><option value="fee_high">Highest Fee</option></select></div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-               {loading ? (<div className="col-span-full py-20 flex flex-col items-center gap-4"><Loader2 className="animate-spin text-primary" size={32} /><span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Leads...</span></div>) : finalJobs.length > 0 ? (<>{finalJobs.slice(0, visibleJobsCount).map((job) => (<JobCard key={getJobId(job)} job={job} onClick={setSelectedJob} isShortlisted={shortlistedIds.includes(getJobId(job))} onShortlistToggle={toggleShortlist} />))}{visibleJobsCount < finalJobs.length && (<div className="col-span-full py-10 flex justify-center"><button onClick={() => setVisibleJobsCount(prev => prev + 10)} className="bg-primary text-white px-10 py-4 rounded-2xl font-[800] text-[12px] uppercase shadow-xl active:scale-95 transition-all">Load More Jobs</button></div>)}</>) : (<div className="col-span-full py-20 text-center space-y-4 bg-white/50 rounded-[40px] border border-slate-100"><div className="text-4xl">🔍</div><div className="space-y-1"><h3 className="text-lg font-[900] text-slate-900 uppercase tracking-tighter">No jobs found</h3><p className="text-xs text-slate-500 font-bold max-w-[200px] mx-auto">Try changing your location or filters to see more results.</p></div><button onClick={clearFilters} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Reset All</button></div>)}
-            </div>
-          </div>
+          <JobsView 
+            finalJobs={finalJobs}
+            loading={loading}
+            searchQuery={jobSearchQuery}
+            setSearchQuery={setJobSearchQuery}
+            setShowAdvancedFilterDrawer={setShowAdvancedFilterDrawer}
+            cityFilter={jobCityFilter}
+            filterLocalities={jobFilterLocalities}
+            filterClasses={jobFilterClasses}
+            filterGender={jobFilterGender as any}
+            clearFilters={clearJobsFilters}
+            setShowQuickPicker={setShowQuickPicker}
+            sortBy={jobSortBy}
+            setSortBy={setJobSortBy}
+            visibleJobsCount={visibleJobsCount}
+            setVisibleJobsCount={setVisibleJobsCount}
+            setSelectedJob={setSelectedJob}
+            shortlistedIds={shortlistedIds}
+            toggleShortlist={toggleShortlist}
+          />
        )}
        {activeTab === 'tutors' && (
-          <div className="px-5 pt-4 space-y-6">
-            <div className="flex flex-col gap-1"><h2 className="text-[17px] font-[1000] text-slate-900 tracking-tighter leading-none">Experts Hub</h2><p className="text-slate-500 text-[10.5px] font-medium tracking-tight">Connect with certified premium educators across your city.</p></div>
-            <div className="flex flex-col gap-3 sticky top-[64px] z-50 bg-[#F8FAFC] py-2 -mx-5 px-5 no-line sticky-fix">
-               <div className="flex items-center gap-2">
-                  <div className="flex-1 relative group">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={12} />
-                    <input 
-                      type="text" 
-                      placeholder="Search Name, ID or Subject..." 
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="w-full bg-white border border-slate-100 rounded-full py-1.5 pl-9 pr-6 text-[11px] font-semibold focus:outline-none focus:border-primary transition-all"
-                    />
-                    {searchQuery && (
-                      <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                  <button onClick={() => setShowAdvancedFilterDrawer(true)} className="w-8 h-8 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-primary transition-all active:scale-95">
-                    <Filter size={14} />
-                  </button>
-               </div>
-               <div className="flex items-center gap-1 pb-1 overflow-x-auto px-1 no-scrollbar">
-                  {(cityFilter !== 'all' || filterLocalities.length > 0 || filterClasses.length > 0 || filterGender !== 'All') && (
-                    <FilterChip icon={<X size={10} />} label="Clear" onClick={clearFilters} isClear />
-                  )}
-                  <FilterChip icon={<MapPin size={10} />} label={toTitleCase(cityFilter === 'all' ? 'Everywhere' : cityFilter)} active={cityFilter !== 'all'} onClick={() => setShowQuickPicker('city')} />
-                  <FilterChip icon={<MapPin size={10} />} label={filterLocalities.length > 0 ? `${filterLocalities.length} Locs` : 'Locality'} active={filterLocalities.length > 0} onClick={() => setShowQuickPicker('locality')} />
-                  <FilterChip icon={<BookOpen size={10} />} label={filterClasses.length > 0 ? `${filterClasses.length} Cls` : 'Classes'} active={filterClasses.length > 0} onClick={() => setShowQuickPicker('class')} />
-                  <FilterChip icon={<LucideUser size={10} />} label={filterGender !== 'All' ? filterGender : 'Gender'} active={filterGender !== 'All'} onClick={() => setShowQuickPicker('gender')} />
-               </div>
-            </div>
-            <div className="flex justify-between items-center px-1">
-               <div className="text-[14px] font-black text-slate-900 tracking-tighter uppercase">{finalTutors.length} Tutors found</div>
-               <div className="flex items-center gap-2"><span className="text-[11px] font-bold text-slate-400">Sort by:</span><select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="bg-transparent text-[11px] font-black text-primary uppercase tracking-widest outline-none"><option value="newest">Newest First</option><option value="fee_high">Experience</option></select></div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-               {loading ? (<div className="col-span-full py-20 flex flex-col items-center gap-4"><Loader2 className="animate-spin text-primary" size={32} /><span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Experts...</span></div>) : finalTutors.length > 0 ? (<>{finalTutors.slice(0, visibleTutorsCount).map((tutor) => (<TutorCard key={getTutorId(tutor)} tutor={tutor} onClick={setSelectedTutor} isShortlisted={shortlistedIds.includes(getTutorId(tutor))} onShortlistToggle={toggleShortlist} />))}{visibleTutorsCount < finalTutors.length && (<div className="col-span-full py-10 flex justify-center"><button onClick={() => setVisibleTutorsCount(prev => prev + 10)} className="bg-primary text-white px-10 py-4 rounded-2xl font-[800] text-[12px] uppercase shadow-xl active:scale-95 transition-all">Load More Tutors</button></div>)}</>) : (<div className="col-span-full py-20 text-center space-y-4 bg-white/50 rounded-[40px] border border-slate-100"><div className="text-4xl">🔍</div><div className="space-y-1"><h3 className="text-lg font-[900] text-slate-900 uppercase tracking-tighter">No experts found</h3><p className="text-xs text-slate-500 font-bold max-w-[200px] mx-auto">Try changing your location or filters to see more results.</p></div><button onClick={clearFilters} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Reset All</button></div>)}
-            </div>
-          </div>
+          <TutorsView 
+            finalTutors={finalTutors}
+            loading={loading}
+            searchQuery={tutorSearchQuery}
+            setSearchQuery={setTutorSearchQuery}
+            setShowAdvancedFilterDrawer={setShowAdvancedFilterDrawer}
+            cityFilter={tutorCityFilter}
+            filterLocalities={tutorFilterLocalities}
+            filterClasses={tutorFilterClasses}
+            filterGender={tutorFilterGender as any}
+            clearFilters={clearTutorsFilters}
+            setShowQuickPicker={setShowQuickPicker}
+            sortBy={tutorSortBy}
+            setSortBy={setTutorSortBy}
+            visibleTutorsCount={visibleTutorsCount}
+            setVisibleTutorsCount={setVisibleTutorsCount}
+            setSelectedTutor={setSelectedTutor}
+            shortlistedIds={shortlistedIds}
+            toggleShortlist={toggleShortlist}
+          />
        )}
        {activeTab === 'alerts' && (
-         <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={currentUser} handleSignIn={() => {}} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} /></div>
+          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={currentUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={currentUser?.email} isServerData={isServerData} /></div>
        )}
-       {activeTab === 'payments' && (
-            <div className="px-6 py-10 max-w-lg mx-auto">
-              <div className="bg-white rounded-[40px] border border-slate-100 shadow-2xl p-10 text-center space-y-8 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600" />
-                <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[32px] flex items-center justify-center mx-auto shadow-inner transform -rotate-3 hover:rotate-0 transition-transform duration-500">
-                  <CreditCard size={48} strokeWidth={2.5} />
-                </div>
-                <div className="space-y-4">
-                  <h2 className="text-3xl font-[1000] text-slate-900 uppercase tracking-tighter leading-none">Payments</h2>
-                  <div className="h-1 w-12 bg-emerald-500 mx-auto rounded-full" />
-                  <p className="text-[13px] text-slate-600 font-bold leading-relaxed px-2">
-                    Experience seamless and secure transactions. Whether you're a tutor settling commissions or a parent investing in quality education, we ensure your payments are handled with the utmost care.
-                  </p>
-                </div>
-                <div className="space-y-4 pt-2">
-                   <a href="https://zohosecurepay.in/checkout/i9db4wt2-verz1l6gn6ogo/Make-a-secure-payment-now" target="_blank" rel="noreferrer" className="block w-full bg-slate-900 hover:bg-slate-800 text-white p-5 rounded-[24px] font-black text-center shadow-2xl shadow-slate-900/20 uppercase tracking-widest active:scale-95 transition-all text-xs">
-                     Proceed to Secure Payment
-                   </a>
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">100% Encrypted & Secure Gateway</p>
-                </div>
-              </div>
-            </div>
+       {activeTab === 'support' && (<SupportView userName={userName} userType={userType} userCity={userCity} />)}
+       {activeTab === 'concierge' && (<ParentHubView userName={userName} playTapSound={playTapSound} setActiveTab={setActiveTab} setShowFormModal={setShowFormModal} setFormType={setFormType} />)}
+       {activeTab === 'earnings' && (<EarningsView leads={leads} firestoreLeads={firestoreLeads} userName={userName} userCity={userCity} playTapSound={playTapSound} setSelectedJob={setSelectedJob} />)}
+       {activeTab === 'admin' && (
+         <div className="px-6 py-10">
+           {isAdminUser ? (
+             <AdminPanel currentCity={userCity} />
+           ) : (
+             <PasscodeLogin 
+               onSuccess={() => setActiveTab('admin')} 
+               adminEmail="doableindia@gmail.com"
+               adminPass="admin123"
+             />
+           )}
+         </div>
        )}
-       {activeTab === 'support' && (<div className="px-0"><SupportView userName={userName} userType={userType} userCity={userCity} /></div>)}
-       {activeTab === 'admin' && isAdminUser && (<div className="px-6 py-10"><AdminPanel currentCity={userCity} /></div>)}
       </main>
+
+
 
       {!selectedJob && !selectedTutor && !showAdvancedFilterDrawer && !showFilterDrawer && !showProfileSetup && !showFormModal && (
         <nav className="fixed bottom-0 left-0 right-0 z-[8000] bg-white/90 backdrop-blur-xl border-t border-slate-100 px-3 pt-2 pb-[calc(1.2rem+var(--safe-area-bottom,20px))] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between gap-1 max-w-[600px] mx-auto">
-            <NavButton active={activeTab === 'home'} onClick={() => { playTapSound(); setActiveTab('home'); window.scrollTo(0,0); }} icon={<HomeIcon className="w-[18px] h-[18px]" />} label="Home" activeColor="text-white" activeBg="bg-slate-800" inactiveColor="text-slate-600" inactiveBg="bg-slate-100" />
+            <NavButton active={activeTab === 'home'} onClick={() => { playTapSound(); setActiveTab('home'); window.scrollTo(0,0); }} icon={<HomeIcon className="w-[18px] h-[18px]" />} label="Home" activeColor="text-white" activeBg="bg-[#CC2570]" inactiveColor="text-[#CC2570]" inactiveBg="bg-[#CC2570]/5" />
             <NavButton active={activeTab === 'jobs'} onClick={() => { playTapSound(); setActiveTab('jobs'); window.scrollTo(0,0); }} icon={<FileText className="w-[18px] h-[18px]" />} label="Jobs" activeColor="text-white" activeBg="bg-indigo-600" inactiveColor="text-indigo-600" inactiveBg="bg-indigo-50" />
             <NavButton active={activeTab === 'tutors'} onClick={() => { playTapSound(); setActiveTab('tutors'); window.scrollTo(0,0); }} icon={<GraduationCap className="w-[18px] h-[18px]" />} label="Tutors" activeColor="text-white" activeBg="bg-emerald-500" inactiveColor="text-emerald-600" inactiveBg="bg-emerald-50" />
-            <NavButton active={activeTab === 'payments'} onClick={() => { playTapSound(); setActiveTab('payments'); window.scrollTo(0,0); }} icon={<CreditCard className="w-[18px] h-[18px]" />} label="Pay" activeColor="text-white" activeBg="bg-orange-500" inactiveColor="text-orange-600" inactiveBg="bg-orange-50" />
-            <NavButton active={activeTab === 'support'} onClick={() => { playTapSound(); setActiveTab('support'); window.scrollTo(0,0); }} icon={<MessageSquare className="w-[18px] h-[18px]" />} label="Support" activeColor="text-white" activeBg="bg-blue-500" inactiveColor="text-blue-600" inactiveBg="bg-blue-50" />
-            {isAdminUser && (<button onClick={() => { playTapSound(); setActiveTab('admin'); }} className={cn("w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center transition-all active:scale-95 ml-1 shadow-lg", activeTab === 'admin' ? "ring-4 ring-primary/20" : "")}><Settings size={16} /></button>)}
+            
+            {userType === 'teacher' && (
+              <NavButton active={activeTab === 'earnings'} onClick={() => { playTapSound(); setActiveTab('earnings'); window.scrollTo(0,0); }} icon={<TrendingUp className="w-[18px] h-[18px]" />} label="Earnings" activeColor="text-white" activeBg="bg-[#7A2157]" inactiveColor="text-[#7A2157]" inactiveBg="bg-[#7A2157]/5" />
+            )}
+            
+            {userType === 'parent' && (
+              <NavButton active={activeTab === 'concierge'} onClick={() => { playTapSound(); setActiveTab('concierge'); window.scrollTo(0,0); }} icon={<Sparkles className="w-[18px] h-[18px]" />} label="Concierge" activeColor="text-white" activeBg="bg-[#572149]" inactiveColor="text-[#572149]" inactiveBg="bg-[#572149]/5" />
+            )}
+
+            <NavButton active={activeTab === 'support'} onClick={() => { playTapSound(); setActiveTab('support'); window.scrollTo(0,0); }} icon={<MessageSquare className="w-[18px] h-[18px]" />} label="Support" activeColor="text-white" activeBg="bg-[#347475]" inactiveColor="text-[#347475]" inactiveBg="bg-[#347475]/5" />
           </div>
         </nav>
       )}
+
+      <AnimatePresence>
+        {activeToast && (
+          <motion.div 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 20, opacity: 1 }}
+            exit={{ y: -100, opacity: 0 }}
+            onClick={() => { setActiveToast(null); setActiveTab('alerts'); }}
+            className="fixed top-[env(safe-area-inset-top,20px)] left-4 right-4 z-[20000] bg-white rounded-[24px] shadow-2xl border border-slate-100 p-4 flex items-center gap-4 cursor-pointer active:scale-95 transition-all"
+          >
+            <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
+              <Bell size={24} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-[13px] font-black text-slate-900 truncate">{activeToast.title}</h4>
+              <p className="text-[11px] font-bold text-slate-500 line-clamp-2 leading-snug">{activeToast.body}</p>
+            </div>
+            <button onClick={(e) => { e.stopPropagation(); setActiveToast(null); }} className="p-2 text-slate-300 hover:text-slate-500">
+              <X size={18} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {selectedJob && (
@@ -800,10 +994,12 @@ export default function App() {
             <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="relative bg-[#F8FAFC] w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[96vh] overflow-hidden">
                <div className="p-8 text-center text-white relative shrink-0 pt-[calc(2rem+var(--safe-area-top,24px))]" style={{ background: getCityTheme(selectedJob.City).grad }}>
                   <button onClick={() => setSelectedJob(null)} className="absolute top-8 left-6 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-all"><X size={20} /></button>
-                  <div className="text-[22px] font-[900] text-white mb-1 tracking-tight">✨ {toTitleCase(selectedJob.Name || (selectedJob.subjects?.split(',')[0] || 'Tutor') + ' Required')}</div>
+                  <div className="text-[22px] font-[900] text-white mb-1 tracking-tight">
+                    ✨ {toTitleCase((selectedJob.Name || (selectedJob.subjects?.split(',')[0] || 'Tutor') + ' Required').replace(/\s*[Jj]i\s*$/, '').replace(/\s*[Jj]i\s+/g, ' '))}
+                  </div>
                   <div className="text-[11px] font-black bg-black/20 px-3 py-1 rounded-lg inline-block uppercase tracking-widest mt-1">Order ID: {selectedJob['Order ID']}</div>
                </div>
-               <div className="flex-1 overflow-y-auto p-6 space-y-4 pb-[calc(8rem+var(--safe-area-bottom,20px))]">
+               <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-[calc(8rem+var(--safe-area-bottom,20px))]">
                   {/* Info List - 11 Lines Stacked with Solid Emojis */}
                   <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
                     <div className="grid grid-cols-1 divide-y divide-slate-50">
@@ -841,26 +1037,76 @@ export default function App() {
                     </div>
                     <p className="text-[12px] text-slate-700 font-medium leading-relaxed">{selectedJob.Notes || 'Professional tutor needed for home tuition.'}</p>
                   </div>
+
+                  {/* Guidelines & Platform Policy - Unified White Card Style */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 px-2">
+                       <div className="w-6 h-6 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-sm"><CheckCircle size={12} /></div>
+                       <span className="text-[10px] font-[1000] uppercase text-slate-900 tracking-widest">Platform Policy & Guidelines</span>
+                    </div>
+                    
+                    <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
+                      <div className="grid grid-cols-1 divide-y divide-slate-50">
+                        {/* 1. Zero Registration Fee */}
+                        <div className="p-4 flex items-start gap-4">
+                           <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 text-lg shrink-0">✨</div>
+                           <div className="space-y-0.5">
+                              <h5 className="text-[11.5px] font-black uppercase text-emerald-700 tracking-tight leading-none">Zero Registration Fees</h5>
+                              <p className="text-[10.5px] font-medium text-emerald-600/80 leading-snug">No upfront charges or hidden costs to join our elite network. 100% Free Signup.</p>
+                           </div>
+                        </div>
+
+                        {/* 2. First Month Commission */}
+                        <div className="p-4 flex items-start gap-4 bg-[#304B70]/5">
+                           <div className="w-10 h-10 rounded-2xl bg-[#304B70] flex items-center justify-center text-white text-lg shadow-md shrink-0">💰</div>
+                           <div className="space-y-0.5">
+                              <h5 className="text-[11.5px] font-black uppercase text-[#304B70] tracking-tight leading-none">First-Month Commission</h5>
+                              <p className="text-[10.5px] font-bold text-[#304B70] leading-snug">50% service fee is only collected AFTER you receive your first payment from the parent. 🤝</p>
+                           </div>
+                        </div>
+
+                        {/* 3. Second Month Onwards */}
+                        <div className="p-4 flex items-start gap-4">
+                           <div className="w-10 h-10 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 text-lg shrink-0">📈</div>
+                           <div className="space-y-0.5">
+                              <h5 className="text-[11.5px] font-black uppercase text-blue-800 tracking-tight leading-none">100% Earnings for You</h5>
+                              <p className="text-[10.5px] font-medium text-blue-600/80 leading-snug">You deserve success. Keep 100% earnings from month 2. After 11 months, a small 25% renewal fee helps us sustain this community for you. ❤️🔄</p>
+                           </div>
+                        </div>
+
+                        {/* 4. Trial Policy */}
+                        <div className="p-4 flex items-start gap-4">
+                           <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600 text-lg shrink-0">🎁</div>
+                           <div className="space-y-0.5">
+                              <h5 className="text-[11.5px] font-black uppercase text-rose-800 tracking-tight leading-none">1 Free Trial Class</h5>
+                              <p className="text-[10.5px] font-medium text-rose-600/80 leading-snug">To ensure a perfect match, one free trial demo is required for every new lead.</p>
+                           </div>
+                        </div>
+
+                        {/* 5-7. Professional Guidelines */}
+                        {[
+                          { title: 'Selective Matching', desc: 'Selection depends on profile fit. Apply only for roles that match your expertise.', icon: '🎯' },
+                          { title: 'Commitment & Reliability', desc: 'Ensure punctuality and avoid last-minute cancellations for demos.', icon: '⏰' },
+                          { title: 'Ethical Conduct', desc: 'Communicate respectfully with parents and keep your profile updated.', icon: '👔' }
+                        ].map((g, i) => (
+                          <div key={i} className="p-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
+                             <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-lg shrink-0">{g.icon}</div>
+                             <div className="space-y-0.5">
+                                <h5 className="text-[11.5px] font-black uppercase text-slate-800 tracking-tight leading-none">{g.title}</h5>
+                                <p className="text-[10.5px] font-medium text-slate-500 leading-snug">{g.desc}</p>
+                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                </div>
                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 bg-white/80 backdrop-blur-md border-t border-slate-100 flex gap-2 sm:gap-3 pb-[calc(1rem+var(--safe-area-bottom,24px))]">
-                  <a href={`tel:${getCityPhone(selectedJob.City)}`} className="flex-1 py-3.5 sm:py-4 rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest text-center border-2 border-primary text-primary active:scale-95 transition-all">📞 Call</a>
+                  <a href="tel:9971969197" className="flex-1 py-3.5 sm:py-4 rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest text-center border-2 border-primary text-primary active:scale-95 transition-all">📞 Call</a>
                   <a 
-                    href={`https://wa.me/91${getCityPhone(selectedJob.City)}?text=${encodeURIComponent(
-                      `Hello! I am very interested in this tuition job. ✨\n\n` +
-                      `Order ID: ${selectedJob['Order ID']}\n` +
-                      `Details:\n` +
-                      `📚 Class: ${selectedJob['Class / Board'] || (selectedJob.Class ? (selectedJob.Board ? `${selectedJob.Class} - ${selectedJob.Board}` : selectedJob.Class) : (selectedJob.Board || 'General'))}\n` +
-                      `📖 Subjects: ${selectedJob.subjects || 'General'}\n` +
-                      `💰 Fee: ₹${formatCurrency(selectedJob.Fee || '0')}/month\n` +
-                      `⏳ Duration: ${selectedJob.duration || '1 Hr/Day'}\n` +
-                      `📅 Days: ${selectedJob.days || 'Regular'}\n` +
-                      `🕒 Time: ${selectedJob.time || 'Flexible'}\n` +
-                      `📍 City: ${selectedJob.City || 'N/A'}\n` +
-                      `🏠 Location: ${(selectedJob as any).residency || 'Student Home Address'}, ${selectedJob.Locations?.split(',')[0] || selectedJob.City}\n\n` +
-                      `Please let me know the next steps. Thank you! 🙏`
-                    )}`} 
-                    target="_blank" 
-                    className="flex-[1.8] py-3.5 sm:py-4 rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest text-center text-white shadow-xl active:scale-95 transition-all" 
+                    href={`https://wa.me/919971969197?text=${encodeURIComponent(`Hi, I want to apply for Job Order ID: #${selectedJob['Order ID'] || (selectedJob as any).id || 'N/A'}`)}`}
+                    target="_system"
+                    className="flex-[1.8] py-3.5 sm:py-4 rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest text-center text-white shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2" 
                     style={{ background: 'linear-gradient(135deg, #FF1493 0%, #FF69B4 100%)' }}
                   >
                     💬 Apply Now
@@ -1059,7 +1305,13 @@ export default function App() {
 
                <div className="absolute bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-slate-100 flex gap-3 pb-[calc(1.5rem+var(--safe-area-bottom,24px))]">
                   <a href="tel:9971969197" className="flex-1 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-center border-2 border-primary text-primary active:scale-95 transition-all">📞 Call</a>
-                  <button onClick={() => { playTapSound(); setFormType('parent'); setShowFormModal(true); }} className="flex-[1.5] py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-center bg-primary text-white shadow-xl active:scale-95 transition-all">💬 Book a Free Demo</button>
+                  <a 
+                    href={`https://wa.me/919971969197?text=${encodeURIComponent(`Hi, I want to book a free demo with Tutor ID: #${selectedTutor['Tutor ID'] || (selectedTutor as any).id || 'N/A'}`)}`}
+                    target="_system"
+                    className="flex-[1.5] py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-center bg-primary text-white shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    💬 Book a Free Demo
+                  </a>
                </div>
             </motion.div>
           </div>
@@ -1074,89 +1326,258 @@ export default function App() {
                 <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900">Profile Setup</h3>
                 <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm transition-all"><X size={16} /></button>
              </div>
-             <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
-                <div className="space-y-3">
-                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">I am a</label>
-                  <div className="flex gap-2">
-                    {[
-                      { id: 'teacher', label: 'Tutor', icon: GraduationCap },
-                      { id: 'parent', label: 'Parent', icon: LucideUser }
-                    ].map(type => (
-                      <button key={type.id} onClick={() => { playTapSound(); setUserType(type.id as UserType); localStorage.setItem('userType', type.id); }} className={cn("flex-1 py-3 rounded-2xl border-2 font-bold transition-all flex flex-col items-center gap-1.5", userType === type.id ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400")}>
-                        <type.icon size={18} />
-                        <span className="text-[10px] font-black uppercase">{type.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Full Name</label>
-                   <input type="text" value={userName || ''} onChange={(e) => { setUserName(e.target.value); localStorage.setItem('userName', e.target.value); }} placeholder="Enter name" className="w-full bg-slate-50 p-3.5 rounded-2xl border border-slate-100 font-bold outline-none focus:border-primary transition-all text-slate-700 text-sm" />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Gender</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['Male', 'Female', 'Other'].map(gender => (
-                      <button key={gender} onClick={() => { playTapSound(); setUserGender(gender); localStorage.setItem('userGender', gender); }} className={cn("py-2.5 rounded-xl border-2 text-[9px] font-black uppercase transition-all", userGender === gender ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400")}>{gender}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">City</label>
-                  <div className="relative group">
-                    <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                    <select value={userCity} onChange={(e) => { 
-                      const newCity = e.target.value;
-                      setUserCity(newCity); 
-                      setCityFilter(newCity.toLowerCase() === 'all' ? 'all' : newCity.toLowerCase());
-                      localStorage.setItem('userCity', newCity); 
-                    }} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-3.5 pl-10 text-xs font-bold text-slate-700 focus:border-primary focus:bg-white outline-none transition-all appearance-none">
-                      <option value="All">0. All Cities (Everywhere)</option>
-                      {CITIES_LIST.map((city, i) => <option key={city} value={city}>{i + 1}. {city}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Classes (Max 3)</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CLASSES_LIST.slice(0, 12).map(cls => (
-                      <button key={cls} onClick={() => {
-                          playTapSound();
-                          const next = userClasses.includes(cls) ? userClasses.filter(x => x !== cls) : userClasses.length < 3 ? [...userClasses, cls] : userClasses;
-                          setUserClasses(next);
-                          localStorage.setItem('userClasses', JSON.stringify(next));
-                      }} className={cn("px-3 py-1.5 rounded-lg border-2 text-[9px] font-bold uppercase transition-all", userClasses.includes(cls) ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400")}>{cls}</button>
-                    ))}
-                  </div>
-                </div>
-                <button onClick={() => { playTapSound(); setShowProfileSetup(false); }} className="w-full bg-primary text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all mt-2">Save Profile</button>
+             <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-[1000] uppercase text-slate-900 ml-1 tracking-[0.2em]">I'm here as...</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { id: 'parent', label: 'Parent', icon: '👨‍👩‍👧‍👦', desc: 'Looking for a Tutor' },
+                        { id: 'teacher', label: 'Teacher', icon: '👩‍🏫', desc: 'Looking for Jobs' }
+                      ].map(type => (
+                        <button 
+                          key={type.id} 
+                          onClick={() => { 
+                            playTapSound(); 
+                            const newType = type.id as UserType;
+                            setUserType(newType); 
+                            localStorage.setItem('userType', type.id);
+                            setActiveTab('home');
+                            setTutorStatus(null);
+                            setIsTutorFetched(false);
 
-                {/* Debug Info Section */}
-                <div className="mt-8 pt-6 border-t border-slate-100 space-y-3">
-                   <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-slate-400">
-                      <span>Network Diagnostic</span>
-                      <span className={cn(dbStatus === 'Connected' ? "text-emerald-500" : "text-rose-500")}>{dbStatus}</span>
+                            // Clear Details for fresh start in new role
+                            setUserName(null);
+                            setUserGender('All');
+                            setUserCity('Ghaziabad');
+                            setUserClasses([]);
+                            
+                            localStorage.removeItem('userName');
+                            localStorage.removeItem('userGender');
+                            localStorage.setItem('userCity', 'Ghaziabad');
+                            localStorage.removeItem('userClasses');
+                          }} 
+                          className={cn(
+                            "py-5 rounded-[24px] border-2 flex flex-col items-center gap-1 transition-all relative overflow-hidden", 
+                            userType === type.id ? "border-primary bg-primary/5 text-primary shadow-inner" : "border-slate-100 text-slate-400 bg-white"
+                          )}
+                        >
+                          <span className="text-2xl mb-1">{type.icon}</span>
+                          <span className="text-[10px] font-black uppercase tracking-tight">{type.label}</span>
+                          <span className="text-[8px] font-bold opacity-60">{type.desc}</span>
+                          {userType === type.id && (
+                            <motion.div layoutId="role-check" className="absolute top-2 right-2 w-4 h-4 bg-primary text-white rounded-full flex items-center justify-center">
+                              <Check size={10} strokeWidth={4} />
+                            </motion.div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    <motion.div 
+                      key={userType || 'initial'} 
+                      initial={{ opacity: 0, y: 10 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      exit={{ opacity: 0, y: -10 }}
+                      className="space-y-5"
+                    >
+                      {userType === 'teacher' && (
+                        <div className="space-y-4">
+                           <div className="grid grid-cols-2 gap-2">
+                             <button onClick={() => { playTapSound(); setTutorStatus('registered'); }} className={cn("py-3 rounded-xl border-2 font-[900] uppercase text-[9px] transition-all", tutorStatus === 'registered' ? "border-[#572149] bg-[#572149]/5 text-[#572149]" : "border-slate-100 text-slate-400 bg-white")}>Already Registered</button>
+                             <button onClick={() => { playTapSound(); setTutorStatus('new'); setIsTutorFetched(false); }} className={cn("py-3 rounded-xl border-2 font-[900] uppercase text-[9px] transition-all", tutorStatus === 'new' ? "border-[#572149] bg-[#572149]/5 text-[#572149]" : "border-slate-100 text-slate-400 bg-white")}>I'm New</button>
+                           </div>
+
+                           {tutorStatus === 'registered' && !isTutorFetched && (
+                             <div className="bg-slate-900 rounded-[28px] p-6 space-y-4 shadow-xl">
+                               <div className="space-y-1.5">
+                                 <label className="text-[10px] font-black uppercase text-white/40 ml-1 tracking-widest">Verify Identity</label>
+                                 <div className="relative">
+                                    <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" size={16} />
+                                    <input 
+                                      type="text" 
+                                      value={tutorIdInput} 
+                                      onChange={(e) => setTutorIdInput(e.target.value)} 
+                                      placeholder="Enter your Tutor ID" 
+                                      className="w-full bg-white/5 border border-white/5 rounded-2xl py-3.5 pl-10 pr-12 text-white font-bold placeholder:text-white/20 outline-none focus:border-primary/50 transition-all text-sm" 
+                                    />
+                                    <button 
+                                      onClick={fetchTutorDetails} 
+                                      disabled={isFetchingTutor || !tutorIdInput} 
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-primary text-white rounded-xl flex items-center justify-center active:scale-90 transition-all disabled:opacity-30 shadow-lg"
+                                    >
+                                      {isFetchingTutor ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} strokeWidth={3} />}
+                                    </button>
+                                 </div>
+                               </div>
+                               {tutorFetchError && (
+                                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 text-rose-400 text-[9px] font-bold px-1">
+                                    <AlertCircle size={10} /> {tutorFetchError}
+                                 </motion.div>
+                               )}
+                               <div className="space-y-2">
+                                 <p className="text-[8.5px] font-medium text-white/30 px-1 leading-relaxed">Entering your ID will automatically fill your profile details from our records.</p>
+                                 <button onClick={() => { playTapSound(); setActiveTab('support'); setShowProfileSetup(false); }} className="text-[8.5px] font-black text-primary uppercase tracking-widest px-1 hover:underline">Don't remember your Tutor ID?</button>
+                               </div>
+                             </div>
+                           )}
+
+                           {tutorStatus === 'new' && (
+                              <div className="bg-gradient-to-br from-[#572149] to-[#3a1631] rounded-[28px] p-6 text-white space-y-4 shadow-xl">
+                                 <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10"><Sparkles size={20} className="text-amber-300 fill-amber-300" /></div>
+                                    <div className="min-w-0">
+                                       <h4 className="text-[13px] font-black tracking-tight truncate">Become an Elite Tutor</h4>
+                                       <p className="text-[9px] font-bold text-white/60 uppercase tracking-widest leading-none mt-0.5">Join the network</p>
+                                    </div>
+                                 </div>
+                                 <p className="text-[10.5px] font-medium leading-relaxed opacity-90">Start your journey with India's most prestigious tuition network. Click below to register.</p>
+                                 <button onClick={() => { playTapSound(); setFormType('teacher'); setShowFormModal(true); }} className="w-full bg-white text-[#572149] py-4 rounded-xl font-[1000] text-[10px] uppercase tracking-[0.2em] shadow-2xl active:scale-[0.98] transition-all">Join the Elite</button>
+                              </div>
+                           )}
+                        </div>
+                      )}
+
+                      {(userType === 'parent' || (userType === 'teacher' && tutorStatus === 'registered' && isTutorFetched)) && (
+                        <>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? "Student's Full Name" : "Full Name"}</label>
+                             <input 
+                               type="text" 
+                               value={userName || ''} 
+                               onChange={(e) => { if (!isTutorFetched) { setUserName(e.target.value); localStorage.setItem('userName', e.target.value); } }} 
+                               readOnly={isTutorFetched}
+                               placeholder={userType === 'parent' ? "e.g. Aryan Sharma" : "e.g. Deepak Sharma"} 
+                               className={cn(
+                                 "w-full p-4 rounded-2xl border font-bold outline-none transition-all text-sm",
+                                 isTutorFetched ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-100 focus:border-primary text-slate-700"
+                               )}
+                             />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? "Tutor's Gender Preference" : "My Gender"}</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {['Male', 'Female', 'Any'].map(gender => (
+                                <button 
+                                  key={gender} 
+                                  disabled={isTutorFetched}
+                                  onClick={() => { playTapSound(); setUserGender(gender); localStorage.setItem('userGender', gender); }} 
+                                  className={cn(
+                                    "py-3.5 rounded-xl border font-black uppercase text-[10px] transition-all", 
+                                    userGender === gender ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white",
+                                    isTutorFetched && userGender !== gender && "opacity-30 grayscale"
+                                  )}
+                                >
+                                  {gender}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? "City where you need Service?" : "Preferred City"}</label>
+                            <div className="relative group">
+                              <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                              <select 
+                                value={userCity} 
+                                disabled={isTutorFetched}
+                                onChange={(e) => { 
+                                  const newCity = e.target.value;
+                                  setUserCity(newCity); 
+                                  setCityFilter(newCity.toLowerCase() === 'all' ? 'all' : newCity.toLowerCase());
+                                  localStorage.setItem('userCity', newCity); 
+                                }} 
+                                className={cn(
+                                  "w-full border rounded-2xl p-4 pl-10 text-sm font-bold outline-none transition-all appearance-none",
+                                  isTutorFetched ? "bg-slate-100 border-slate-200 text-slate-500" : "bg-slate-50 border-slate-100 focus:border-primary focus:bg-white text-slate-700"
+                                )}
+                              >
+                                <option value="All">0. All Cities (Everywhere)</option>
+                                {CITIES_LIST.map((city, i) => <option key={city} value={city}>{i + 1}. {city}</option>)}
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? "Class Group Preference" : "Class Group"}</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'].map(cls => (
+                                <button 
+                                  key={cls} 
+                                  disabled={isTutorFetched}
+                                  onClick={() => {
+                                    playTapSound();
+                                    const next = userClasses.includes(cls) ? userClasses.filter(x => x !== cls) : [...userClasses, cls];
+                                    setUserClasses(next);
+                                    localStorage.setItem('userClasses', JSON.stringify(next));
+                                  }} 
+                                  className={cn(
+                                    "px-3 py-3 rounded-xl border font-bold text-[9px] transition-all", 
+                                    userClasses.includes(cls) ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white",
+                                    isTutorFetched && !userClasses.includes(cls) && "opacity-30"
+                                  )}
+                                >
+                                  {cls}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {isTutorFetched && (
+                            <div className="pt-2">
+                              <button 
+                                onClick={() => { playTapSound(); setFormType('teacher'); setShowFormModal(true); }}
+                                className="w-full py-3 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
+                              >
+                                 <Edit3 size={14} /> Update my details
+                              </button>
+                              <p className="text-center text-[8px] font-medium text-slate-400 mt-2 px-4 leading-snug italic">Fields are locked for verified accounts. Tap above to request an update.</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                     {currentUser ? (
+                       <div className="space-y-3">
+                         <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                           {currentUser.photoURL ? (
+                             <img src={currentUser.photoURL} alt="User" className="w-10 h-10 rounded-full border border-white shadow-sm" />
+                           ) : (
+                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary"><LucideUser size={20} /></div>
+                           )}
+                           <div className="min-w-0">
+                             <div className="text-[11px] font-black text-slate-900 truncate">{currentUser.displayName || 'Signed In'}</div>
+                             <div className="text-[9px] font-bold text-slate-400 truncate">{currentUser.email}</div>
+                           </div>
+                         </div>
+                         {isAdminUser && (
+                           <button onClick={() => { playTapSound(); setActiveTab('admin'); setShowProfileSetup(false); }} className="w-full bg-slate-900 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+                             <Settings size={16} /> Admin Panel
+                           </button>
+                         )}
+                         <button onClick={() => { playTapSound(); auth.signOut(); }} className="w-full bg-rose-50 text-rose-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+                           <LogOut size={16} /> Sign Out
+                         </button>
+                       </div>
+                     ) : null}
                    </div>
-                   <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-slate-400">
-                      <span>Push Status</span>
-                      <span className={cn(registrationStatus.includes('✅') ? "text-emerald-500" : "text-rose-500")}>{registrationStatus}</span>
-                   </div>
-                   <div className="bg-slate-50 p-3 rounded-xl space-y-1">
-                      <span className="text-[7px] font-black uppercase text-slate-400 tracking-widest block">FCM Token</span>
-                      <div className="text-[7px] font-mono text-slate-500 break-all leading-tight">{fcmToken}</div>
-                   </div>
-                   <button 
-                     onClick={testAlertSound}
-                     className="w-full bg-slate-900 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
-                   >
-                     <Zap size={10} className="text-amber-400 fill-amber-400" /> Test Alert Sound
-                   </button>
-                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-2">Version 1.0.121</div>
+
+                   {(userType === 'parent' || (userType === 'teacher' && isTutorFetched)) && (
+                     <button onClick={() => { playTapSound(); setShowProfileSetup(false); }} className="w-full bg-primary text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all mt-6">Save & Close</button>
+                   )}
+
+                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-4">DoAble India Network • v1.0.123</div>
                 </div>
              </div>
           </div>
-        </div>
-      )}
+        )}
 
       {showFormModal && (
         <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4">
@@ -1184,26 +1605,7 @@ export default function App() {
 function NavButton({ active, onClick, icon, label, activeColor, activeBg, inactiveColor, inactiveBg }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; activeColor: string; activeBg: string; inactiveColor: string; inactiveBg: string }) {
   return (
     <button onClick={onClick} className={cn("flex-1 flex flex-col items-center gap-1 py-1.5 rounded-full transition-all duration-300 active:scale-95 mx-0.5", active ? activeBg + " " + activeColor + " shadow-lg scale-105" : inactiveBg + " " + inactiveColor + " opacity-60")}>
-      {icon}<span className="text-[7.5px] font-black uppercase tracking-tighter">{label}</span>
-    </button>
-  );
-}
-
-function FilterChip({ icon, label, active, onClick, isClear }: { icon: React.ReactNode; label: string; active?: boolean; onClick: () => void; isClear?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg border text-[8.5px] font-[900] transition-all whitespace-nowrap active:scale-95 uppercase tracking-tighter shadow-sm shrink-0",
-        isClear
-          ? "bg-rose-500 text-white border-rose-500"
-          : active
-            ? "bg-slate-900 text-white border-slate-900"
-            : "bg-white text-slate-500 border-slate-100"
-      )}
-    >
-      <span className="scale-75 origin-center">{icon}</span>
-      {label}
+      {icon}<span className="text-[7px] font-[1000] tracking-tight">{label}</span>
     </button>
   );
 }

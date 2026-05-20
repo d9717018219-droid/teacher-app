@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+*.apk
+*.aab
+src_backup*/
+.firebase/
+android/.idea/

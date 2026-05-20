@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { collection, addDoc, serverTimestamp, getDocs, deleteDoc, doc, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, functions } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Send, Zap, AlertTriangle, Info, CheckCircle, Globe, Trash2 } from 'lucide-react';
 import { CITIES_LIST, CLASSES_LIST } from '../constants';
@@ -27,11 +28,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity }) => {
   const [targetUserType, setTargetUserType] = useState<'parent' | 'teacher' | 'all'>('all');
   const [type, setType] = useState<'urgent' | 'info' | 'success' | 'broadcast'>('info');
   const [sending, setSending] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+  const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info', msg: string } | null>(null);
 
   const citiesForAdmin = ['All', ...CITIES_LIST];
   const classesForAdmin = ['All', ...CLASSES_LIST];
+
+  const handleTestPush = async () => {
+    playTapSound();
+    setTesting(true);
+    setStatus(null);
+    try {
+      const sendTest = httpsCallable(functions, 'sendTestNotification');
+      const result: any = await sendTest();
+      if (result.data?.success) {
+        setStatus({ type: 'success', msg: `Sync Success: ${result.data.message}` });
+      } else {
+        setStatus({ type: 'error', msg: `Sync Failed: ${result.data?.message || 'Unknown error'}` });
+      }
+    } catch (err: any) {
+      console.error('Test push error:', err);
+      setStatus({ type: 'error', msg: 'Cloud Function Error: ' + err.message });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const [emergencySending, setEmergencySending] = useState(false);
 
   const handleSend = async () => {
     if (!message.trim()) return;
@@ -40,21 +64,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity }) => {
     setStatus(null);
 
     try {
-      await addDoc(collection(db, 'alerts'), {
+      console.log('AdminPanel: Attempting direct Firestore send...');
+      const docRef = await addDoc(collection(db, 'alerts'), {
         message,
         city: targetCity,
         gender: targetGender,
         targetClass: targetClass,
         targetUserType: targetUserType,
         type,
-        sender: 'DoAble Admin',
+        sender: 'Notification 🔔',
         timestamp: serverTimestamp(),
       });
+      console.log('AdminPanel: Successfully sent alert with ID:', docRef.id);
       setMessage('');
-      setStatus({ type: 'success', msg: 'Broadcast sent successfully!' });
+      setStatus({ type: 'success', msg: 'Broadcast Deployed Successfully! ✨🚀' });
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, 'alerts');
-      setStatus({ type: 'error', msg: 'Permission Denied: Only admins can broadcast.' });
+      console.error('AdminPanel: Firestore Send Failed:', err);
+      let errorMsg = err.message || 'Check your permissions';
+      if (err.code === 'permission-denied') {
+        errorMsg = 'Permission Denied: You are not authorized as an Admin.';
+      }
+      setStatus({ type: 'error', msg: 'Broadcast Failed: ' + errorMsg });
     } finally {
       setSending(false);
     }
@@ -68,7 +98,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity }) => {
     setStatus(null);
 
     try {
-      const q = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(100));
+      const q = query(collection(db, 'alerts'), limit(150));
       const snapshot = await getDocs(q);
       
       if (snapshot.empty) {
@@ -82,7 +112,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity }) => {
       setStatus({ type: 'success', msg: `Successfully cleared ${snapshot.size} alerts.` });
     } catch (err: any) {
       console.error('Clear error:', err);
-      setStatus({ type: 'error', msg: 'Failed to clear alerts. Check permissions.' });
+      setStatus({ type: 'error', msg: 'Failed to clear alerts: ' + (err.message || 'Permission denied') });
     } finally {
       setClearing(false);
     }
@@ -98,11 +128,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity }) => {
             </h2>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Send targeted alerts to users</p>
           </div>
-          <button 
-            onClick={handleClearAll}
-            disabled={clearing}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl transition-all shadow-lg shadow-rose-900/40 active:scale-95 disabled:opacity-50"
-          >
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleTestPush}
+              disabled={testing}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-lg shadow-indigo-900/40 active:scale-95 disabled:opacity-50"
+            >
+              {testing ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Zap size={16} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Test Sync</span>
+                </>
+              )}
+            </button>
+            <button 
+              onClick={handleClearAll}
+              disabled={clearing}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl transition-all shadow-lg shadow-rose-900/40 active:scale-95 disabled:opacity-50"
+            >
             {clearing ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
@@ -113,8 +158,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity }) => {
             )}
           </button>
         </div>
+      </div>
         
-        <div className="mt-8 space-y-4">
+      <div className="mt-8 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Target City</label>

@@ -126,24 +126,35 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
           </div>
         </div>
 
-        {/* Right Action Icons */}
-        <div className="flex flex-col items-end justify-between h-[54px] flex-shrink-0">
-          <button 
-            onClick={(e) => { e.stopPropagation(); onShortlistToggle?.(jobId, e); }}
-            className={cn("transition-colors", isShortlisted ? "text-red-500" : "text-slate-300 hover:text-red-500")}
-          >
-            <Heart size={16} fill={isShortlisted ? "currentColor" : "none"} />
-          </button>
-          <div className="text-slate-300">
-            <ChevronRight size={16} />
-          </div>
-        </div>
+        {/* Compact Right Side (Removed icons, moved to bottom) */}
       </div>
 
-      <div className="flex justify-end border-t border-slate-50 pt-1.5">
-        <span className="text-[#94A3B8] text-[8.5px] font-medium flex items-center gap-1">
-          <Clock size={8} /> Posted: {postedDate}
-        </span>
+      <div className="flex flex-col gap-2 pt-2 border-t border-slate-50">
+        <div className="flex justify-between items-center opacity-70">
+          <span className="text-[#94A3B8] text-[8px] font-black uppercase tracking-tight flex items-center gap-1">
+            <Clock size={8} /> Posted: {postedDate}
+          </span>
+          <span className="text-slate-400 text-[8px] font-black uppercase tracking-tight">Verified Lead</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+           <button 
+             onClick={() => onClick(job)}
+             className="flex-1 bg-slate-100 text-slate-900 h-8 rounded-lg font-[900] text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1.5"
+           >
+             View Details
+             <ChevronRight size={12} strokeWidth={3} className="text-slate-400" />
+           </button>
+           <button 
+             onClick={(e) => { e.stopPropagation(); onShortlistToggle?.(jobId, e); }}
+             className={cn(
+               "w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 border",
+               isShortlisted ? "bg-rose-50 border-rose-100 text-rose-500" : "bg-white border-slate-100 text-slate-300"
+             )}
+           >
+             <Heart size={14} fill={isShortlisted ? "currentColor" : "none"} />
+           </button>
+        </div>
       </div>
     </div>
   );

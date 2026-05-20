@@ -1,33 +1,41 @@
 {
   "project_info": {
-    "project_number": "503686229174",
-    "project_id": "gen-lang-client-0533512936",
-    "storage_bucket": "gen-lang-client-0533512936.firebasestorage.app"
+    "project_number": "237759117673",
+    "project_id": "doable-india-app-9564b-496310",
+    "storage_bucket": "doable-india-app-9564b-496310.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:503686229174:android:d89037f322d6599e820a17",
+        "mobilesdk_app_id": "1:237759117673:android:b57e602d856094b81ce5f8",
         "android_client_info": {
           "package_name": "com.doableindia"
         }
       },
       "oauth_client": [
         {
-          "client_id": "503686229174-j1mpj71ccd454ulv9ee3q40vdm7a22f0.apps.googleusercontent.com",
+          "client_id": "237759117673-1f6i9hqhfp0l3lgqnuve735r5iur9t81.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.doableindia",
+            "certificate_hash": "24cecaf27c33bedc16a0c2e1784cc824c9d0da83"
+          }
+        },
+        {
+          "client_id": "237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyDXYr10YWmsf0EGKP0bWmE5khFL_-ynanw"
+          "current_key": "AIzaSyDURPKldQ7cxmoB-zltg8HHj8SW8FlIpa4"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "503686229174-j1mpj71ccd454ulv9ee3q40vdm7a22f0.apps.googleusercontent.com",
+              "client_id": "237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

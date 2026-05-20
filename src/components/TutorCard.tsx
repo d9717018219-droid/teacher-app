@@ -5,6 +5,7 @@ import {
   Briefcase, 
   Star,
   CheckCircle2,
+  BadgeCheck,
   Heart,
   BookOpen,
   FlaskConical,
@@ -19,10 +20,12 @@ import {
   TrendingUp,
   Code,
   Trophy,
-  Sparkles
+  Sparkles,
+  Clock,
+  User
 } from 'lucide-react';
 import { TutorProfile } from '../types';
-import { cn, toTitleCase } from '../utils';
+import { cn, toTitleCase, formatPostedDate } from '../utils';
 
 interface TutorCardProps {
   tutor: TutorProfile;
@@ -76,7 +79,10 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
   const exp = getValue(['Experience', 'experience', 'Teaching Experience'], '1-3 Years').toString();
   const qual = getValue(['Qualification(s)', 'qualifications', 'Qualification'], 'Graduate').toString();
   const subjects = getValue(['Preferred Subject(s)', 'preferredSubjects', 'subjects'], 'General').toString();
+  const gender = getValue(['Gender', 'gender'], '').toString();
+  const classGroup = getValue(['Preferred Class Group', 'preferredClassGroup', 'classGroup'], '').toString();
   const verified = getValue(['Verified', 'verified'], 'No').toString().toLowerCase().trim() === 'yes';
+  const lastUpdated = formatPostedDate(getValue(['Record Added', 'Updated Time', 'updatedTime'], ''));
 
   const { bg, icon } = getSubjectStyles(subjects);
 
@@ -95,8 +101,15 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
         <div className="flex-1 min-w-0 space-y-0.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="text-primary text-[9.5px] font-bold tracking-tight uppercase">ID: {tutorId}</span>
-              {verified && <CheckCircle2 size={10} className="text-[#10B981]" fill="currentColor" />}
+              <span className="text-primary text-[9.5px] font-[900] tracking-tight">Tutor ID: {tutorId}</span>
+              {verified && (
+                <div className="flex items-center gap-1 ml-2">
+                   <div className="flex items-center gap-1 bg-[#404E78] text-white px-1.5 py-0.5 rounded-lg shadow-lg shadow-[#404E78]/10 border border-white/10">
+                      <BadgeCheck size={10} className="fill-white text-[#404E78]" />
+                      <span className="text-[7.5px] font-[1000] uppercase tracking-widest leading-none">Verified</span>
+                   </div>
+                </div>
+              )}
             </div>
             <span className="text-[#94A3B8] text-[8.5px] font-bold uppercase tracking-widest">{location}</span>
           </div>
@@ -106,38 +119,67 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
           </h4>
           <p className="text-[#64748B] text-[10.5px] font-[500] truncate">{qual}</p>
           
-          <div className="flex items-center gap-2 pt-1">
-            <div className="bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-lg flex items-center gap-1 shrink-0">
-               <span className="text-[#0F172A] text-[9.5px] font-black tracking-tighter whitespace-nowrap">
-                 {(() => {
-                    const cleanFee = fee.replace(/\/.*|per.*|month|mo/gi, '').trim();
-                    return cleanFee.startsWith('₹') ? cleanFee : `₹${cleanFee}`;
-                 })()}/hr
-               </span>
-            </div>
+          <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+            {gender && (
+              <span className={cn(
+                "text-[8.5px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950",
+                gender.toLowerCase().includes('female') 
+                  ? "bg-rose-50 border-rose-100/50" 
+                  : gender.toLowerCase().includes('male')
+                    ? "bg-blue-50 border-blue-100/50"
+                    : "bg-slate-50 border-slate-100/50"
+              )}>
+                <User size={8} strokeWidth={3} className="text-slate-400" /> Gender: {gender}
+              </span>
+            )}
+            {classGroup && (
+              <span className={cn(
+                "text-[8.5px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950",
+                (() => {
+                  const g = classGroup.toLowerCase();
+                  if (g.includes('11') || g.includes('12') || g.includes('higher') || g.includes('senior')) return "bg-violet-50 border-violet-100/50";
+                  if (g.includes('9') || g.includes('10') || g.includes('secondary')) return "bg-amber-50 border-amber-100/50";
+                  if (g.includes('6') || g.includes('7') || g.includes('8') || g.includes('middle')) return "bg-emerald-50 border-emerald-100/50";
+                  if (g.includes('1') || g.includes('2') || g.includes('3') || g.includes('4') || g.includes('5') || g.includes('primary')) return "bg-indigo-50 border-indigo-100/50";
+                  return "bg-slate-50 border-slate-100/50";
+                })()
+              )}>
+                <BookOpen size={8} strokeWidth={3} className="text-slate-400" /> Class: {classGroup}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right Arrow & Like */}
-        <div className="flex flex-col items-end justify-between h-[54px] flex-shrink-0">
-          <button 
-            onClick={(e) => { e.stopPropagation(); onShortlistToggle?.(tutorId, e); }}
-            className={cn("transition-colors", isShortlisted ? "text-red-500" : "text-slate-300 hover:text-red-500")}
-          >
-            <Heart size={16} fill={isShortlisted ? "currentColor" : "none"} />
-          </button>
-          <div className="text-slate-300">
-            <ChevronRight size={16} />
-          </div>
-        </div>
+        {/* Compact Right Side (Removed redundant icons, moved to bottom) */}
       </div>
 
-      <div className="flex justify-between items-center pt-1.5 border-t border-slate-50 mt-0.5">
-        <div className="flex items-center gap-1.5">
-          <CheckCircle2 size={10} className="text-primary" />
-          <span className="text-[8.5px] font-bold text-slate-700 uppercase tracking-tight">School Exp: {getValue(['School Exp.', 'schoolExp'], 'No')}</span>
+      <div className="flex flex-col gap-2 pt-2 mt-1 border-t border-slate-50">
+        <div className="flex justify-between items-center opacity-70">
+          <div className="flex items-center gap-1">
+            <CheckCircle2 size={9} className="text-primary" />
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tight">School Exp.: {getValue(['School Exp.', 'schoolExp'], 'No')}</span>
+          </div>
+          <span className="text-[#94A3B8] text-[8px] font-black uppercase tracking-tight">Own Vehicle: {getValue(['Have own Vehicle', 'haveOwnVehicle'], 'No')}</span>
         </div>
-        <span className="text-[#94A3B8] text-[8.5px] font-bold uppercase tracking-tight">Own Vehicle: {getValue(['Have own Vehicle', 'haveOwnVehicle'], 'No')}</span>
+
+        <div className="flex items-center gap-2">
+           <button 
+             onClick={() => onClick(tutor)}
+             className="flex-1 bg-slate-100 text-slate-900 h-8 rounded-lg font-[900] text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1.5"
+           >
+             View Profile
+             <ChevronRight size={12} strokeWidth={3} className="text-slate-400" />
+           </button>
+           <button 
+             onClick={(e) => { e.stopPropagation(); onShortlistToggle?.(tutorId, e); }}
+             className={cn(
+               "w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 border",
+               isShortlisted ? "bg-rose-50 border-rose-100 text-rose-500" : "bg-white border-slate-100 text-slate-300"
+             )}
+           >
+             <Heart size={14} fill={isShortlisted ? "currentColor" : "none"} />
+           </button>
+        </div>
       </div>
     </div>
   );

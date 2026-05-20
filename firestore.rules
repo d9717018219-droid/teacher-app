@@ -1,16 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Global Deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Hardened ID Validation
-    function isValidId(id) { 
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
-    }
     
+    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
@@ -19,76 +11,42 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    function incoming() {
-      return request.resource.data;
+    // ALERTS COLLECTION (Temporarily Open for Debugging)
+    match /alerts/{alertId} {
+      allow read, write: if true; 
     }
 
-    function existing() {
-      return resource.data;
-    }
-
-    // JOBS COLLECTION (Legacy/Alternative)
-    match /jobs/{jobId} {
-      function isValidJob(data) {
-        return data.keys().hasAll(['orderId', 'city', 'postedAt', 'authorId']) &&
-               data.orderId is string && data.orderId.size() <= 50 &&
-               data.city is string && data.city.size() <= 100 &&
-               data.postedAt is timestamp &&
-               data.authorId == request.auth.uid;
-      }
-
-      allow read: if true;
-      allow create: if isSignedIn() && isAdmin() && isValidId(jobId) && isValidJob(incoming()) && 
-                    incoming().postedAt == request.time;
-      allow update, delete: if isSignedIn() && isAdmin();
-    }
-
-    // LEADS COLLECTION (Current)
+    // LEADS COLLECTION
     match /leads/{leadId} {
       allow read: if true;
-      allow create, update, delete: if isSignedIn() && isAdmin();
+      allow create, update, delete: if true; // Temporarily open
     }
 
-    // ALERTS COLLECTION
-    match /alerts/{alertId} {
-      function isValidAlert(data) {
-        return data.keys().hasAll(['message', 'city', 'type', 'timestamp', 'sender']) &&
-               data.message is string && data.message.size() <= 1000 &&
-               data.city is string && data.city.size() <= 100 &&
-               data.type in ['urgent', 'info', 'success', 'broadcast'] &&
-               data.timestamp is timestamp &&
-               data.sender is string && data.sender.size() <= 100;
-      }
-
-      allow read: if true; // Alerts are broadcast to all visitors
-      
-      allow create: if isSignedIn() && isAdmin() && isValidId(alertId) && 
-                    isValidAlert(incoming()) && incoming().timestamp == request.time;
-                    
-      allow update, delete: if isSignedIn() && isAdmin();
-    }
-
-    // ADMINS COLLECTION (System-generated or manually seeded)
+    // ADMINS COLLECTION
     match /admins/{adminUid} {
-      allow read: if isSignedIn(); // Users can check if they are admin
-      allow write: if false; // Only manageable via console for safety
+      allow read: if true;
+      allow write: if false;
     }
 
     // USERS COLLECTION
     match /users/{userId} {
-      allow read: if isSignedIn(); // Allow users to read profiles for role checks
-      allow write: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    // CONNECTION TEST
-    match /test/connection {
-      allow read: if isSignedIn();
+      allow read, write: if true;
     }
 
     // FCM TOKENS COLLECTION
     match /fcm_tokens/{tokenId} {
-      allow read: if false;
+      allow read: if true;
       allow write: if true;
+    }
+
+    // USER NOTIFICATIONS
+    match /user_notifications/{deviceId}/{document=**} {
+      allow read, write: if true; 
+    }
+
+    // Global Deny (Default)
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

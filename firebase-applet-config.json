@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0533512936",
-  "appId": "1:503686229174:web:bbe0957d75035e9b820a17",
-  "apiKey": "AIzaSyBDcug_xiTTGc6fkb3So3DBMw99e7rEfDk",
-  "authDomain": "gen-lang-client-0533512936.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-c2dd7af9-dcc1-4c28-b5b9-2e1400ca3e28",
-  "storageBucket": "gen-lang-client-0533512936.firebasestorage.app",
-  "messagingSenderId": "503686229174",
-  "measurementId": ""
+  "projectId": "doable-india-app-9564b-496310",
+  "appId": "1:237759117673:web:77f0b3ce12b5f4e71ce5f8",
+  "apiKey": "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s",
+  "authDomain": "doable-india-app-9564b-496310.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "doable-india-app-9564b-496310.firebasestorage.app",
+  "messagingSenderId": "237759117673",
+  "measurementId": "G-0CG77PL3GM"
 }
