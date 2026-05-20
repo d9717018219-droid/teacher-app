@@ -6,9 +6,8 @@ workflows:
     integrations:
       app_store_connect: "DoAble Apple Key"
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.doableindia
+      groups:
+        - ios
       vars:
         BUNDLE_ID: "com.doableindia"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
@@ -28,6 +27,9 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
+          # This command will fetch OR create the certificate and profile
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS app
         script: |
