@@ -1573,7 +1573,7 @@ export default function App() {
                      <button onClick={() => { playTapSound(); setShowProfileSetup(false); }} className="w-full bg-primary text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all mt-6">Save & Close</button>
                    )}
 
-                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-4">DoAble India Network • v1.0.123</div>
+                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-4">DoAble India Network • v1.0.134</div>
                 </div>
              </div>
           </div>

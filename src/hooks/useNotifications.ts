@@ -93,7 +93,7 @@ async function saveTokenToFirestore(
       gender: gender || 'Any',
       targetClass: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All',
       targetUserType: userType || 'all',
-      appVersion: '1.0.121_ULTIMATE_v5',
+      appVersion: '1.0.134-DIAGNOSTIC',
       lastSeen: new Date().toISOString()
     };
 
@@ -132,6 +132,7 @@ async function setupCapacitorPushNotifications(
       // Subscribe to registration errors
       await PushNotifications.addListener('registrationError', (error) => {
         console.error('❌ Push Registration Error:', error);
+        alert('Push Registration Error: ' + JSON.stringify(error));
         window.dispatchEvent(new CustomEvent('fcmRegistrationError', { detail: error.error }));
       });
 
@@ -142,6 +143,7 @@ async function setupCapacitorPushNotifications(
           const fcmToken = token.value;
           const platform = Capacitor.getPlatform();
           console.log(`✅ Native FCM Token Registered (${platform}):`, fcmToken);
+          alert('FCM Token Registered! App will now receive notifications.');
           localStorage.setItem('fcmToken', fcmToken);
           await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType);
         }
