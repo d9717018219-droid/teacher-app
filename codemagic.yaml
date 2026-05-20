@@ -6,6 +6,9 @@ workflows:
     integrations:
       app_store_connect: "DoAble Apple Key"
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.doableindia
       groups:
         - ios
       vars:
