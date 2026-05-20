@@ -4,6 +4,8 @@ workflows:
     max_build_duration: 90
     instance_type: mac_mini_m2
     environment:
+      groups:
+        - apple_credentials # Ensure this matches your group name in Codemagic
       vars:
         BUNDLE_ID: "com.doableindia"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
@@ -30,12 +32,20 @@ workflows:
           npx cap sync ios || (echo "⚠️ Sync failed, attempting to re-add platform..." && npx cap add ios && npx cap sync ios)
       - name: Set up code signing
         script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --project "$XCODE_PROJECT" --type IOS_APP_STORE --create
+          keychain add-certificates
           xcode-project use-profiles
       - name: Build unsigned iOS app
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --bundle-id "$BUNDLE_ID"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit: false # Set to true later to auto-submit to TestFlight
