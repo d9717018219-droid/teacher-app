@@ -18,9 +18,11 @@ workflows:
       - name: Build web assets with Vite
         script: |
           npm run build
+          ls -la dist
       - name: Sync Capacitor with iOS
         script: |
-          npx cap sync ios
+          # Ensure the ios platform is recognized
+          npx cap sync ios --verbose
       - name: Install CocoaPods dependencies
         script: |
           cd ios/App && pod install
