@@ -5,52 +5,39 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       groups:
-        - ios
-      vars:
-        BUNDLE_ID: "com.doableindia"
-        XCODE_PROJECT: "ios/App/App.xcodeproj"
-        XCODE_SCHEME: "App"
-      node: 22.14.0
-      xcode: latest
-    scripts:
-      - name: Install npm dependencies
-        script: |
-          npm install --legacy-peer-deps
-      - name: Build web assets with Vite
-        script: |
-          npm run build
-      - name: Sync Capacitor with iOS
-        script: |
-          npx cap sync ios
-      - name: Set up code signing
-        script: |
-          keychain initialize
-          # Fetch signing files for the bundle ID
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-          keychain add-certificates
-          echo "🔍 Verifying Provisioning Profiles..."
-          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          if [ -d "$PROFILES_DIR" ] && [ "$(ls -A "$PROFILES_DIR")" ]; then
-            ls -la "$PROFILES_DIR"
-            echo "✅ Profiles downloaded successfully."
-          else
-            echo "❌ ERROR: No provisioning profiles found. Check your App Store Connect API Key and Bundle ID ($BUNDLE_ID)."
-            echo "Make sure the App is created in App Store Connect with this Bundle ID."
-            exit 1
-          fi
-          xcode-project use-profiles --project "$XCODE_PROJECT"
-      - name: Build iOS app
-        script: |
-          xcodebuild -project "$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -archivePath build/ios/xcarchive/App.xcarchive \
-            archive \
-            CODE_SIGN_STYLE=Manual \
-            COMPILER_INDEX_STORE_ENABLE=NO | xcbeautify
-          
-          xcode-project build-ipa \
-            --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
+        environment:
+          groups:
+            - ios
+          vars:
+            BUNDLE_ID: "com.doableindia"
+            XCODE_PROJECT: "ios/App/App.xcodeproj"
+            XCODE_SCHEME: "App"
+          node: 22.14.0
+          xcode: latest
+        scripts:
+          - name: Install npm dependencies
+            script: |
+              npm install --legacy-peer-deps
+          - name: Build web assets with Vite
+            script: |
+              npm run build
+          - name: Sync Capacitor with iOS
+            script: |
+              npx cap sync ios
+          - name: Set up code signing
+            script: |
+              keychain initialize
+              # Force create a new certificate if the private key is missing
+              app-store-connect fetch-signing-files "$BUNDLE_ID" \
+                --type IOS_APP_STORE \
+                --create
+              keychain add-certificates
+              xcode-project use-profiles --project "$XCODE_PROJECT"
+          - name: Build iOS app
+            script: |
+              xcode-project build-ipa \
+                --project "$XCODE_PROJECT" \
+                --scheme "$XCODE_SCHEME"
+        artifacts:
+          - build/ios/ipa/*.ipa
+          - /tmp/xcodebuild_logs/*.log
