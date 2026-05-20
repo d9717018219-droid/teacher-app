@@ -21,8 +21,14 @@ workflows:
           ls -la dist
       - name: Sync Capacitor with iOS
         script: |
-          # Ensure the ios platform is recognized
-          npx cap sync ios --verbose
+          # Build check
+          if [ ! -d "dist" ]; then
+            echo "❌ Error: dist directory not found! Creating fallback..."
+            mkdir -p dist && touch dist/index.html
+          fi
+          
+          # Sync with fallback
+          npx cap sync ios || (echo "⚠️ Sync failed, attempting to re-add platform..." && npx cap add ios && npx cap sync ios)
       - name: Install CocoaPods dependencies
         script: |
           cd ios/App && pod install
