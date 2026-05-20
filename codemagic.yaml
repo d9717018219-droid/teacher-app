@@ -10,6 +10,7 @@ workflows:
         BUNDLE_ID: "com.doableindia"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
+        TEAM_ID: "5WW267C2PX"
       node: 22.14.0
       xcode: latest
     scripts:
@@ -27,31 +28,34 @@ workflows:
           keychain initialize
           keychain add-certificates
           
-          echo "🔍 DIAGNOSTICS: Listing Keychain Identities"
-          security find-identity -v -p codesigning
-          
-          echo "🔍 DIAGNOSTICS: Checking Profiles Directory"
+          # Force copy profiles to the correct location
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
-          
-          # Try to find profiles in the current directory (uploaded via UI)
           find . -name "*.mobileprovision" -exec cp {} "$PROFILES_HOME" \;
           
-          ls -la "$PROFILES_HOME" || echo "⚠️ Profiles directory is empty!"
+          # Extract UUID from the profile
+          export PROFILE_UUID=$(grep UUID -A1 -a "$PROFILES_HOME"/*.mobileprovision | grep -io "[-A-Z0-9]\{36\}")
+          echo "🎯 Using Profile UUID: $PROFILE_UUID"
           
-          # Force mapping
+          # Save for next step
+          echo "export PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
+          
+          # Apply to project
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS app
         script: |
-          # Use explicit xcodebuild command with environment variables to force signing
+          # Use explicit signing arguments to bypass all errors
           xcodebuild -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -archivePath build/ios/xcarchive/App.xcarchive \
             archive \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
             COMPILER_INDEX_STORE_ENABLE=NO | xcbeautify
           
+          # Convert archive to IPA
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
