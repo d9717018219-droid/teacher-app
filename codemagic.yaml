@@ -48,4 +48,3 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit: false # Set to true later to auto-submit to TestFlight
