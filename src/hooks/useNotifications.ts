@@ -24,10 +24,14 @@ export const useNotifications = (
   useEffect(() => {
     const initializeNotifications = async () => {
       console.log('🔔 Initializing notifications...');
+      if (Capacitor.isNativePlatform()) {
+        alert('DEBUG 1: Hook Started (v1.0.134-B6)');
+      }
 
       try {
         // 1. Local Notifications Setup (Channels)
         if (Capacitor.isNativePlatform()) {
+          alert('DEBUG 2: Setting up Channels...');
           await LocalNotifications.createChannel({
             id: 'doable_channel_v6',
             name: 'Tuition Alerts',
@@ -121,9 +125,11 @@ async function setupCapacitorPushNotifications(
   userType: string
 ) {
   try {
+    alert('DEBUG 3: Requesting Permissions...');
     console.log('🔑 Requesting Push permissions...');
     const result = await PushNotifications.requestPermissions();
     console.log('📊 Permission result:', result.receive);
+    alert('DEBUG 4: Permission Result = ' + result.receive);
 
     if (result.receive === 'granted') {
       // Clear all listeners first to avoid duplicates
