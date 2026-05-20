@@ -3,12 +3,7 @@ workflows:
     name: DoAble India iOS Build
     max_build_duration: 90
     instance_type: mac_mini_m2
-    integrations:
-      app_store_connect: "DoAble Apple Key"
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.doableindia
       vars:
         BUNDLE_ID: "com.doableindia"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
@@ -28,6 +23,8 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
+          # Keychain and profiles will be automatically handled by Codemagic 
+          # from the files uploaded in the UI
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS app
         script: |
