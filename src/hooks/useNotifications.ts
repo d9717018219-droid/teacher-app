@@ -23,48 +23,43 @@ export const useNotifications = (
 ) => {
   useEffect(() => {
     const initializeNotifications = async () => {
-      console.log('🔔 Initializing notifications...');
       if (Capacitor.isNativePlatform()) {
-        alert('DEBUG 1: Hook Started (v1.0.134-B6)');
+        alert('DEBUG: Starting v1.0.134-B7');
       }
 
       try {
-        // 1. Local Notifications Setup (Channels)
         if (Capacitor.isNativePlatform()) {
-          alert('DEBUG 2: Setting up Channels...');
-          await LocalNotifications.createChannel({
-            id: 'doable_channel_v6',
-            name: 'Tuition Alerts',
-            description: 'Custom sound alerts for tuition jobs',
-            sound: 'blackberry.mp3', // Extension needed for LocalNotifications
-            importance: 5,
-            visibility: 1,
-            vibration: true,
-          });
-        }
-
-        // 2. Web-Push Initialization (Only if not native)
-        if (!Capacitor.isNativePlatform()) {
+          // 1. Setup Push Notifications First (Most Important)
+          await setupCapacitorPushNotifications(userCity, userGender, userClasses, userType);
+          
+          // 2. Setup Local Channels (Optional, mostly for Android)
+          try {
+            await LocalNotifications.createChannel({
+              id: 'doable_channel_v6',
+              name: 'Tuition Alerts',
+              description: 'Custom sound alerts for tuition jobs',
+              sound: 'blackberry.mp3',
+              importance: 5,
+              visibility: 1,
+              vibration: true,
+            });
+            console.log('✅ Local Channel Created');
+          } catch (channelError) {
+            console.warn('⚠️ Channel Creation Error:', channelError);
+          }
+        } else {
+           // Web-Push Initialization
            const permissionGranted = await requestNotificationPermission();
            if (permissionGranted) {
               initForegroundMessaging();
               const fcmToken = await getWebFCMToken();
               if (fcmToken) {
-                console.log('✅ Web FCM Token:', fcmToken);
-                localStorage.setItem('fcmToken', fcmToken);
                 await saveTokenToFirestore(fcmToken, 'web', userCity, userGender, userClasses, userType);
               }
            }
         }
-
-      // 3. Native Push Initialization
-        if (Capacitor.isNativePlatform()) {
-          console.log('📱 Native platform detected, setting up Capacitor Push...');
-          await setupCapacitorPushNotifications(userCity, userGender, userClasses, userType);
-        }
-
-        console.log('✅ Notifications initialized successfully');
       } catch (error) {
+        alert('❌ GLOBAL ERROR: ' + String(error));
         console.error('❌ Error initializing notifications:', error);
       }
     };
@@ -86,7 +81,6 @@ async function saveTokenToFirestore(
 ) {
   try {
     const user = auth.currentUser;
-    console.log(`💾 Attempting to save ${platform} token to Firestore...`);
     const tokenData = {
       token,
       platform,
@@ -97,15 +91,12 @@ async function saveTokenToFirestore(
       gender: gender || 'Any',
       targetClass: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All',
       targetUserType: userType || 'all',
-      appVersion: '1.0.134-DIAGNOSTIC',
+      appVersion: '1.0.134-DIAGNOSTIC-B7',
       lastSeen: new Date().toISOString()
     };
 
-    // Sanitize token for use as document ID (Firestore IDs cannot have slashes)
-    // We also store the original token as a field for the Cloud Function to use
     const sanitizedId = token.replace(/[\/\.]/g, '_');
     await setDoc(doc(db, 'fcm_tokens', sanitizedId), tokenData, { merge: true });
-    console.log('✅ Token saved to Firestore successfully (ID: ' + sanitizedId + ')');
     
     // Dispatch event to update UI with token
     window.dispatchEvent(new CustomEvent('fcmTokenUpdated', { detail: token }));
@@ -125,58 +116,33 @@ async function setupCapacitorPushNotifications(
   userType: string
 ) {
   try {
-    alert('DEBUG 3: Requesting Permissions...');
-    console.log('🔑 Requesting Push permissions...');
+    alert('DEBUG: Requesting Push Permissions...');
     const result = await PushNotifications.requestPermissions();
-    console.log('📊 Permission result:', result.receive);
-    alert('DEBUG 4: Permission Result = ' + result.receive);
+    alert('DEBUG: Permission Result = ' + result.receive);
 
     if (result.receive === 'granted') {
-      // Clear all listeners first to avoid duplicates
       await PushNotifications.removeAllListeners();
 
-      // Subscribe to registration errors
       await PushNotifications.addListener('registrationError', (error) => {
-        console.error('❌ Push Registration Error:', error);
-        alert('Push Registration Error: ' + JSON.stringify(error));
-        window.dispatchEvent(new CustomEvent('fcmRegistrationError', { detail: error.error }));
+        alert('❌ Push Reg Error: ' + JSON.stringify(error));
       });
 
-      // Subscribe to push notifications
       await PushNotifications.addListener(
         'registration',
         async (token) => {
           const fcmToken = token.value;
+          alert('✅ Token Received: ' + fcmToken.substring(0, 10) + '...');
           const platform = Capacitor.getPlatform();
-          console.log(`✅ Native FCM Token Registered (${platform}):`, fcmToken);
-          alert('FCM Token Registered! App will now receive notifications.');
           localStorage.setItem('fcmToken', fcmToken);
           await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType);
         }
       );
 
-      // Handle incoming push notifications (Foreground)
-      let lastNotificationId = '';
       await PushNotifications.addListener(
         'pushNotificationReceived',
         (notification) => {
-          console.log('📬 Push received (foreground):', notification);
-          
-          // De-duplication logic
-          const currentId = notification.id || 
-                           (notification.data?.notificationId) || 
-                           `${notification.title}-${notification.body}`;
-          
-          if (currentId === lastNotificationId) {
-            console.log('🚫 Skipping duplicate notification in foreground');
-            return;
-          }
-          lastNotificationId = currentId;
-
-          // Trigger custom event for UI updates (like alert count)
+          // Foreground notification handling
           window.dispatchEvent(new CustomEvent('firebaseNotification', { detail: notification }));
-
-          // Show a local notification so the user sees it in foreground
           showLocalNotification(
             notification.title || 'New Job Alert 🆕',
             notification.body || 'Check the latest tuition requirements!'
@@ -184,26 +150,20 @@ async function setupCapacitorPushNotifications(
         }
       );
 
-      // Handle push notification action (Tap)
       await PushNotifications.addListener(
         'pushNotificationActionPerformed',
         (notification) => {
-          console.log('👆 Push action performed:', notification);
-          const data = notification.notification.data;
-          handleNotificationAction(data);
+          handleNotificationAction(notification.notification.data);
         }
       );
 
-      // Finally Register
       await PushNotifications.register();
-      console.log('✅ Capacitor Push Notifications registered');
+      alert('DEBUG: Push Registered Successfully');
     } else {
-      console.warn('⚠️ Push notification permission denied');
-      window.dispatchEvent(new CustomEvent('fcmRegistrationError', { detail: 'Permission denied by user' }));
+      alert('⚠️ Push Permission Denied by User');
     }
   } catch (error) {
-    console.error('❌ Error setting up Capacitor notifications:', error);
-    window.dispatchEvent(new CustomEvent('fcmRegistrationError', { detail: String(error) }));
+    alert('❌ Push Setup Crash: ' + String(error));
   }
 }
 
@@ -219,7 +179,7 @@ async function showLocalNotification(title: string, body: string) {
           body,
           id: Math.floor(Math.random() * 10000),
           schedule: {
-            at: new Date(Date.now() + 500) // Immediate
+            at: new Date(Date.now() + 500)
           },
           sound: 'blackberry.mp3',
           channelId: 'doable_channel_v6'
@@ -235,13 +195,11 @@ async function showLocalNotification(title: string, body: string) {
  * Handle notification action/tap
  */
 function handleNotificationAction(data: any) {
-  console.log('Handling notification action with data:', data);
   if (data?.type === 'job' || data?.jobId) {
     window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'jobs' }));
   } else if (data?.type === 'alert' || data?.type === 'support') {
     window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'alerts' }));
   } else {
-    // Default fallback
     window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'home' }));
   }
 }
