@@ -156,10 +156,11 @@ class NotificationService {
 
   private async saveTokenToFirestore(token: string, user: NotificationUser) {
     try {
+      const platform = Capacitor.getPlatform();
       const tokenData = {
         token,
         lastUpdated: serverTimestamp(),
-        platform: 'android',
+        platform: platform,
         city: user.city,
         gender: user.gender,
         classes: user.classes,
@@ -168,7 +169,7 @@ class NotificationService {
       };
 
       await setDoc(doc(db, 'fcm_tokens', token), tokenData, { merge: true });
-      console.log('FCM Token saved to Firestore');
+      console.log(`FCM Token saved to Firestore (${platform})`);
     } catch (error) {
       console.error('Error saving FCM token:', error);
     }

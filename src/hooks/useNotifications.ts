@@ -140,9 +140,10 @@ async function setupCapacitorPushNotifications(
         'registration',
         async (token) => {
           const fcmToken = token.value;
-          console.log('✅ Native FCM Token Registered:', fcmToken);
+          const platform = Capacitor.getPlatform();
+          console.log(`✅ Native FCM Token Registered (${platform}):`, fcmToken);
           localStorage.setItem('fcmToken', fcmToken);
-          await saveTokenToFirestore(fcmToken, 'android', city, gender, classes, userType);
+          await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType);
         }
       );
 
