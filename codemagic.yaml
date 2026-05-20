@@ -13,19 +13,18 @@ workflows:
       node: 22.14.0
       xcode: latest
     scripts:
-      - name: Install dependencies and build
+      - name: Build web assets
         script: |
           npm install --legacy-peer-deps
           npm run build
           npx cap sync ios
-      - name: Set up code signing
+      - name: Code signing
         script: |
           keychain initialize
-          # This uses the 'app_store_connect' integration directly
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
           xcode-project use-profiles --project "$XCODE_PROJECT"
-      - name: Build iOS app
+      - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
