@@ -26,6 +26,7 @@
 		}
 	},
 	"packageClassList": [
+		"FCMPlugin",
 		"LocalNotificationsPlugin",
 		"PushNotificationsPlugin",
 		"GoogleAuth"
