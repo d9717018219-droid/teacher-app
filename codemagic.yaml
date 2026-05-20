@@ -26,14 +26,32 @@ workflows:
         script: |
           keychain initialize
           keychain add-certificates
-          # Manually find and use the provisioning profile
+          
+          echo "🔍 DIAGNOSTICS: Listing Keychain Identities"
+          security find-identity -v -p codesigning
+          
+          echo "🔍 DIAGNOSTICS: Checking Profiles Directory"
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
+          
+          # Try to find profiles in the current directory (uploaded via UI)
           find . -name "*.mobileprovision" -exec cp {} "$PROFILES_HOME" \;
+          
+          ls -la "$PROFILES_HOME" || echo "⚠️ Profiles directory is empty!"
+          
+          # Force mapping
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build iOS app
         script: |
-          # Final build command
+          # Use explicit xcodebuild command with environment variables to force signing
+          xcodebuild -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -archivePath build/ios/xcarchive/App.xcarchive \
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            COMPILER_INDEX_STORE_ENABLE=NO | xcbeautify
+          
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
