@@ -228,23 +228,30 @@ export default function App() {
     
     const initializeAlerts = async () => {
       try {
+        window.alert('Step 1: Enabling Network...');
         await enableNetwork(db);
         
-        // Build 230: ZERO FILTER QUERY - Fetch everything to confirm connection
+        // Build 235: ABSOLUTE MINIMUM QUERY - No ordering, no filtering
         const q = query(
           collection(db, 'alerts'), 
-          orderBy('timestamp', 'desc'),
-          limit(50)
+          limit(10)
         );
 
-        const snap = await getDocsFromServer(q);
-        window.alert(`DIAGNOSTIC: Received ${snap.size} docs from Server`);
+        window.alert('Step 2: Fetching from Server...');
+        const snap = await getDocsFromServer(q).catch(e => {
+            window.alert('FETCH ERROR: ' + (e.code || e.message));
+            throw e;
+        });
+
+        window.alert(`Step 3: Received ${snap.size} docs`);
         
         if (snap.size > 0) {
-           const firstDoc = snap.docs[0].data();
-           console.log('Sample Doc:', firstDoc);
            const initialData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
            setAlerts(initialData);
+           setAlertsLoading(false);
+        } else {
+           window.alert('Step 3b: Collection is EMPTY');
+           setAlertsLoading(false);
         }
 
         const unsub = onSnapshot(q, (snapshot) => {
