@@ -257,35 +257,17 @@ body {
   gap: 12px !important;
 }
 
+/* Prevent iOS launcher/webview auto-zoom on input focus */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
 #support-chat-mount .chat-inputs textarea {
   border-radius: 14px !important;
   border: 1px solid #e2e8f0 !important;
   background: #f8fafc !important;
   padding: 10px 14px !important;
-  font-size: 14px !important;
-}
-
-#support-chat-mount .chat-inputs button {
-  background: #2563eb !important;
-  border-radius: 12px !important;
-  width: 44px !important;
-  height: 44px !important;
-}
-
-/* ═══════════════ BRANDING REMOVAL ═══════════════ */
-/* Hide all n8n branding, footers, and links */
-#support-chat-mount .n8n-chat-window-footer,
-#support-chat-mount .n8n-chat-window-footer-text,
-#support-chat-mount a[href*="n8n"],
-#support-chat-mount .n8n-chat-powered-by,
-.n8n-chat-powered-by {
-  display: none !important;
-  height: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
+  font-size: 16px !important; /* Fixed at 16px for iOS */
 }
 
 /* Hide the floating launcher bubble */
