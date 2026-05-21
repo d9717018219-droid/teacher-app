@@ -206,20 +206,29 @@ export default function App() {
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [alertsError, setAlertsError] = useState<string | null>(null);
 
-  const isAlertsInitialLoad = useRef(true);
+  const fetchAlertsFromServer = async () => {
+    setAlertsLoading(true);
+    try {
+      const q = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(100));
+      const snap = await getDocsFromServer(q);
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
+      setAlerts(data);
+      setAlertsLoading(false);
+      if (data.length === 0) window.alert('No alerts found on SERVER.');
+      else window.alert(`Loaded ${data.length} alerts from SERVER.`);
+    } catch (e: any) {
+      window.alert('Server Fetch Error: ' + e.message);
+      setAlertsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setAlertsError(null);
     setAlertsLoading(true);
-    
     try {
-      // Build 185 Fix: Simplify query to the absolute minimum to ensure data flow
-      const q = query(
-        collection(db, 'alerts'), 
-        limit(150)
-      );
-
+      const q = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(150));
       const unsub = onSnapshot(q, (snapshot) => {
+        const source = snapshot.metadata.fromCache ? 'Cache' : 'Server';
+        console.log(`📡 Alerts: ${snapshot.size} items from ${source}`);
         const alertsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
         
         if (!isAlertsInitialLoad.current) {
@@ -236,17 +245,15 @@ export default function App() {
         setAlertsLoading(false);
       }, (err) => {
         console.error('❌ Firestore Error:', err);
-        window.alert('Firestore Error: ' + err.code);
         setAlertsError(err.message);
         setAlertsLoading(false);
       });
       return () => unsub();
     } catch (e: any) {
-      console.error('❌ Exception in Alerts:', e);
       setAlertsError(e.message);
       setAlertsLoading(false);
     }
-  }, [userCity]); // Re-subscribe if userCity changes for filtering logic within listener if needed
+  }, []); // Re-subscribe if userCity changes for filtering logic within listener if needed
 
   const [debugClicks, setDebugClicks] = useState(0);
   const [fcmToken, setFcmToken] = useState<string>(localStorage.getItem('fcmToken') || 'Initializing...');
@@ -908,7 +915,7 @@ export default function App() {
           />
        )}
        {activeTab === 'alerts' && (
-          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={currentUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={currentUser?.email} isServerData={isServerData} /></div>
+          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={currentUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={currentUser?.email} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
        )}
        {activeTab === 'support' && (<SupportView userName={userName} userType={userType} userCity={userCity} />)}
        {activeTab === 'concierge' && (<ParentHubView userName={userName} playTapSound={playTapSound} setActiveTab={setActiveTab} setShowFormModal={setShowFormModal} setFormType={setFormType} />)}

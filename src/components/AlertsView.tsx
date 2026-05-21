@@ -36,6 +36,7 @@ interface AlertsViewProps {
   leadsCount?: number;
   authEmail?: string | null;
   isServerData?: boolean;
+  onRefresh?: () => void;
 }
 
 const TAP_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
@@ -294,6 +295,14 @@ const AlertsView: React.FC<AlertsViewProps> = ({
           </div>
           
           <div className="flex items-center gap-3">
+            {onRefresh && (
+              <button 
+                onClick={() => { playTapSound(); onRefresh(); }}
+                className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-md"
+              >
+                Refresh
+              </button>
+            )}
             {loading && (
               <div className="flex items-center gap-2 text-[8px] font-black text-slate-400 uppercase tracking-widest animate-pulse">
                 <Settings size={10} className="animate-spin" /> Syncing...
