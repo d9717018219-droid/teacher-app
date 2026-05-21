@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache, enableIndexedDbPersistence, terminate, clearPersistence } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache, enableIndexedDbPersistence, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { Capacitor } from '@capacitor/core';
 
@@ -21,11 +21,11 @@ export const db = initializeFirestore(app, {
   localCache: memoryLocalCache(),
 });
 
-// Build 115: Helper to force-clear firestore cache if it hangs
+// Build 116: Helper to force-clear firestore cache if it hangs
 export const forceResetFirestore = async () => {
     try {
         await terminate(db);
-        await clearPersistence(db);
+        await clearIndexedDbPersistence(db);
         console.log('✅ Firestore Cache Cleared');
         window.location.reload();
     } catch (e) {
