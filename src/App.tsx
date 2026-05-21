@@ -205,6 +205,7 @@ export default function App() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [alertsError, setAlertsError] = useState<string | null>(null);
+  const isAlertsInitialLoad = useRef(true);
 
   const fetchAlertsFromServer = async () => {
     setAlertsLoading(true);
@@ -225,10 +226,17 @@ export default function App() {
   useEffect(() => {
     setAlertsLoading(true);
     try {
-      const q = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(150));
+      // Build 220 Fix: Use city-inclusive query (User's City + All)
+      const q = query(
+        collection(db, 'alerts'), 
+        where('city', 'in', [userCity || 'All', 'All', 'all']),
+        orderBy('timestamp', 'desc'),
+        limit(150)
+      );
+
       const unsub = onSnapshot(q, (snapshot) => {
         const source = snapshot.metadata.fromCache ? 'Cache' : 'Server';
-        console.log(`📡 Alerts: ${snapshot.size} items from ${source}`);
+        console.log(`📡 Alerts Sync: ${snapshot.size} items from ${source}`);
         const alertsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
         
         if (!isAlertsInitialLoad.current) {
@@ -250,10 +258,11 @@ export default function App() {
       });
       return () => unsub();
     } catch (e: any) {
+      console.error('❌ Exception in Alerts:', e);
       setAlertsError(e.message);
       setAlertsLoading(false);
     }
-  }, []); // Re-subscribe if userCity changes for filtering logic within listener if needed
+  }, [userCity]); // Re-subscribe if userCity changes for filtering logic within listener if needed
 
   const [debugClicks, setDebugClicks] = useState(0);
   const [fcmToken, setFcmToken] = useState<string>(localStorage.getItem('fcmToken') || 'Initializing...');
