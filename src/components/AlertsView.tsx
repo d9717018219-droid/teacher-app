@@ -282,8 +282,30 @@ const AlertsView: React.FC<AlertsViewProps> = ({
     }
   };
 
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  
+  useEffect(() => {
+     const addLog = (msg: string) => setDebugLogs(prev => [new Date().toLocaleTimeString() + ': ' + msg, ...prev].slice(0, 5));
+     addLog('AlertsView Initialized');
+     addLog('City: ' + city);
+     addLog('Alerts count: ' + alerts.length);
+     if (loading) addLog('Status: SYNCING...');
+     else addLog('Status: READY');
+  }, [loading, alerts.length]);
+
   return (
     <div className="space-y-4 pb-24 mt-8">
+      {/* BUILD 110 DEBUG CONSOLE */}
+      <div className="mx-6 p-4 bg-slate-100 rounded-2xl border border-slate-200 text-[9px] font-mono text-slate-500 overflow-hidden">
+        <div className="flex justify-between items-center mb-2">
+          <span className="font-bold uppercase tracking-widest text-[8px]">Device Debug Log</span>
+          <span className={cn("px-2 py-0.5 rounded-full text-white text-[7px] font-black", loading ? "bg-amber-500" : "bg-emerald-500")}>
+            {loading ? "OFFLINE/SYNC" : "ONLINE/READY"}
+          </span>
+        </div>
+        {debugLogs.map((log, i) => <div key={i} className="truncate opacity-80">{log}</div>)}
+      </div>
+
       <audio ref={domAudioRef} onEnded={() => setIsPlaying(null)} className="hidden" preload="auto" crossOrigin="anonymous" />
       
       {/* Modern Filter Bar */}

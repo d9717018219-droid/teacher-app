@@ -214,9 +214,18 @@ export default function App() {
     console.log('📍 Firestore experimentalForceLongPolling:', true);
     setAlertsError(null);
     
+    // Build 110 Fix: Force loading to end after 8 seconds if Firestore hangs
+    const syncTimeout = setTimeout(() => {
+      if (alertsLoading) {
+        console.warn('⚠️ Firestore sync timed out. Forcing UI to ready state.');
+        setAlertsLoading(false);
+      }
+    }, 8000);
+
     try {
       const q = query(collection(db, 'alerts'), limit(150));
       const unsub = onSnapshot(q, (snapshot) => {
+        clearTimeout(syncTimeout);
         console.log(`✅ Firestore Alerts Sync: ${snapshot.size} items received | Source: ${snapshot.metadata.fromCache ? 'Cache' : 'Server'}`);
         if (snapshot.empty) {
           console.log('⚠️ Alerts collection is empty.');
