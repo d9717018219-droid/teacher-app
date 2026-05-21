@@ -228,87 +228,45 @@ export default function App() {
     
     const initializeAlerts = async () => {
       try {
-        window.alert('Build 255: Starting REST Sync');
-        
-        // Build 255: Reinforced REST API Bypass with API Key
+        window.alert('Build 260: REST Final');
         const API_KEY = "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s";
         const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=50&key=${API_KEY}`;
         
-        try {
-          console.log('📡 Fetching via REST...');
-          const response = await fetch(REST_URL).catch(e => {
-             window.alert('REST NETWORK ERROR: ' + e.message);
-             throw e;
-          });
-
-          if (!response.ok) {
-             const errText = await response.text();
-             window.alert('REST SERVER ERROR: ' + response.status);
-             throw new Error('HTTP ' + response.status);
-          }
-
-          const data = await response.json();
-          if (data.documents) {
-            const initialData = data.documents.map((doc: any) => {
-              const parts = doc.name.split('/');
-              const fields = doc.fields || {};
-              // REST API format conversion
-              return {
-                id: parts[parts.length - 1],
-                message: fields.message?.stringValue || fields.Message?.stringValue || '',
-                sender: fields.sender?.stringValue || 'System',
-                type: fields.type?.stringValue || 'info',
-                city: fields.city?.stringValue || 'All',
-                timestamp: fields.timestamp?.timestampValue || new Date().toISOString()
-              };
-            }) as Alert[];
-            
-            window.alert('REST_SUCCESS: Found ' + initialData.length + ' docs');
-            setAlerts(initialData);
-            setAlertsLoading(false);
-          } else {
-            window.alert('REST_SUCCESS: No docs in database');
-            setAlertsLoading(false);
-          }
-        } catch (restErr: any) {
-          console.error('REST Bypass failed:', restErr);
-        }
-
-        // Standard SDK call in background - if it times out, we already have REST data
-        const q = query(collection(db, 'alerts'), limit(20));
-        onSnapshot(q, () => {});
-          const source = snapshot.metadata.fromCache ? 'Cache' : 'Server';
-          console.log(`📡 Alerts Sync: ${snapshot.size} items from ${source}`);
-          const alertsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
-          
-          if (!isAlertsInitialLoad.current) {
-            const newAlerts = snapshot.docChanges().filter(change => change.type === 'added');
-            if (newAlerts.length > 0) {
-              setUnseenAlertsCount(prev => prev + newAlerts.length);
-              playTapSound();
-            }
-          } else {
-            isAlertsInitialLoad.current = false;
-          }
-
-          setAlerts(alertsData);
-          setAlertsLoading(false);
-        }, (err) => {
-          console.error('❌ Firestore Error:', err);
-          setAlertsError(err.message);
-          setAlertsLoading(false);
+        const response = await fetch(REST_URL).catch(e => {
+           window.alert('REST ERROR: ' + e.message);
+           throw e;
         });
-        return unsub;
+
+        const data = await response.json();
+        if (data.documents && data.documents.length > 0) {
+          const initialData = data.documents.map((doc: any) => {
+            const parts = doc.name.split('/');
+            const fields = doc.fields || {};
+            return {
+              id: parts[parts.length - 1],
+              message: fields.message?.stringValue || fields.Message?.stringValue || 'No Message',
+              sender: fields.sender?.stringValue || 'System',
+              type: fields.type?.stringValue || 'info',
+              city: fields.city?.stringValue || 'All',
+              timestamp: fields.timestamp?.timestampValue || new Date().toISOString()
+            };
+          }) as Alert[];
+          
+          window.alert(`REST_SUCCESS: ${initialData.length} docs. First: ${initialData[0].message.substring(0, 20)}`);
+          setAlerts(initialData);
+          setAlertsLoading(false);
+        } else {
+          window.alert('REST: 0 docs');
+          setAlertsLoading(false);
+        }
       } catch (e: any) {
-        console.error('❌ Sync Initialization Error:', e);
-        setAlertsError(e.message);
+        console.error('Final sync error:', e);
         setAlertsLoading(false);
-        return () => {};
       }
     };
 
-    const cleanupPromise = initializeAlerts();
-    return () => { cleanupPromise.then(unsub => unsub()); };
+    initializeAlerts();
+    return () => {};
   }, [userCity]); // Re-subscribe if userCity changes for filtering logic within listener if needed
 
   const [debugClicks, setDebugClicks] = useState(0);
