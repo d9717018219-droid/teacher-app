@@ -1602,28 +1602,7 @@ export default function App() {
                      <button onClick={() => { playTapSound(); setShowProfileSetup(false); }} className="w-full bg-primary text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all mt-6">Save & Close</button>
                    )}
 
-                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-2">DoAble India Network • v1.13.0</div>                   
-                   {/* FCM Token Debug Section */}
-                   <div className="px-4 pb-4">
-                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-2">
-                       <div className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Your FCM Token (iOS Debug)</div>
-                       <div className="text-[9px] font-mono text-slate-600 break-all bg-white p-2 rounded border border-slate-100 select-all">
-                         {localStorage.getItem('fcmToken') || 'Token not registered yet...'}
-                       </div>
-                       <button 
-                         onClick={() => {
-                           const token = localStorage.getItem('fcmToken');
-                           if (token) {
-                             navigator.clipboard.writeText(token);
-                             alert('Token copied to clipboard!');
-                           }
-                         }}
-                         className="text-[9px] font-bold text-primary flex items-center gap-1"
-                       >
-                         <Check size={10} /> Copy Full Token
-                       </button>
-                     </div>
-                   </div>
+                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-2">DoAble India Network • v1.13.1</div>                   
                 </div>
              </div>
           </div>
