@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'DoAble India',
   webDir: 'dist',
   server: {
-    // allowNavigation: ["*"] // Removed to allow system to handle external links
+    allowNavigation: ["*"] 
   },
   plugins: {
     GoogleAuth: {

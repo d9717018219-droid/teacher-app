@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { Capacitor } from '@capacitor/core';
 
@@ -16,11 +16,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-export const db = initializeFirestore(app, {
-  // Build 225: FORCING Long Polling and memory-only cache to fix iOS sync hang
-  experimentalForceLongPolling: true,
-  localCache: memoryLocalCache(),
-});
+// Build 240: Back to the most standard initialization
+export const db = getFirestore(app);
 
 // Build 116: Helper to force-clear firestore cache if it hangs
 export const forceResetFirestore = async () => {

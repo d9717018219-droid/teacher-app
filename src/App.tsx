@@ -228,29 +228,26 @@ export default function App() {
     
     const initializeAlerts = async () => {
       try {
-        window.alert('Step 1: Enabling Network...');
-        await enableNetwork(db);
+        window.alert('Build 240: Start Sync');
         
-        // Build 235: ABSOLUTE MINIMUM QUERY - No ordering, no filtering
         const q = query(
           collection(db, 'alerts'), 
-          limit(10)
+          limit(20)
         );
 
-        window.alert('Step 2: Fetching from Server...');
-        const snap = await getDocsFromServer(q).catch(e => {
+        // Build 240: Just use simple getDocs, it handles cache/server internally
+        const snap = await getDocs(q).catch(e => {
             window.alert('FETCH ERROR: ' + (e.code || e.message));
             throw e;
         });
 
-        window.alert(`Step 3: Received ${snap.size} docs`);
+        window.alert(`Sync Done: ${snap.size} docs`);
         
         if (snap.size > 0) {
            const initialData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
            setAlerts(initialData);
            setAlertsLoading(false);
         } else {
-           window.alert('Step 3b: Collection is EMPTY');
            setAlertsLoading(false);
         }
 
