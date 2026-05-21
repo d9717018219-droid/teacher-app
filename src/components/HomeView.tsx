@@ -148,7 +148,7 @@ export default function HomeView({
             className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-full border border-slate-100 text-[#0F172A] text-[10px] font-bold shadow-sm active:scale-90 transition-all shrink-0"
           >
             <MapPin size={12} className="text-primary" />
-            <span className="tracking-tight">{toTitleCase(userCity) || 'City'}</span>
+            <span className="tracking-tight">{toTitleCase(userCity) || 'All'}</span>
             <ChevronDown size={10} className="text-slate-300" />
           </button>
         </div>

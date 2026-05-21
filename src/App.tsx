@@ -75,7 +75,7 @@ export default function App() {
   const [firestoreLeads, setFirestoreLeads] = useState<JobLead[]>([]);
   const [tutors, setTutors] = useState<TutorProfile[]>([]);
 
-  const [userCity, setUserCity] = useState<string>(localStorage.getItem('userCity') || 'Ghaziabad');
+  const [userCity, setUserCity] = useState<string>(localStorage.getItem('userCity') || 'All');
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('userName'));
   const [userGender, setUserGender] = useState<string | null>(localStorage.getItem('userGender') || 'All');
   const [userType, setUserType] = useState<UserType | null>(localStorage.getItem('userType') as UserType);
@@ -1395,8 +1395,28 @@ export default function App() {
                       {userType === 'teacher' && (
                         <div className="space-y-4">
                            <div className="grid grid-cols-2 gap-2">
-                             <button onClick={() => { playTapSound(); setTutorStatus('registered'); }} className={cn("py-3 rounded-xl border-2 font-[900] uppercase text-[9px] transition-all", tutorStatus === 'registered' ? "border-[#572149] bg-[#572149]/5 text-[#572149]" : "border-slate-100 text-slate-400 bg-white")}>Sign In</button>
-                             <button onClick={() => { playTapSound(); setTutorStatus('new'); setIsTutorFetched(false); }} className={cn("py-3 rounded-xl border-2 font-[900] uppercase text-[9px] transition-all", tutorStatus === 'new' ? "border-[#572149] bg-[#572149]/5 text-[#572149]" : "border-slate-100 text-slate-400 bg-white")}>Sign Up</button>
+                             <button 
+                               onClick={() => { playTapSound(); setTutorStatus('registered'); }} 
+                               className={cn(
+                                 "py-3 rounded-xl font-[900] uppercase text-[9px] transition-all shadow-md active:scale-95", 
+                                 tutorStatus === 'registered' 
+                                   ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-purple-200" 
+                                   : "bg-white border-2 border-slate-100 text-slate-400"
+                               )}
+                             >
+                               Sign In
+                             </button>
+                             <button 
+                               onClick={() => { playTapSound(); setTutorStatus('new'); setIsTutorFetched(false); }} 
+                               className={cn(
+                                 "py-3 rounded-xl font-[900] uppercase text-[9px] transition-all shadow-md active:scale-95", 
+                                 tutorStatus === 'new' 
+                                   ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-indigo-200" 
+                                   : "bg-white border-2 border-slate-100 text-slate-400"
+                               )}
+                             >
+                               Sign Up
+                             </button>
                            </div>
 
                            {tutorStatus === 'registered' && !isTutorFetched && (
