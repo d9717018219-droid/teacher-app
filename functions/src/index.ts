@@ -130,13 +130,25 @@ export const emergencyDispatchAlert = functions.https.onCall({ region: "us-centr
 export const sendTestNotification = functions.https.onCall({ region: "us-central1" }, async (request) => {
     try {
         const db = getFirestore(CUSTOM_DB_ID);
+        
+        // SAVE TO ALERTS COLLECTION FIRST
+        const alertData = {
+            message: "🔥 Test Alert: Backend optimized!",
+            sender: "System Test 🛠️",
+            type: "broadcast",
+            city: "All",
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            via: "Test Function"
+        };
+        await db.collection("alerts").add(alertData);
+
         const tokensSnap = await db.collection("fcm_tokens").get();
         const registrationTokens: string[] = [];
         tokensSnap.forEach(doc => {
             const token = doc.data().token || doc.id;
             if (token && token.length > 20) registrationTokens.push(token);
         });
-        if (registrationTokens.length === 0) return { success: false };
+        if (registrationTokens.length === 0) return { success: true, message: "Alert saved to history, but no tokens found for push." };
         
         const testPayload = {
             notification: { title: "🔥 Test Alert", body: "Backend optimized!" },
@@ -147,7 +159,7 @@ export const sendTestNotification = functions.https.onCall({ region: "us-central
             tokens: registrationTokens
         };
         const response = await admin.messaging().sendEachForMulticast(testPayload);
-        return { success: true, count: response.successCount };
+        return { success: true, count: response.successCount, message: "Alert saved and notification sent!" };
     } catch (error) {
         return { success: false, error: String(error) };
     }
