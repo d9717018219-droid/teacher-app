@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 56;
 	objects = {
 /* Begin PBXBuildFile section */
 		958DCC732DB07C7200EA8C5F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 958DCC742DB07C7200EA8C5F /* GoogleService-Info.plist */; };

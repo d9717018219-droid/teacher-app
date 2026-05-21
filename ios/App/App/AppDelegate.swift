@@ -13,6 +13,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // Override point for customization after application launch.
         FirebaseApp.configure()
         
+        // Build 165: Enable Web Inspection for TestFlight debugging
+        if #available(iOS 16.4, *) {
+            DispatchQueue.main.async {
+                if let vc = self.window?.rootViewController as? CAPBridgeViewController {
+                    vc.bridge?.webView?.isInspectable = true
+                }
+            }
+        }
+        
         // Set messaging delegate
         Messaging.messaging().delegate = self
         
