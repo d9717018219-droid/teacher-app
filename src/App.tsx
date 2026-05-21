@@ -228,23 +228,34 @@ export default function App() {
     
     const initializeAlerts = async () => {
       try {
-        window.alert('Build 250: REST Sync');
+        window.alert('Build 255: Starting REST Sync');
         
-        // Build 250: Direct REST API Bypass for iOS Hangs
-        const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=20`;
+        // Build 255: Reinforced REST API Bypass with API Key
+        const API_KEY = "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s";
+        const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=50&key=${API_KEY}`;
         
         try {
-          const response = await fetch(REST_URL);
+          console.log('📡 Fetching via REST...');
+          const response = await fetch(REST_URL).catch(e => {
+             window.alert('REST NETWORK ERROR: ' + e.message);
+             throw e;
+          });
+
+          if (!response.ok) {
+             const errText = await response.text();
+             window.alert('REST SERVER ERROR: ' + response.status);
+             throw new Error('HTTP ' + response.status);
+          }
+
           const data = await response.json();
-          console.log('📡 REST API Result:', data);
-          
           if (data.documents) {
             const initialData = data.documents.map((doc: any) => {
               const parts = doc.name.split('/');
               const fields = doc.fields || {};
+              // REST API format conversion
               return {
                 id: parts[parts.length - 1],
-                message: fields.message?.stringValue || '',
+                message: fields.message?.stringValue || fields.Message?.stringValue || '',
                 sender: fields.sender?.stringValue || 'System',
                 type: fields.type?.stringValue || 'info',
                 city: fields.city?.stringValue || 'All',
@@ -252,21 +263,20 @@ export default function App() {
               };
             }) as Alert[];
             
-            window.alert(`REST Done: ${initialData.length} docs`);
+            window.alert('REST_SUCCESS: Found ' + initialData.length + ' docs');
             setAlerts(initialData);
             setAlertsLoading(false);
           } else {
-            window.alert('REST Done: Empty collection');
+            window.alert('REST_SUCCESS: No docs in database');
             setAlertsLoading(false);
           }
         } catch (restErr: any) {
-          window.alert('REST FAILED: ' + restErr.message);
-          setAlertsLoading(false);
+          console.error('REST Bypass failed:', restErr);
         }
 
-        // Keep listener in background but don't block on it
+        // Standard SDK call in background - if it times out, we already have REST data
         const q = query(collection(db, 'alerts'), limit(20));
-        onSnapshot(q, (snapshot) => {
+        onSnapshot(q, () => {});
           const source = snapshot.metadata.fromCache ? 'Cache' : 'Server';
           console.log(`📡 Alerts Sync: ${snapshot.size} items from ${source}`);
           const alertsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
