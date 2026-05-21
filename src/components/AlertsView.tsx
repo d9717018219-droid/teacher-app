@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, forceResetFirestore } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, UserType } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -295,10 +295,16 @@ const AlertsView: React.FC<AlertsViewProps> = ({
 
   return (
     <div className="space-y-4 pb-24 mt-8">
-      {/* BUILD 110 DEBUG CONSOLE */}
+      {/* BUILD 115 DEBUG CONSOLE */}
       <div className="mx-6 p-4 bg-slate-100 rounded-2xl border border-slate-200 text-[9px] font-mono text-slate-500 overflow-hidden">
         <div className="flex justify-between items-center mb-2">
           <span className="font-bold uppercase tracking-widest text-[8px]">Device Debug Log</span>
+          <button 
+            onClick={() => { if(window.confirm('Reset Firestore Sync?')) forceResetFirestore(); }}
+            className="px-2 py-0.5 bg-rose-500 text-white text-[7px] font-black rounded-full"
+          >
+            FORCE RESET
+          </button>
           <span className={cn("px-2 py-0.5 rounded-full text-white text-[7px] font-black", loading ? "bg-amber-500" : "bg-emerald-500")}>
             {loading ? "OFFLINE/SYNC" : "ONLINE/READY"}
           </span>
