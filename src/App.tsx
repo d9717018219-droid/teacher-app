@@ -228,25 +228,25 @@ export default function App() {
     
     const initializeAlerts = async () => {
       try {
-        // Build 225: Explicitly enable network and fetch from server only
         await enableNetwork(db);
         
+        // Build 230: ZERO FILTER QUERY - Fetch everything to confirm connection
         const q = query(
           collection(db, 'alerts'), 
-          where('city', 'in', [userCity || 'All', 'All', 'all']),
           orderBy('timestamp', 'desc'),
-          limit(150)
+          limit(50)
         );
 
-        // 1. Force a server-only fetch first
         const snap = await getDocsFromServer(q);
-        console.log(`📡 Build 225: Server-only fetch returned ${snap.size} docs`);
-        const initialData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
-        if (initialData.length > 0) {
-          setAlerts(initialData);
+        window.alert(`DIAGNOSTIC: Received ${snap.size} docs from Server`);
+        
+        if (snap.size > 0) {
+           const firstDoc = snap.docs[0].data();
+           console.log('Sample Doc:', firstDoc);
+           const initialData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
+           setAlerts(initialData);
         }
 
-        // 2. Start the real-time listener
         const unsub = onSnapshot(q, (snapshot) => {
           const source = snapshot.metadata.fromCache ? 'Cache' : 'Server';
           console.log(`📡 Alerts Sync: ${snapshot.size} items from ${source}`);
