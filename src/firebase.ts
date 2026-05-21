@@ -17,7 +17,9 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 export const db = initializeFirestore(app, {
-  // Build 185: Using standard settings for maximum compatibility
+  // Build 225: FORCING Long Polling and memory-only cache to fix iOS sync hang
+  experimentalForceLongPolling: true,
+  localCache: memoryLocalCache(),
 });
 
 // Build 116: Helper to force-clear firestore cache if it hangs

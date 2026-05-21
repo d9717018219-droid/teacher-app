@@ -225,43 +225,61 @@ export default function App() {
 
   useEffect(() => {
     setAlertsLoading(true);
-    try {
-      // Build 220 Fix: Use city-inclusive query (User's City + All)
-      const q = query(
-        collection(db, 'alerts'), 
-        where('city', 'in', [userCity || 'All', 'All', 'all']),
-        orderBy('timestamp', 'desc'),
-        limit(150)
-      );
-
-      const unsub = onSnapshot(q, (snapshot) => {
-        const source = snapshot.metadata.fromCache ? 'Cache' : 'Server';
-        console.log(`📡 Alerts Sync: ${snapshot.size} items from ${source}`);
-        const alertsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
+    
+    const initializeAlerts = async () => {
+      try {
+        // Build 225: Explicitly enable network and fetch from server only
+        await enableNetwork(db);
         
-        if (!isAlertsInitialLoad.current) {
-          const newAlerts = snapshot.docChanges().filter(change => change.type === 'added');
-          if (newAlerts.length > 0) {
-            setUnseenAlertsCount(prev => prev + newAlerts.length);
-            playTapSound();
-          }
-        } else {
-          isAlertsInitialLoad.current = false;
+        const q = query(
+          collection(db, 'alerts'), 
+          where('city', 'in', [userCity || 'All', 'All', 'all']),
+          orderBy('timestamp', 'desc'),
+          limit(150)
+        );
+
+        // 1. Force a server-only fetch first
+        const snap = await getDocsFromServer(q);
+        console.log(`📡 Build 225: Server-only fetch returned ${snap.size} docs`);
+        const initialData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
+        if (initialData.length > 0) {
+          setAlerts(initialData);
         }
 
-        setAlerts(alertsData);
+        // 2. Start the real-time listener
+        const unsub = onSnapshot(q, (snapshot) => {
+          const source = snapshot.metadata.fromCache ? 'Cache' : 'Server';
+          console.log(`📡 Alerts Sync: ${snapshot.size} items from ${source}`);
+          const alertsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
+          
+          if (!isAlertsInitialLoad.current) {
+            const newAlerts = snapshot.docChanges().filter(change => change.type === 'added');
+            if (newAlerts.length > 0) {
+              setUnseenAlertsCount(prev => prev + newAlerts.length);
+              playTapSound();
+            }
+          } else {
+            isAlertsInitialLoad.current = false;
+          }
+
+          setAlerts(alertsData);
+          setAlertsLoading(false);
+        }, (err) => {
+          console.error('❌ Firestore Error:', err);
+          setAlertsError(err.message);
+          setAlertsLoading(false);
+        });
+        return unsub;
+      } catch (e: any) {
+        console.error('❌ Sync Initialization Error:', e);
+        setAlertsError(e.message);
         setAlertsLoading(false);
-      }, (err) => {
-        console.error('❌ Firestore Error:', err);
-        setAlertsError(err.message);
-        setAlertsLoading(false);
-      });
-      return () => unsub();
-    } catch (e: any) {
-      console.error('❌ Exception in Alerts:', e);
-      setAlertsError(e.message);
-      setAlertsLoading(false);
-    }
+        return () => {};
+      }
+    };
+
+    const cleanupPromise = initializeAlerts();
+    return () => { cleanupPromise.then(unsub => unsub()); };
   }, [userCity]); // Re-subscribe if userCity changes for filtering logic within listener if needed
 
   const [debugClicks, setDebugClicks] = useState(0);
