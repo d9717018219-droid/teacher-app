@@ -227,7 +227,12 @@ export default function App() {
     // Build 135: Initial One-time fetch for stability
     const fetchInitial = async () => {
       try {
-        const qBase = query(collection(db, 'alerts'), limit(150));
+        const qBase = query(
+          collection(db, 'alerts'),
+          where('city', 'in', [userCity || 'All', 'All', 'all']),
+          orderBy('timestamp', 'desc'),
+          limit(150)
+        );
         const snap = await getDocs(qBase);
         console.log(`📡 Initial Fetch Success: ${snap.size} docs`);
         const initialData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
@@ -243,8 +248,13 @@ export default function App() {
     fetchInitial();
 
     try {
-      // Build 135: Back to simple query to avoid any iOS-specific query operator hangs
-      const q = query(collection(db, 'alerts'), limit(150));
+      // Build 135: Using optimized composite index query
+      const q = query(
+        collection(db, 'alerts'),
+        where('city', 'in', [userCity || 'All', 'All', 'all']),
+        orderBy('timestamp', 'desc'),
+        limit(150)
+      );
       const unsub = onSnapshot(q, (snapshot) => {
         clearTimeout(syncTimeout);
         console.log(`✅ Firestore Alerts Sync: ${snapshot.size} items received | Source: ${snapshot.metadata.fromCache ? 'Cache' : 'Server'}`);

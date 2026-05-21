@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache, enableIndexedDbPersistence, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { Capacitor } from '@capacitor/core';
 
@@ -19,6 +19,7 @@ export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   // Build 135: Let SDK auto-detect best transport for iOS stability
   experimentalAutoDetectLongPolling: true,
+  localCache: persistentLocalCache(),
 });
 
 // Build 116: Helper to force-clear firestore cache if it hangs
