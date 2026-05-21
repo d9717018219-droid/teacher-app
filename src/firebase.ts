@@ -17,9 +17,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 export const db = initializeFirestore(app, {
-  // Build 150: FORCING Long Polling and disabling persistence to fix iOS hang
-  experimentalForceLongPolling: true,
-  localCache: memoryLocalCache(),
+  // Build 185: Using standard settings for maximum compatibility
 });
 
 // Build 116: Helper to force-clear firestore cache if it hangs

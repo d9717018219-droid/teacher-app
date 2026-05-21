@@ -213,11 +213,9 @@ export default function App() {
     setAlertsLoading(true);
     
     try {
-      // Build 180 Fix: Include both specific city and 'All'
+      // Build 185 Fix: Simplify query to the absolute minimum to ensure data flow
       const q = query(
         collection(db, 'alerts'), 
-        where('city', 'in', [userCity || 'All', 'All', 'all']),
-        orderBy('timestamp', 'desc'),
         limit(150)
       );
 
@@ -238,6 +236,7 @@ export default function App() {
         setAlertsLoading(false);
       }, (err) => {
         console.error('❌ Firestore Error:', err);
+        window.alert('Firestore Error: ' + err.code);
         setAlertsError(err.message);
         setAlertsLoading(false);
       });
