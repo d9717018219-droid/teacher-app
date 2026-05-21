@@ -85,7 +85,9 @@ async function saveTokenToFirestore(
     };
 
     const sanitizedId = token.replace(/[\/\.]/g, '_');
+    console.log('📝 Attempting to save token to Firestore:', sanitizedId, 'Platform:', platform);
     await setDoc(doc(db, 'fcm_tokens', sanitizedId), tokenData, { merge: true });
+    console.log('✅ Token saved successfully to Firestore');
     window.dispatchEvent(new CustomEvent('fcmTokenUpdated', { detail: token }));
   } catch (e) {
     console.error('❌ Error saving token:', e);

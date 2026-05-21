@@ -225,7 +225,12 @@ export default function App() {
     }, 8000);
 
     try {
-      const q = query(collection(db, 'alerts'), limit(150));
+      // Build 130 Fix: Include both specific city and 'All' in the query
+      const q = query(
+        collection(db, 'alerts'), 
+        where('city', 'in', [userCity || 'All', 'All', 'all']),
+        limit(150)
+      );
       const unsub = onSnapshot(q, (snapshot) => {
         clearTimeout(syncTimeout);
         console.log(`✅ Firestore Alerts Sync: ${snapshot.size} items received | Source: ${snapshot.metadata.fromCache ? 'Cache' : 'Server'}`);
