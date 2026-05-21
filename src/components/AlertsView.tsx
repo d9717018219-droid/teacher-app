@@ -289,22 +289,26 @@ const AlertsView: React.FC<AlertsViewProps> = ({
   const createLocalTestAlert = async () => {
     try {
       addLog('Attempting write...');
-      await addDoc(collection(db, 'alerts'), {
-        message: '🚀 Local iOS Test Alert ' + new Date().toLocaleTimeString(),
+      const writePromise = addDoc(collection(db, 'alerts'), {
+        message: '🚀 Build 145 Test ' + new Date().toLocaleTimeString(),
         sender: 'Device Debug',
         type: 'success',
         city: 'All',
         timestamp: serverTimestamp()
       });
+      
+      const writeTimeout = setTimeout(() => addLog('⌛ Write pending...'), 4000);
+      await writePromise;
+      clearTimeout(writeTimeout);
       addLog('Write Successful! ✅');
     } catch (e: any) {
-      addLog('Write Error: ' + e.message);
+      addLog('❌ Write Error: ' + (e.code || e.message));
     }
   };
 
   useEffect(() => {
      addLog('AlertsView Initialized');
-     addLog('City: ' + city);
+     addLog('User: ' + (auth.currentUser?.email || 'Guest'));
      addLog('Alerts count: ' + alerts.length);
      if (loading) addLog('Status: SYNCING...');
      else addLog('Status: READY');
@@ -312,8 +316,13 @@ const AlertsView: React.FC<AlertsViewProps> = ({
 
   useEffect(() => {
      const handleTimeout = () => addLog('⚠️ SYNC TIMEOUT (Using Cache)');
+     const handleSyncLog = (e: any) => addLog('📡 ' + e.detail);
      window.addEventListener('dbSyncTimeout', handleTimeout);
-     return () => window.removeEventListener('dbSyncTimeout', handleTimeout);
+     window.addEventListener('dbSyncLog', handleSyncLog);
+     return () => {
+       window.removeEventListener('dbSyncTimeout', handleTimeout);
+       window.removeEventListener('dbSyncLog', handleSyncLog);
+     };
   }, []);
 
   const manualFetch = async () => {
@@ -329,7 +338,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
 
   return (
     <div className="space-y-4 pb-24 mt-8">
-      {/* BUILD 125 DEBUG CONSOLE */}
+      {/* BUILD 145 DEBUG CONSOLE */}
       <div className="mx-6 p-4 bg-slate-100 rounded-2xl border border-slate-200 text-[9px] font-mono text-slate-500 overflow-hidden">
         <div className="flex justify-between items-center mb-2 gap-2">
           <span className="font-bold uppercase tracking-widest text-[8px] shrink-0">Device Debug</span>

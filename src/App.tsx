@@ -257,7 +257,9 @@ export default function App() {
       );
       const unsub = onSnapshot(q, (snapshot) => {
         clearTimeout(syncTimeout);
-        console.log(`✅ Firestore Alerts Sync: ${snapshot.size} items received | Source: ${snapshot.metadata.fromCache ? 'Cache' : 'Server'}`);
+        const source = snapshot.metadata.fromCache ? 'CACHE' : 'SERVER';
+        console.log(`✅ Firestore Alerts Sync: ${snapshot.size} items received | Source: ${source}`);
+        window.dispatchEvent(new CustomEvent('dbSyncLog', { detail: `Sync: ${snapshot.size} docs (${source})` }));
         if (snapshot.empty) {
           console.log('⚠️ Alerts collection is empty.');
         }
