@@ -219,6 +219,8 @@ export default function App() {
       if (alertsLoading) {
         console.warn('⚠️ Firestore sync timed out. Forcing UI to ready state.');
         setAlertsLoading(false);
+        setDbStatus('Error');
+        window.dispatchEvent(new CustomEvent('dbSyncTimeout'));
       }
     }, 8000);
 

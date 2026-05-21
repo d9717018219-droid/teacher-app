@@ -17,7 +17,8 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: !Capacitor.isNativePlatform(),
+  // Build 125: Re-enabling Long Polling for Native (Recommended for Capacitor iOS)
+  experimentalForceLongPolling: Capacitor.isNativePlatform(),
   localCache: memoryLocalCache(),
 });
 

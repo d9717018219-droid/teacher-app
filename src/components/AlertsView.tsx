@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { collection, query, where, orderBy, onSnapshot, limit, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, limit, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db, forceResetFirestore } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, UserType } from '../types';
@@ -310,26 +310,39 @@ const AlertsView: React.FC<AlertsViewProps> = ({
      else addLog('Status: READY');
   }, [loading, alerts.length]);
 
+  useEffect(() => {
+     const handleTimeout = () => addLog('⚠️ SYNC TIMEOUT (Using Cache)');
+     window.addEventListener('dbSyncTimeout', handleTimeout);
+     return () => window.removeEventListener('dbSyncTimeout', handleTimeout);
+  }, []);
+
+  const manualFetch = async () => {
+    try {
+      addLog('Manual Fetch started...');
+      const q = query(collection(db, 'alerts'), limit(50));
+      const snap = await getDocs(q);
+      addLog(`Fetch Success: ${snap.size} docs`);
+    } catch (e: any) {
+      addLog('Fetch Error: ' + e.message);
+    }
+  };
+
   return (
     <div className="space-y-4 pb-24 mt-8">
-      {/* BUILD 121 DEBUG CONSOLE */}
+      {/* BUILD 125 DEBUG CONSOLE */}
       <div className="mx-6 p-4 bg-slate-100 rounded-2xl border border-slate-200 text-[9px] font-mono text-slate-500 overflow-hidden">
         <div className="flex justify-between items-center mb-2 gap-2">
           <span className="font-bold uppercase tracking-widest text-[8px] shrink-0">Device Debug</span>
-          <button 
-            onClick={createLocalTestAlert}
-            className="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black rounded-full"
-          >
-            CREATE TEST
-          </button>
+          <button onClick={manualFetch} className="px-2 py-0.5 bg-emerald-500 text-white text-[7px] font-black rounded-full">FETCH</button>
+          <button onClick={createLocalTestAlert} className="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black rounded-full">WRITE</button>
           <button 
             onClick={() => { if(window.confirm('Reset Firestore Sync?')) forceResetFirestore(); }}
             className="px-2 py-0.5 bg-rose-500 text-white text-[7px] font-black rounded-full"
           >
-            FORCE RESET
+            RESET
           </button>
           <span className={cn("px-2 py-0.5 rounded-full text-white text-[7px] font-black ml-auto", loading ? "bg-amber-500" : "bg-emerald-500")}>
-            {loading ? "OFFLINE/SYNC" : "ONLINE/READY"}
+            {loading ? "SYNC" : "READY"}
           </span>
         </div>
         {debugLogs.map((log, i) => <div key={i} className="truncate opacity-80">{log}</div>)}
