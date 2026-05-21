@@ -185,7 +185,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
   setUserCity, setUserGender, setUserClasses, setUserType,
   userName, setUserName, initialTab = 'feed',
   alerts, loading, error, dbStatus,
-  leadsCount, authEmail, isServerData
+  leadsCount, authEmail, isServerData, onRefresh
 }) => {
   const [activeTab, setActiveTab] = useState<'feed' | 'support' | 'setup'>(initialTab);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
