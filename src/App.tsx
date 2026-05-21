@@ -228,38 +228,45 @@ export default function App() {
     
     const initializeAlerts = async () => {
       try {
-        window.alert('Build 245: Start Sync');
-        window.alert('Config Check: ' + (db as any)._databaseId.projectId);
+        window.alert('Build 250: REST Sync');
         
-        const q = query(
-          collection(db, 'alerts'), 
-          limit(20)
-        );
-
-        // Build 245: Timeout Wrapper to break iOS hangs
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('SYNC TIMED OUT')), 5000)
-        );
-
-        const snap: any = await Promise.race([
-          getDocs(q),
-          timeoutPromise
-        ]).catch(e => {
-            window.alert('FETCH FAILED: ' + e.message);
-            throw e;
-        });
-
-        window.alert(`Sync Done: ${snap.size} docs`);
+        // Build 250: Direct REST API Bypass for iOS Hangs
+        const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=20`;
         
-        if (snap.size > 0) {
-           const initialData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
-           setAlerts(initialData);
-           setAlertsLoading(false);
-        } else {
-           setAlertsLoading(false);
+        try {
+          const response = await fetch(REST_URL);
+          const data = await response.json();
+          console.log('📡 REST API Result:', data);
+          
+          if (data.documents) {
+            const initialData = data.documents.map((doc: any) => {
+              const parts = doc.name.split('/');
+              const fields = doc.fields || {};
+              return {
+                id: parts[parts.length - 1],
+                message: fields.message?.stringValue || '',
+                sender: fields.sender?.stringValue || 'System',
+                type: fields.type?.stringValue || 'info',
+                city: fields.city?.stringValue || 'All',
+                timestamp: fields.timestamp?.timestampValue || new Date().toISOString()
+              };
+            }) as Alert[];
+            
+            window.alert(`REST Done: ${initialData.length} docs`);
+            setAlerts(initialData);
+            setAlertsLoading(false);
+          } else {
+            window.alert('REST Done: Empty collection');
+            setAlertsLoading(false);
+          }
+        } catch (restErr: any) {
+          window.alert('REST FAILED: ' + restErr.message);
+          setAlertsLoading(false);
         }
 
-        const unsub = onSnapshot(q, (snapshot) => {
+        // Keep listener in background but don't block on it
+        const q = query(collection(db, 'alerts'), limit(20));
+        onSnapshot(q, (snapshot) => {
           const source = snapshot.metadata.fromCache ? 'Cache' : 'Server';
           console.log(`📡 Alerts Sync: ${snapshot.size} items from ${source}`);
           const alertsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
