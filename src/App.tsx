@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle } from 'lucide-react';
-import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc, getDocsFromServer, enableNetwork } from 'firebase/firestore';
 import { db, auth, auth as firebaseAuth } from './firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
@@ -224,7 +224,18 @@ export default function App() {
       }
     }, 8000);
 
-    // Build 135: Initial One-time fetch for stability
+    // Build 155: Force Network Connectivity
+    const forceConnect = async () => {
+      try {
+        await enableNetwork(db);
+        console.log('🌐 Network enabled manually');
+      } catch (e) {
+        console.error('Network enable error:', e);
+      }
+    };
+    forceConnect();
+
+    // Build 155: Server-only fetch to bypass cache
     const fetchInitial = async () => {
       try {
         const qBase = query(
@@ -233,16 +244,16 @@ export default function App() {
           orderBy('timestamp', 'desc'),
           limit(150)
         );
-        const snap = await getDocs(qBase);
-        console.log(`📡 Initial Fetch Success: ${snap.size} docs`);
+        const snap = await getDocsFromServer(qBase);
+        console.log(`📡 SERVER Initial Fetch Success: ${snap.size} docs`);
         const initialData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
         if (initialData.length > 0) {
            setAlerts(initialData);
            setAlertsLoading(false);
            clearTimeout(syncTimeout);
         }
-      } catch (e) {
-        console.error('Initial fetch error:', e);
+      } catch (e: any) {
+        console.error('Initial server fetch error:', e);
       }
     };
     fetchInitial();

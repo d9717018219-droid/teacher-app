@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { collection, query, where, orderBy, onSnapshot, limit, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, limit, addDoc, serverTimestamp, getDocs, getDocsFromServer } from 'firebase/firestore';
 import { db, forceResetFirestore } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, UserType } from '../types';
@@ -328,22 +328,27 @@ const AlertsView: React.FC<AlertsViewProps> = ({
 
   const manualFetch = async () => {
     try {
-      addLog('Manual Fetch started...');
-      const q = query(collection(db, 'alerts'), limit(50));
-      const snap = await getDocs(q);
-      addLog(`Fetch Success: ${snap.size} docs`);
+      addLog('Manual SRV-Fetch started...');
+      const q = query(
+        collection(db, 'alerts'),
+        where('city', 'in', [city || 'All', 'All', 'all']),
+        orderBy('timestamp', 'desc'),
+        limit(50)
+      );
+      const snap = await getDocsFromServer(q);
+      addLog(`SERVER Fetch Success: ${snap.size} docs`);
     } catch (e: any) {
-      addLog('Fetch Error: ' + e.message);
+      addLog('❌ SERVER Fetch Error: ' + (e.code || e.message));
     }
   };
 
   return (
     <div className="space-y-4 pb-24 mt-8">
-      {/* BUILD 145 DEBUG CONSOLE */}
+      {/* BUILD 155 DEBUG CONSOLE */}
       <div className="mx-6 p-4 bg-slate-100 rounded-2xl border border-slate-200 text-[9px] font-mono text-slate-500 overflow-hidden">
         <div className="flex justify-between items-center mb-2 gap-2">
           <span className="font-bold uppercase tracking-widest text-[8px] shrink-0">Device Debug</span>
-          <button onClick={manualFetch} className="px-2 py-0.5 bg-emerald-500 text-white text-[7px] font-black rounded-full">FETCH</button>
+          <button onClick={manualFetch} className="px-2 py-0.5 bg-emerald-500 text-white text-[7px] font-black rounded-full">SRV-FETCH</button>
           <button onClick={createLocalTestAlert} className="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black rounded-full">WRITE</button>
           <button 
             onClick={() => { if(window.confirm('Reset Firestore Sync?')) forceResetFirestore(); }}
