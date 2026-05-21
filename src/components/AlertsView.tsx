@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, limit, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, forceResetFirestore } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, UserType } from '../types';
@@ -284,8 +284,25 @@ const AlertsView: React.FC<AlertsViewProps> = ({
 
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   
+  const addLog = (msg: string) => setDebugLogs(prev => [new Date().toLocaleTimeString() + ': ' + msg, ...prev].slice(0, 5));
+
+  const createLocalTestAlert = async () => {
+    try {
+      addLog('Attempting write...');
+      await addDoc(collection(db, 'alerts'), {
+        message: '🚀 Local iOS Test Alert ' + new Date().toLocaleTimeString(),
+        sender: 'Device Debug',
+        type: 'success',
+        city: 'All',
+        timestamp: serverTimestamp()
+      });
+      addLog('Write Successful! ✅');
+    } catch (e: any) {
+      addLog('Write Error: ' + e.message);
+    }
+  };
+
   useEffect(() => {
-     const addLog = (msg: string) => setDebugLogs(prev => [new Date().toLocaleTimeString() + ': ' + msg, ...prev].slice(0, 5));
      addLog('AlertsView Initialized');
      addLog('City: ' + city);
      addLog('Alerts count: ' + alerts.length);
@@ -295,17 +312,23 @@ const AlertsView: React.FC<AlertsViewProps> = ({
 
   return (
     <div className="space-y-4 pb-24 mt-8">
-      {/* BUILD 115 DEBUG CONSOLE */}
+      {/* BUILD 121 DEBUG CONSOLE */}
       <div className="mx-6 p-4 bg-slate-100 rounded-2xl border border-slate-200 text-[9px] font-mono text-slate-500 overflow-hidden">
-        <div className="flex justify-between items-center mb-2">
-          <span className="font-bold uppercase tracking-widest text-[8px]">Device Debug Log</span>
+        <div className="flex justify-between items-center mb-2 gap-2">
+          <span className="font-bold uppercase tracking-widest text-[8px] shrink-0">Device Debug</span>
+          <button 
+            onClick={createLocalTestAlert}
+            className="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black rounded-full"
+          >
+            CREATE TEST
+          </button>
           <button 
             onClick={() => { if(window.confirm('Reset Firestore Sync?')) forceResetFirestore(); }}
             className="px-2 py-0.5 bg-rose-500 text-white text-[7px] font-black rounded-full"
           >
             FORCE RESET
           </button>
-          <span className={cn("px-2 py-0.5 rounded-full text-white text-[7px] font-black", loading ? "bg-amber-500" : "bg-emerald-500")}>
+          <span className={cn("px-2 py-0.5 rounded-full text-white text-[7px] font-black ml-auto", loading ? "bg-amber-500" : "bg-emerald-500")}>
             {loading ? "OFFLINE/SYNC" : "ONLINE/READY"}
           </span>
         </div>
