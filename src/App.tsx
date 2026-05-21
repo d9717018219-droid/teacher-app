@@ -238,6 +238,7 @@ export default function App() {
     // Build 155: Server-only fetch to bypass cache
     const fetchInitial = async () => {
       try {
+        console.log('📡 SERVER Initial Fetch started...');
         const qBase = query(
           collection(db, 'alerts'),
           where('city', 'in', [userCity || 'All', 'All', 'all']),
@@ -251,9 +252,11 @@ export default function App() {
            setAlerts(initialData);
            setAlertsLoading(false);
            clearTimeout(syncTimeout);
+           window.dispatchEvent(new CustomEvent('dbSyncLog', { detail: `Srv-Fetch: ${snap.size} docs` }));
         }
       } catch (e: any) {
         console.error('Initial server fetch error:', e);
+        window.dispatchEvent(new CustomEvent('dbSyncLog', { detail: `Srv-Fetch Error: ${e.code || 'fail'}` }));
       }
     };
     fetchInitial();
