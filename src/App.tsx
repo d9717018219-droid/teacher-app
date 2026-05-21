@@ -228,16 +228,24 @@ export default function App() {
     
     const initializeAlerts = async () => {
       try {
-        window.alert('Build 240: Start Sync');
+        window.alert('Build 245: Start Sync');
+        window.alert('Config Check: ' + (db as any)._databaseId.projectId);
         
         const q = query(
           collection(db, 'alerts'), 
           limit(20)
         );
 
-        // Build 240: Just use simple getDocs, it handles cache/server internally
-        const snap = await getDocs(q).catch(e => {
-            window.alert('FETCH ERROR: ' + (e.code || e.message));
+        // Build 245: Timeout Wrapper to break iOS hangs
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('SYNC TIMED OUT')), 5000)
+        );
+
+        const snap: any = await Promise.race([
+          getDocs(q),
+          timeoutPromise
+        ]).catch(e => {
+            window.alert('FETCH FAILED: ' + e.message);
             throw e;
         });
 
