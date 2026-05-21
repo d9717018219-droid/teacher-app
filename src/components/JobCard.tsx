@@ -96,30 +96,30 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
         {/* Middle Content */}
         <div className="flex-1 space-y-0.5 min-w-0">
           <div className="flex items-center justify-between">
-            <span className="text-[#10B981] text-[9.5px] font-bold tracking-tight">Order ID: {job['Order ID']}</span>
+            <span className="text-[#10B981] text-[10.5px] font-bold tracking-tight">Order ID: {job['Order ID']}</span>
             {isNew && (
-              <span className="bg-[#DCFCE7] text-[#166534] px-2 py-0.5 rounded-full text-[8.5px] font-bold tracking-wider">NEW</span>
+              <span className="bg-[#DCFCE7] text-[#166534] px-2 py-0.5 rounded-full text-[9.5px] font-bold tracking-wider">NEW</span>
             )}
           </div>
           
-          <h4 className="text-[14px] font-[800] text-[#0F172A] leading-tight tracking-tight truncate">
+          <h4 className="text-[16px] font-[800] text-[#0F172A] leading-tight tracking-tight truncate">
             {toTitleCase(name)}
           </h4>
-          <p className="text-[#64748B] text-[10.5px] font-[500] truncate">{classBoard}</p>
+          <p className="text-[#64748B] text-[12px] font-[500] truncate">{classBoard}</p>
           
-          <div className="flex items-center gap-1 text-[#64748B] text-[10.5px] font-[500] pt-0.5">
-            <MapPin size={10} className="text-slate-400" />
+          <div className="flex items-center gap-1 text-[#64748B] text-[12px] font-[500] pt-0.5">
+            <MapPin size={11} className="text-slate-400" />
             <span className="truncate">{location}</span>
           </div>
 
           <div className="flex items-center gap-2 pt-1">
-            <div className="bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-lg flex items-center gap-1">
-               <span className="text-[#0F172A] text-[9px] font-black tracking-tighter whitespace-nowrap">
+            <div className="bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
+               <span className="text-[#0F172A] text-[10px] font-black tracking-tighter whitespace-nowrap">
                  ₹{formatCurrency(job.Fee || '0')}/month
                </span>
             </div>
-            <div className="bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-lg flex items-center gap-1">
-               <span className="text-[#0F172A] text-[9px] font-bold tracking-tight">
+            <div className="bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
+               <span className="text-[#0F172A] text-[10px] font-bold tracking-tight">
                  {requiredGender} Required
                </span>
             </div>

@@ -101,40 +101,40 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
         <div className="flex-1 min-w-0 space-y-0.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="text-primary text-[9.5px] font-[900] tracking-tight">Tutor ID: {tutorId}</span>
+              <span className="text-primary text-[10.5px] font-[900] tracking-tight">Tutor ID: {tutorId}</span>
               {verified && (
                 <div className="flex items-center gap-1 ml-2">
                    <div className="flex items-center gap-1 bg-[#404E78] text-white px-1.5 py-0.5 rounded-lg shadow-lg shadow-[#404E78]/10 border border-white/10">
-                      <BadgeCheck size={10} className="fill-white text-[#404E78]" />
-                      <span className="text-[7.5px] font-[1000] uppercase tracking-widest leading-none">Verified</span>
+                      <BadgeCheck size={11} className="fill-white text-[#404E78]" />
+                      <span className="text-[8.5px] font-[1000] uppercase tracking-widest leading-none">Verified</span>
                    </div>
                 </div>
               )}
             </div>
-            <span className="text-[#94A3B8] text-[8.5px] font-bold uppercase tracking-widest">{location}</span>
+            <span className="text-[#94A3B8] text-[9.5px] font-bold uppercase tracking-widest">{location}</span>
           </div>
           
-          <h4 className="text-[14px] font-[800] text-[#0F172A] leading-tight tracking-tight truncate">
+          <h4 className="text-[16px] font-[800] text-[#0F172A] leading-tight tracking-tight truncate">
             {toTitleCase(name)}
           </h4>
-          <p className="text-[#64748B] text-[10.5px] font-[500] truncate">{qual}</p>
+          <p className="text-[#64748B] text-[12px] font-[500] truncate">{qual}</p>
           
           <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
             {gender && (
               <span className={cn(
-                "text-[8.5px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950",
+                "text-[10px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950",
                 gender.toLowerCase().includes('female') 
                   ? "bg-rose-50 border-rose-100/50" 
                   : gender.toLowerCase().includes('male')
                     ? "bg-blue-50 border-blue-100/50"
                     : "bg-slate-50 border-slate-100/50"
               )}>
-                <User size={8} strokeWidth={3} className="text-slate-400" /> Gender: {gender}
+                <User size={10} strokeWidth={3} className="text-slate-400" /> Gender: {gender}
               </span>
             )}
             {classGroup && (
               <span className={cn(
-                "text-[8.5px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950",
+                "text-[10px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950",
                 (() => {
                   const g = classGroup.toLowerCase();
                   if (g.includes('11') || g.includes('12') || g.includes('higher') || g.includes('senior')) return "bg-violet-50 border-violet-100/50";
