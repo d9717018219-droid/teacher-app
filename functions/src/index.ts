@@ -87,7 +87,7 @@ export const sendAlertNotification = onDocumentCreated({
                             title: displayTitle,
                             body: message
                         },
-                        sound: "default", // Using default for maximum compatibility during test
+                        sound: "blackberry.mp3", 
                         badge: 1,
                         "content-available": 1,
                         "mutable-content": 1

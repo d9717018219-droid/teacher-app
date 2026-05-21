@@ -70,10 +70,11 @@ async function saveTokenToFirestore(
 ) {
   try {
     const user = auth.currentUser;
+    const timestamp = new Date().toISOString();
     const tokenData = {
       token,
       platform,
-      lastUpdated: serverTimestamp(),
+      lastUpdated: timestamp,
       userId: user ? user.uid : 'anonymous',
       userEmail: user ? user.email : 'anonymous',
       city: city || 'All',
@@ -81,22 +82,50 @@ async function saveTokenToFirestore(
       targetClass: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All',
       targetUserType: userType || 'all',
       appVersion: '1.13.0',
-      lastSeen: new Date().toISOString()
+      lastSeen: timestamp
     };
 
     const sanitizedId = token.replace(/[\/\.]/g, '_');
-    console.log('📝 Attempting to save token to Firestore:', sanitizedId, 'Platform:', platform);
-    try {
-      await setDoc(doc(db, 'fcm_tokens', sanitizedId), tokenData, { merge: true });
-      console.log('✅ Token saved successfully to Firestore');
-      window.alert('SUCCESS: Token saved to DB (Platform: ' + platform + ')');
-    } catch (dbErr: any) {
-      console.error('❌ DB Save Error:', dbErr);
-      window.alert('ERROR: Could not save token to DB: ' + dbErr.code);
+    console.log('📝 Attempting to save token (REST Bypass):', sanitizedId);
+    
+    // Build 265: Use REST API to save token since SDK is hanging
+    const API_KEY = "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s";
+    const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/fcm_tokens/${sanitizedId}?key=${API_KEY}`;
+    
+    // Format for Firestore REST write
+    const restPayload = {
+      fields: {
+        token: { stringValue: token },
+        platform: { stringValue: platform },
+        lastUpdated: { timestampValue: timestamp },
+        userId: { stringValue: user ? user.uid : 'anonymous' },
+        userEmail: { stringValue: user ? user.email : 'anonymous' },
+        city: { stringValue: city || 'All' },
+        gender: { stringValue: gender || 'Any' },
+        targetClass: { stringValue: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All' },
+        targetUserType: { stringValue: userType || 'all' },
+        appVersion: { stringValue: '1.13.0' },
+        lastSeen: { stringValue: timestamp }
+      }
+    };
+
+    const response = await fetch(REST_URL, {
+      method: 'PATCH', // PATCH with query param creates/updates doc
+      body: JSON.stringify(restPayload)
+    });
+
+    if (response.ok) {
+      console.log('✅ Token saved successfully via REST');
+      window.alert('SUCCESS: iOS Device Registered for Broadcast! ✅');
+    } else {
+      const err = await response.text();
+      window.alert('REST TOKEN ERROR: ' + response.status);
     }
+    
     window.dispatchEvent(new CustomEvent('fcmTokenUpdated', { detail: token }));
-  } catch (e) {
+  } catch (e: any) {
     console.error('❌ Error saving token:', e);
+    window.alert('TOKEN FATAL ERROR: ' + e.message);
   }
 }
 
