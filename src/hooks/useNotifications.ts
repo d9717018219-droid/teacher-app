@@ -116,16 +116,14 @@ async function saveTokenToFirestore(
 
     if (response.ok) {
       console.log('✅ Token saved successfully via REST');
-      window.alert('SUCCESS: iOS Device Registered for Broadcast! ✅');
     } else {
       const err = await response.text();
-      window.alert('REST TOKEN ERROR: ' + response.status);
+      console.error('REST TOKEN ERROR: ' + response.status, err);
     }
     
     window.dispatchEvent(new CustomEvent('fcmTokenUpdated', { detail: token }));
   } catch (e: any) {
     console.error('❌ Error saving token:', e);
-    window.alert('TOKEN FATAL ERROR: ' + e.message);
   }
 }
 
@@ -151,11 +149,6 @@ async function setupCapacitorPushNotifications(
           const fcmToken = token.value;
           console.log('🚀 RAW TOKEN RECEIVED:', fcmToken);
           
-          // Debug alert for visibility on device
-          if (Capacitor.getPlatform() === 'ios') {
-             alert('DEBUG: iOS Token Length: ' + fcmToken.length);
-          }
-
           if (fcmToken && fcmToken.length > 10) {
             console.log('✅ Valid Token Format');
             const platform = Capacitor.getPlatform();

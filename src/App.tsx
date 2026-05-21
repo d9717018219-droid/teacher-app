@@ -215,10 +215,10 @@ export default function App() {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
       setAlerts(data);
       setAlertsLoading(false);
-      if (data.length === 0) window.alert('No alerts found on SERVER.');
-      else window.alert(`Loaded ${data.length} alerts from SERVER.`);
+      if (data.length === 0) console.log('No alerts found on SERVER.');
+      else console.log(`Loaded ${data.length} alerts from SERVER.`);
     } catch (e: any) {
-      window.alert('Server Fetch Error: ' + e.message);
+      console.error('Server Fetch Error: ' + e.message);
       setAlertsLoading(false);
     }
   };
@@ -228,12 +228,11 @@ export default function App() {
     
     const initializeAlerts = async () => {
       try {
-        window.alert('Build 260: REST Final');
         const API_KEY = "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s";
         const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=50&key=${API_KEY}`;
         
         const response = await fetch(REST_URL).catch(e => {
-           window.alert('REST ERROR: ' + e.message);
+           console.error('REST ERROR: ' + e.message);
            throw e;
         });
 
@@ -252,11 +251,11 @@ export default function App() {
             };
           }) as Alert[];
           
-          window.alert(`REST_SUCCESS: ${initialData.length} docs. First: ${initialData[0].message.substring(0, 20)}`);
+          console.log(`REST_SUCCESS: ${initialData.length} docs.`);
           setAlerts(initialData);
           setAlertsLoading(false);
         } else {
-          window.alert('REST: 0 docs');
+          console.log('REST: 0 docs');
           setAlertsLoading(false);
         }
       } catch (e: any) {
@@ -418,7 +417,8 @@ export default function App() {
         
         if (!user.authentication.idToken) {
           console.error('❌ No idToken in user.authentication');
-          alert('Error: idToken missing from Google response.');
+          setActiveToast({ title: 'Sign-in Error', body: 'idToken missing from Google response.' });
+          setTimeout(() => setActiveToast(null), 6000);
           return;
         }
 
@@ -426,7 +426,8 @@ export default function App() {
         const credential = GoogleAuthProvider.credential(user.authentication.idToken);
         const result = await signInWithCredential(auth, credential);
         console.log('🎉 Firebase: Login Success!', result.user.email);
-        alert('Welcome! Signed in as: ' + result.user.email);
+        setActiveToast({ title: 'Welcome!', body: `Signed in as: ${result.user.email}` });
+        setTimeout(() => setActiveToast(null), 4000);
       } else {
         console.log('🌐 Web Platform: signInWithPopup starting...');
         const provider = new GoogleAuthProvider();
@@ -443,10 +444,11 @@ export default function App() {
         errorMsg = String(err);
       }
       
-      alert('Sign-in failed!\n\nError: ' + errorMsg);
+      setActiveToast({ title: 'Sign-in Failed', body: errorMsg });
+      setTimeout(() => setActiveToast(null), 6000);
       
       if (errorMsg.includes('10:') || errorMsg.includes('DEVELOPER_ERROR')) {
-        alert('DEBUG HINT: This is usually a SHA-1 or Client ID mismatch in Firebase/Google Console.');
+        console.warn('DEBUG HINT: This is usually a SHA-1 or Client ID mismatch in Firebase/Google Console.');
       }
     }
   };
