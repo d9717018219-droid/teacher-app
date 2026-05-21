@@ -217,16 +217,21 @@ export default function App() {
     try {
       const q = query(collection(db, 'alerts'), limit(150));
       const unsub = onSnapshot(q, (snapshot) => {
-        console.log(`✅ Firestore Connected! ${snapshot.size} docs received`);
+        console.log(`✅ Firestore Alerts Sync: ${snapshot.size} items received | Source: ${snapshot.metadata.fromCache ? 'Cache' : 'Server'}`);
         if (snapshot.empty) {
-          console.log('⚠️ Alerts collection is EMPTY on server.');
+          console.log('⚠️ Alerts collection is empty.');
         }
         const alertsData = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
           .sort((a: any, b: any) => {
-            const tA = a.timestamp?.toMillis?.() ?? (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
-            const tB = b.timestamp?.toMillis?.() ?? (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
-            return tB - tA;
+            const getTs = (item: any) => {
+               if (item.timestamp?.toMillis) return item.timestamp.toMillis();
+               if (item.timestamp?.seconds) return item.timestamp.seconds * 1000;
+               if (typeof item.timestamp === 'string') return new Date(item.timestamp).getTime();
+               if (item.timestamp instanceof Date) return item.timestamp.getTime();
+               return Date.now(); // Fallback for real-time local updates
+            };
+            return getTs(b) - getTs(a);
           }) as Alert[];
         
         // Handle unseen count for new additions
