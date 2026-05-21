@@ -1395,8 +1395,8 @@ export default function App() {
                       {userType === 'teacher' && (
                         <div className="space-y-4">
                            <div className="grid grid-cols-2 gap-2">
-                             <button onClick={() => { playTapSound(); setTutorStatus('registered'); }} className={cn("py-3 rounded-xl border-2 font-[900] uppercase text-[9px] transition-all", tutorStatus === 'registered' ? "border-[#572149] bg-[#572149]/5 text-[#572149]" : "border-slate-100 text-slate-400 bg-white")}>Already Registered</button>
-                             <button onClick={() => { playTapSound(); setTutorStatus('new'); setIsTutorFetched(false); }} className={cn("py-3 rounded-xl border-2 font-[900] uppercase text-[9px] transition-all", tutorStatus === 'new' ? "border-[#572149] bg-[#572149]/5 text-[#572149]" : "border-slate-100 text-slate-400 bg-white")}>I'm New</button>
+                             <button onClick={() => { playTapSound(); setTutorStatus('registered'); }} className={cn("py-3 rounded-xl border-2 font-[900] uppercase text-[9px] transition-all", tutorStatus === 'registered' ? "border-[#572149] bg-[#572149]/5 text-[#572149]" : "border-slate-100 text-slate-400 bg-white")}>Sign In</button>
+                             <button onClick={() => { playTapSound(); setTutorStatus('new'); setIsTutorFetched(false); }} className={cn("py-3 rounded-xl border-2 font-[900] uppercase text-[9px] transition-all", tutorStatus === 'new' ? "border-[#572149] bg-[#572149]/5 text-[#572149]" : "border-slate-100 text-slate-400 bg-white")}>Sign Up</button>
                            </div>
 
                            {tutorStatus === 'registered' && !isTutorFetched && (
