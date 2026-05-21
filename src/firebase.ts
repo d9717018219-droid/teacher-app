@@ -17,9 +17,8 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 export const db = initializeFirestore(app, {
-  // Build 125: Re-enabling Long Polling for Native (Recommended for Capacitor iOS)
-  experimentalForceLongPolling: Capacitor.isNativePlatform(),
-  localCache: memoryLocalCache(),
+  // Build 135: Let SDK auto-detect best transport for iOS stability
+  experimentalAutoDetectLongPolling: true,
 });
 
 // Build 116: Helper to force-clear firestore cache if it hangs
