@@ -309,6 +309,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
   useEffect(() => {
      addLog('AlertsView Initialized');
      addLog('User: ' + (auth.currentUser?.email || 'Guest'));
+     addLog('Network: ' + (navigator.onLine ? 'Online' : 'Offline'));
      addLog('Alerts count: ' + alerts.length);
      if (loading) addLog('Status: SYNCING...');
      else addLog('Status: READY');

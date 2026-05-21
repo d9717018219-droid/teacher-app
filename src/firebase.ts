@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { Capacitor } from '@capacitor/core';
 
@@ -17,9 +17,9 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 export const db = initializeFirestore(app, {
-  // Build 135: Let SDK auto-detect best transport for iOS stability
-  experimentalAutoDetectLongPolling: true,
-  localCache: persistentLocalCache(),
+  // Build 150: FORCING Long Polling and disabling persistence to fix iOS hang
+  experimentalForceLongPolling: true,
+  localCache: memoryLocalCache(),
 });
 
 // Build 116: Helper to force-clear firestore cache if it hangs
