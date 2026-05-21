@@ -80,7 +80,7 @@ async function saveTokenToFirestore(
       gender: gender || 'Any',
       targetClass: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All',
       targetUserType: userType || 'all',
-      appVersion: '1.1.0-PRODUCTION',
+      appVersion: '1.13.0',
       lastSeen: new Date().toISOString()
     };
 
@@ -112,10 +112,21 @@ async function setupCapacitorPushNotifications(
         'registration',
         async (token) => {
           const fcmToken = token.value;
-          alert('🚀 FULL FCM TOKEN RECEIVED: ' + fcmToken);
-          const platform = Capacitor.getPlatform();
-          localStorage.setItem('fcmToken', fcmToken);
-          await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType);
+          console.log('🚀 RAW TOKEN RECEIVED:', fcmToken);
+          
+          // Debug alert for visibility on device
+          if (Capacitor.getPlatform() === 'ios') {
+             alert('DEBUG: iOS Token Length: ' + fcmToken.length);
+          }
+
+          if (fcmToken && fcmToken.length > 10) {
+            console.log('✅ Valid Token Format');
+            const platform = Capacitor.getPlatform();
+            localStorage.setItem('fcmToken', fcmToken);
+            await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType);
+          } else {
+            console.error('❌ Invalid or empty token received');
+          }
         }
       );
 

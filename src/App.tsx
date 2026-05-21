@@ -210,12 +210,14 @@ export default function App() {
 
   useEffect(() => {
     console.log('🔄 Starting Global Alerts Listener...');
+    console.log('📍 Platform:', Capacitor.getPlatform());
+    console.log('📍 Firestore experimentalForceLongPolling:', true);
     setAlertsError(null);
     
     try {
       const q = query(collection(db, 'alerts'), limit(150));
       const unsub = onSnapshot(q, (snapshot) => {
-        console.log(`📡 Alerts Update: ${snapshot.size} docs received`);
+        console.log(`✅ Firestore Connected! ${snapshot.size} docs received`);
         if (snapshot.empty) {
           console.log('⚠️ Alerts collection is EMPTY on server.');
         }
@@ -238,7 +240,7 @@ export default function App() {
                
                if (currentUserCity === 'all' || alertCity === 'all' || alertCity === currentUserCity) {
                  setUnseenAlertsCount(prev => prev + 1);
-                 playTapSound(); // Or blackberry sound if available
+                 playTapSound(); 
                }
             });
           }
@@ -251,12 +253,14 @@ export default function App() {
         setAlertsError(null);
       }, (err) => {
         setDbStatus('Error');
-        console.error('❌ Firestore Alerts Error:', err);
+        console.error('❌ FIRESTORE ERROR:', err.code, err.message);
+        console.error('Full Error:', JSON.stringify(err));
         setAlertsError(`${err.code}: ${err.message}`);
         setAlertsLoading(false);
       });
       return () => unsub();
     } catch (e: any) {
+      console.error('❌ Exception in Alerts Listener:', e);
       setAlertsError(e.message);
       setAlertsLoading(false);
     }
@@ -1573,8 +1577,7 @@ export default function App() {
                      <button onClick={() => { playTapSound(); setShowProfileSetup(false); }} className="w-full bg-primary text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all mt-6">Save & Close</button>
                    )}
 
-                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-2">DoAble India Network • v1.1.0</div>
-                   
+                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-2">DoAble India Network • v1.13.0</div>                   
                    {/* FCM Token Debug Section */}
                    <div className="px-4 pb-4">
                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-2">
