@@ -82,11 +82,20 @@ const EXPERIENCE_LIST = [
   "More than 10 Years"
 ];
 
+const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const TIME_LIST = [
+  '06:00 AM', '06:30 AM', '07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM',
+  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+  '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM',
+  '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
+  '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM', '08:30 PM', '09:00 PM'
+];
+
 export default function App() {
   const [leads, setLeads] = useState<JobLead[]>([]);
   const [firestoreLeads, setFirestoreLeads] = useState<JobLead[]>([]);
   const [showSelectionDrawer, setShowSelectionDrawer] = useState<{
-    type: 'qualification' | 'experience' | 'classGroup' | 'subjects' | 'localities' | null;
+    type: 'qualification' | 'experience' | 'classGroup' | 'subjects' | 'localities' | 'days' | 'time' | null;
     title: string;
     options: string[];
     selected: string[];
@@ -105,6 +114,8 @@ export default function App() {
       if (type === 'qualification') { setUserQualifications(next); localStorage.setItem('userQualifications', JSON.stringify(next)); }
       if (type === 'subjects') { setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }
       if (type === 'localities') { setUserLocalities(next); localStorage.setItem('userLocalities', JSON.stringify(next)); }
+      if (type === 'days') { setUserDays(next.join(', ')); localStorage.setItem('userDays', next.join(', ')); }
+      if (type === 'time') { setUserTime(next.join(', ')); localStorage.setItem('userTime', next.join(', ')); }
     } else {
       const next = [value];
       setShowSelectionDrawer(null); // Close on single select
@@ -2298,6 +2309,46 @@ export default function App() {
                                       <button key={v} onClick={() => { setHasVehicle(v); localStorage.setItem('hasVehicle', v); }} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", hasVehicle === v ? "bg-emerald-100 text-emerald-600 border border-emerald-200" : "bg-slate-50 text-slate-300 border border-transparent")}>{v}</button>
                                     ))}
                                   </div>
+                                </div>
+
+                                {/* Available Days */}
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Available Days</label>
+                                    <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{userDays || "Not selected"}</div>
+                                  </div>
+                                  <button 
+                                    onClick={() => setShowSelectionDrawer({
+                                      type: 'days',
+                                      title: 'Select Available Days',
+                                      options: DAYS_LIST,
+                                      selected: userDays ? userDays.split(', ').map(s => s.trim()) : [],
+                                      isMulti: true
+                                    })}
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                  >
+                                    <Edit3 size={16} />
+                                  </button>
+                                </div>
+
+                                {/* Preferred Time */}
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Preferred Time</label>
+                                    <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{userTime || "Not selected"}</div>
+                                  </div>
+                                  <button 
+                                    onClick={() => setShowSelectionDrawer({
+                                      type: 'time',
+                                      title: 'Select Preferred Time',
+                                      options: TIME_LIST,
+                                      selected: userTime ? userTime.split(', ').map(s => s.trim()) : [],
+                                      isMulti: true
+                                    })}
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                  >
+                                    <Edit3 size={16} />
+                                  </button>
                                 </div>
                               </div>
                             </div>
