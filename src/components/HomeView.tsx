@@ -196,12 +196,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
               <div className="relative z-10">
                 <div className="space-y-0.5 mb-2.5">
-                  <span className="text-[9px] font-black uppercase tracking-[0.15em] flex items-center gap-1.5" style={{ color: banners[currentBanner].accent }}>
-                    {banners[currentBanner].sub.split(' ').map((word, i) => 
-                      /[\u2700-\u27bf]|[\u1f300-\u1f5ff]|[\u1f600-\u1f64f]|[\u1f680-\u1f6ff]|[\u2600-\u26ff]|[\ud83c\udde0-\ud83c\uddff]|[\ud83c\udf00-\ud83c\udfff]|[\ud83d\udc00-\ud83d\udfff]|[\ud83e\udd00-\ud83e\udfff]/.test(word) 
-                        ? <span key={i} className="text-amber-400">{word}</span> 
-                        : <span key={i}>{word}</span>
-                    )}
+                  <span className="text-[9px] font-black uppercase tracking-[0.15em] flex items-center gap-1" style={{ color: banners[currentBanner].accent }}>
+                    {banners[currentBanner].sub.split(' ').map((word, i) => {
+                      const hasEmoji = /\p{Extended_Pictographic}/u.test(word);
+                      return (
+                        <span key={i} className={cn(hasEmoji && "text-amber-400")}>
+                          {word}
+                        </span>
+                      );
+                    })}
                   </span>
                   <h2 className={cn("text-[21px] font-[900] tracking-tighter leading-none whitespace-nowrap", banners[currentBanner].text)}>
                     {banners[currentBanner].title} <span className="text-amber-400">{banners[currentBanner].emoji}</span>
