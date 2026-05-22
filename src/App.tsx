@@ -2158,9 +2158,10 @@ export default function App() {
                                     <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Date of Birth & Age</label>
                                     <div className="text-sm font-bold text-slate-700">{userDob || "YYYY-MM-DD"} {userAge ? `(${userAge} yrs)` : ''}</div>
                                   </div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="relative">
                                     <input 
                                       type="date" 
+                                      id="dob-input"
                                       value={userDob} 
                                       onChange={(e) => { 
                                         const date = e.target.value;
@@ -2179,8 +2180,13 @@ export default function App() {
                                           localStorage.setItem('userAge', ageStr);
                                         }
                                       }}
-                                      className="bg-slate-50 text-[10px] font-bold p-1.5 rounded-lg border-none outline-none" 
+                                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10" 
                                     />
+                                    <button 
+                                      className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                    >
+                                      <Edit3 size={16} />
+                                    </button>
                                   </div>
                                 </div>
                               )}
