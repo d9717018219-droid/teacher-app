@@ -21,10 +21,11 @@ import {
   FileText,
   Code,
   Sparkles,
-  Baby
+  Baby,
+  User
 } from 'lucide-react';
 import { JobLead } from '../types';
-import { cn, formatCurrency, formatPostedDate, toTitleCase } from '../utils';
+import { cn, formatCurrency, formatPostedDate, toTitleCase, cleanValue } from '../utils';
 
 interface JobCardProps {
   job: JobLead;
@@ -66,8 +67,8 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
   onShortlistToggle 
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
-  const subjects = (job.subjects || 'General').split(/[;,]/)[0].trim();
-  const classBoard = job['Class / Board'] || ((job.Class || '') + (job.Board ? ' (' + job.Board + ')' : '')) || 'General';
+  const subjects = cleanValue(job.subjects || 'General').split(/[;,]/)[0].trim();
+  const classBoard = cleanValue(job['Class / Board'] || ((job.Class || '') + (job.Board ? ' (' + job.Board + ')' : '')) || 'General');
   const { bg, icon } = getSubjectStyles(subjects, classBoard);
   
   const jobId = job['Order ID'] || (job as any).id || 'N/A';
@@ -134,16 +135,16 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
           <span className="text-[#94A3B8] text-[8px] font-black uppercase tracking-tight flex items-center gap-1">
             <Clock size={8} /> Posted: {postedDate}
           </span>
-          <span className="text-slate-400 text-[8px] font-black uppercase tracking-tight">Verified Lead</span>
+          <span className="text-[#592973] text-[8px] font-black uppercase tracking-tight">✅ Verified Lead</span>
         </div>
 
         <div className="flex items-center gap-2">
            <button 
              onClick={() => onClick(job)}
-             className="flex-1 bg-slate-100 text-slate-900 h-8 rounded-lg font-[900] text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1.5"
+             className="flex-1 bg-slate-100 text-[#191445] h-8 rounded-lg font-[900] text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1.5"
            >
              View Details
-             <ChevronRight size={12} strokeWidth={3} className="text-slate-400" />
+             <ChevronRight size={12} strokeWidth={3} className="text-[#191445] opacity-50" />
            </button>
            <button 
              onClick={(e) => { e.stopPropagation(); onShortlistToggle?.(jobId, e); }}

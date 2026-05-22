@@ -25,7 +25,7 @@ import {
   User
 } from 'lucide-react';
 import { TutorProfile } from '../types';
-import { cn, toTitleCase, formatPostedDate } from '../utils';
+import { cn, toTitleCase, formatPostedDate, cleanValue } from '../utils';
 
 interface TutorCardProps {
   tutor: TutorProfile;
@@ -77,10 +77,10 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
   const location = area ? `${area} - ${city}` : city;
   const fee = getValue(['Fee/Month', 'feeMonth', 'Fee', 'fee'], 'Flexible').toString();
   const exp = getValue(['Experience', 'experience', 'Teaching Experience'], '1-3 Years').toString();
-  const qual = getValue(['Qualification(s)', 'qualifications', 'Qualification'], 'Graduate').toString();
-  const subjects = getValue(['Preferred Subject(s)', 'preferredSubjects', 'subjects'], 'General').toString();
+  const qual = cleanValue(getValue(['Qualification(s)', 'qualifications', 'Qualification'], 'Graduate'));
+  const subjects = cleanValue(getValue(['Preferred Subject(s)', 'preferredSubjects', 'subjects'], 'General'));
   const gender = getValue(['Gender', 'gender'], '').toString();
-  const classGroup = getValue(['Preferred Class Group', 'preferredClassGroup', 'classGroup'], '').toString();
+  const classGroup = cleanValue(getValue(['Preferred Class Group', 'preferredClassGroup', 'classGroup'], ''));
   const verified = getValue(['Verified', 'verified'], 'No').toString().toLowerCase().trim() === 'yes';
   const lastUpdated = formatPostedDate(getValue(['Record Added', 'Updated Time', 'updatedTime'], ''));
 
@@ -119,22 +119,22 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
           </h4>
           <p className="text-[#64748B] text-[12px] font-[500] truncate">{qual}</p>
           
-          <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+          <div className="flex items-center gap-1.5 pt-1.5 overflow-x-auto no-scrollbar">
             {gender && (
               <span className={cn(
-                "text-[10px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950",
+                "text-[9px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950 whitespace-nowrap",
                 gender.toLowerCase().includes('female') 
                   ? "bg-rose-50 border-rose-100/50" 
                   : gender.toLowerCase().includes('male')
                     ? "bg-blue-50 border-blue-100/50"
                     : "bg-slate-50 border-slate-100/50"
               )}>
-                <User size={10} strokeWidth={3} className="text-slate-400" /> Gender: {gender}
+                <User size={9} strokeWidth={3} className="text-slate-400" /> {gender}
               </span>
             )}
             {classGroup && (
               <span className={cn(
-                "text-[10px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950",
+                "text-[9px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950 whitespace-nowrap",
                 (() => {
                   const g = classGroup.toLowerCase();
                   if (g.includes('11') || g.includes('12') || g.includes('higher') || g.includes('senior')) return "bg-violet-50 border-violet-100/50";
@@ -144,7 +144,7 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
                   return "bg-slate-50 border-slate-100/50";
                 })()
               )}>
-                <BookOpen size={8} strokeWidth={3} className="text-slate-400" /> Class: {classGroup}
+                <BookOpen size={9} strokeWidth={3} className="text-slate-400" /> {classGroup}
               </span>
             )}
           </div>

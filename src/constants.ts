@@ -128,7 +128,7 @@ export const CLASS_SUBJECTS_DATA: Record<string, string[]> = {
 
 export const CITY_TO_LOCATIONS_DATA: Record<string, string[]> = {
   "Ahmedabad": [
-    "\"Ahmedabad Cantonment",
+    "Ahmedabad Cantonment",
     "Alam Roza",
     "Ambawadi",
     "Ambli",
@@ -383,7 +383,7 @@ export const CITY_TO_LOCATIONS_DATA: Record<string, string[]> = {
     "Rani Chennamma Nagar"
   ],
   "Bangalore": [
-    "\"Adugodi",
+    "Adugodi",
     "Agara",
     "Agram",
     "Airport Road",

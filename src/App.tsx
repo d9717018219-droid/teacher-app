@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle } from 'lucide-react';
+import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle, Mail, Lock, Camera, Phone, Plus } from 'lucide-react';
 import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc, getDocsFromServer, enableNetwork } from 'firebase/firestore';
 import { db, auth, auth as firebaseAuth } from './firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
-import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -22,7 +22,7 @@ import { ParentHubView } from './components/ParentHubView';
 
 import { requestNotificationPermission } from './firebase';
 import { useNotifications } from './hooks/useNotifications';
-import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp } from './utils';
+import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp, cleanValue } from './utils';
 import { 
   CITIES_LIST, 
   CLASSES_LIST,
@@ -70,18 +70,204 @@ function DetailStat({ emoji, label, value, color = "bg-slate-900" }: { emoji: st
   );
 }
 
+const QUALIFICATIONS_LIST = [
+  "B.Arch", "B.Com", "B.Ed", "B.LLB", "B.Lib", "B.Ped", "B.Pharma", "B.Sc", "B.Tech", "BA", "BBA", "BBM", "BCA", "BDS", "BFA", "BHM", "BJ", "BPT", "CA", "CFA", "CS", "D.Ed", "D.El.Ed", "DM", "DNB", "Ed.D.", "ICWA", "LLB", "LLM", "M.Arch", "M.Com", "M.Ed", "M.Ped", "M.Pharma", "M.Sc", "M.Tech", "MA", "MBA", "MBBS", "MCA", "MD", "MDS", "MS", "NTT", "PGDCA", "PGDM", "Ph.D."
+];
+
+const EXPERIENCE_LIST = [
+  "Less than 1 Year",
+  "1 to 3 Years",
+  "3 to 5 Years",
+  "5 to 10 Years",
+  "More than 10 Years"
+];
+
 export default function App() {
   const [leads, setLeads] = useState<JobLead[]>([]);
   const [firestoreLeads, setFirestoreLeads] = useState<JobLead[]>([]);
   const [tutors, setTutors] = useState<TutorProfile[]>([]);
 
-  const [userCity, setUserCity] = useState<string>(localStorage.getItem('userCity') || 'All');
+  // Auth State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [resetPin, setResetPin] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setRetypePassword] = useState('');
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [customUser, setCustomUser] = useState<any>(JSON.parse(localStorage.getItem('customUser') || 'null'));
+  const activeUser = currentUser || customUser;
+
+  const handleLogout = () => {
+    playTapSound();
+    auth.signOut();
+    setCustomUser(null);
+    localStorage.removeItem('customUser');
+    localStorage.removeItem('userType');
+    setUserType(null);
+    setShowOnboarding(true);
+    setAuthMode('signin');
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!activeUser?.email) return;
+
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      
+      if (userType === 'teacher') {
+        const url = isNative ? 'https://doableindia.com/api_copy.php' : '/api/profile/update';
+        // Map frontend state to CRM_Leads column names
+        const profileData = {
+          action: 'upsert',
+          Order_ID: localStorage.getItem('tutorId') || 'NEW_USER', 
+          Email: activeUser.email,
+          Name: userName,
+          Gender: userGender,
+          Age: userAge,
+          DOB: userDob,
+          Phone: userPhone,
+          Qualification: JSON.stringify(userQualifications),
+          Experience: userExperience,
+
+          School_Experience: isSchoolTeacher,
+          Vehicle: hasVehicle,
+          city: userCity,
+          Class: JSON.stringify(userClasses),
+          Subject_Field: JSON.stringify(userSubjects),
+          Preferred_Location: JSON.stringify(userLocalities),
+          Photo: profilePhoto,
+          About: aboutMe,
+          Status: 'Active',
+          Record_Added: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          Verified: 'No'
+        };
+
+        console.log(`Syncing teacher profile to ${url}...`, profileData);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profileData)
+        });
+        const data = await response.json();
+        console.log('Teacher profile sync response:', data);
+      } 
+      else if (userType === 'parent') {
+        const url = isNative ? 'https://doableindia.com/parent_api.php' : '/api/profile/parent/update';
+        // Map frontend state to CRM_Contacts column names based on the parent PHP script
+        const parentData = {
+          Order_ID: activeUser.email, // Using email as Order_ID for parents
+          Name: userName,
+          Class: JSON.stringify(userClasses),
+          subjects: JSON.stringify(userSubjects),
+          City: userCity,
+          Gender: userGender,
+          Address: userAddress,
+          Board: userBoard,
+          Mode: userMode,
+          Preferred_Time: userTime,
+          days: userDays,
+          duration: userDuration,
+          Fee: userFee,
+          Notes: aboutMe,
+          Created_Time1: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          Locations: JSON.stringify(userLocalities)
+        };
+
+        console.log(`Syncing parent profile to ${url}...`, parentData);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(parentData)
+        });
+        const data = await response.json();
+        console.log('Parent profile sync response:', data);
+      }
+    } catch (error) {
+      console.error('Error syncing profile:', error);
+    }
+  };
+
+  const [userCity, setUserCity] = useState<string>(localStorage.getItem('userCity') || 'Delhi');
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('userName'));
   const [userGender, setUserGender] = useState<string | null>(localStorage.getItem('userGender') || 'All');
   const [userType, setUserType] = useState<UserType | null>(localStorage.getItem('userType') as UserType);
-  const [userClasses, setUserClasses] = useState<string[]>(JSON.parse(localStorage.getItem('userClasses') || '[]'));
-  const [userSubjects, setUserSubjects] = useState<string[]>(JSON.parse(localStorage.getItem('userSubjects') || '[]'));
-  const [userLocalities, setUserLocalities] = useState<string[]>(JSON.parse(localStorage.getItem('userLocalities') || '[]'));
+  const [userClasses, setUserClasses] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('userClasses') || '[]');
+      return Array.isArray(saved) ? saved.filter(c => c && c.trim() !== '') : [];
+    } catch { return []; }
+  });
+  const [userSubjects, setUserSubjects] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('userSubjects') || '[]');
+      return Array.isArray(saved) ? saved.filter(s => s && s.trim() !== '') : [];
+    } catch { return []; }
+  });
+  const [userLocalities, setUserLocalities] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('userLocalities') || '[]');
+      return Array.isArray(saved) ? saved.filter(l => l && l.trim() !== '') : [];
+    } catch { return []; }
+  });
+  const [userPhone, setUserPhone] = useState<string>(localStorage.getItem('userPhone') || '');
+  const [userDob, setUserDob] = useState<string>(localStorage.getItem('userDob') || '');
+  const [userAge, setUserAge] = useState<string>(localStorage.getItem('userAge') || '');
+  const [userQualifications, setUserQualifications] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('userQualifications') || '[]');
+      return Array.isArray(saved) ? saved.filter(q => q && q.trim() !== '') : [];
+    } catch { return []; }
+  });
+  const [userExperience, setUserExperience] = useState<string>(localStorage.getItem('userExperience') || '');
+  const [isSchoolTeacher, setIsSchoolTeacher] = useState<string>(localStorage.getItem('isSchoolTeacher') || 'No');
+  const [hasVehicle, setHasVehicle] = useState<string>(localStorage.getItem('hasVehicle') || 'No');
+  const [aboutMe, setAboutMe] = useState<string>(localStorage.getItem('aboutMe') || '');
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(localStorage.getItem('userPhoto'));
+  
+  // Parent Specific States
+  const [userBoard, setUserBoard] = useState<string>(localStorage.getItem('userBoard') || 'CBSE');
+  const [userMode, setUserMode] = useState<string>(localStorage.getItem('userMode') || 'Home Tuition');
+  const [userAddress, setUserAddress] = useState<string>(localStorage.getItem('userAddress') || '');
+  const [userDays, setUserDays] = useState<string>(localStorage.getItem('userDays') || '');
+  const [userTime, setUserTime] = useState<string>(localStorage.getItem('userTime') || '');
+  const [userDuration, setUserDuration] = useState<string>(localStorage.getItem('userDuration') || '');
+  const [userFee, setUserFee] = useState<string>(localStorage.getItem('userFee') || '');
+
+  // Calculate age from DOB
+  useEffect(() => {
+    if (userDob) {
+      const birthDate = new Date(userDob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      const ageStr = age.toString();
+      setUserAge(ageStr);
+      localStorage.setItem('userAge', ageStr);
+    }
+  }, [userDob]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit
+        alert("Image is too large. Please select an image under 1MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setProfilePhoto(base64String);
+        localStorage.setItem('userPhoto', base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Job Filters
   const [jobFilterClasses, setJobFilterClasses] = useState<string[]>([]);
@@ -99,9 +285,6 @@ export default function App() {
   const [tutorSearchQuery, setTutorSearchQuery] = useState('');
   const [tutorSortBy, setTutorSortBy] = useState<'newest' | 'fee_high' | 'fee_low' | 'verified'>('newest');
 
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  
   const [showAdvancedFilterDrawer, setShowAdvancedFilterDrawer] = useState(false);
   const [showQuickPicker, setShowQuickPicker] = useState<'city' | 'locality' | 'class' | 'gender' | null>(null);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
@@ -113,6 +296,8 @@ export default function App() {
   const [activeToast, setActiveToast] = useState<{ title: string, body: string } | null>(null);
   const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
   const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('userType'));
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [tutorStatus, setTutorStatus] = useState<'registered' | 'new' | null>(null);
   
   // Profile Auto-fill Logic
@@ -120,6 +305,84 @@ export default function App() {
   const [isFetchingTutor, setIsFetchingTutor] = useState(false);
   const [tutorFetchError, setTutorFetchError] = useState<string | null>(null);
   const [isTutorFetched, setIsTutorFetched] = useState(false);
+
+  // Auto-fill profile from tutors list when user signs in
+  useEffect(() => {
+    if (activeUser?.email && tutors.length > 0 && !isTutorFetched) {
+      const email = activeUser.email.toLowerCase().trim();
+      const tutor = tutors.find(t => {
+        const tEmail = (t.Email || (t as any).email || '').toString().toLowerCase().trim();
+        return tEmail === email;
+      });
+
+      if (tutor) {
+        console.log('Found matching tutor profile for:', email);
+        const name = (tutor['Full Name'] || (tutor as any).fullName || tutor.Name || '').toString();
+        const gender = (tutor.Gender || (tutor as any).gender || 'Male').toString();
+        const city = (tutor['Preferred City'] || (tutor as any).preferredCity || (tutor as any).City || 'All').toString();
+        const classGroup = (tutor['Preferred Class Group'] || (tutor as any).preferredClassGroup || (tutor as any).classGroup || '').toString();
+        const tutorId = (tutor['Tutor ID'] || (tutor as any).tutorId || (tutor as any).id || '').toString();
+        const phone = (tutor.Phone || (tutor as any).phone || '').toString();
+        const about = (tutor.About || (tutor as any).about || '').toString();
+        const dob = (tutor.DOB || (tutor as any).dob || '').toString();
+        let qualification: string[] = [];
+        try {
+          const rawQ = (tutor.Qualification || (tutor as any).qualification || '').toString();
+          qualification = rawQ.startsWith('[') ? JSON.parse(rawQ) : (rawQ ? [rawQ] : []);
+        } catch { qualification = []; }
+        
+        const experience = (tutor.Experience || (tutor as any).experience || '').toString();
+        const schoolExp = (tutor['School Exp.'] || tutor.School_Experience || 'No').toString();
+        const vehicle = (tutor['Have own Vehicle'] || tutor.Vehicle || 'No').toString();
+        const subjects = JSON.parse((tutor['Preferred Subject(s)'] || tutor.Subject_Field || '[]').toString());
+        const localities = JSON.parse((tutor['Preferred Location(s)'] || tutor.Preferred_Location || '[]').toString());
+
+        setUserName(toTitleCase(name));
+        setUserGender(toTitleCase(gender));
+        setUserCity(toTitleCase(city));
+        setUserPhone(phone);
+        setAboutMe(about);
+        setUserDob(dob);
+        setUserQualifications(qualification);
+        setUserExperience(experience);
+        setIsSchoolTeacher(schoolExp);
+        setHasVehicle(vehicle);
+        setUserSubjects(subjects);
+        setUserLocalities(localities);
+
+        if (tutorId) localStorage.setItem('tutorId', tutorId);
+        
+        // Match Class Groups - Enforce single selection
+        const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
+        const matchedGroups = groups.filter(g => classGroup.toLowerCase().includes(g.toLowerCase().replace('class ', '')));
+        if (matchedGroups.length > 0) {
+          const singleGroup = [matchedGroups[0]];
+          setUserClasses(singleGroup);
+          localStorage.setItem('userClasses', JSON.stringify(singleGroup));
+        } else {
+          setUserClasses([]);
+          localStorage.setItem('userClasses', JSON.stringify([]));
+        }
+        
+        // Save to LocalStorage
+        localStorage.setItem('userName', toTitleCase(name));
+        localStorage.setItem('userGender', toTitleCase(gender));
+        localStorage.setItem('userCity', toTitleCase(city));
+        localStorage.setItem('userPhone', phone);
+        localStorage.setItem('aboutMe', about);
+        localStorage.setItem('userDob', dob);
+        localStorage.setItem('userQualifications', JSON.stringify(qualification));
+        localStorage.setItem('userExperience', experience);
+        localStorage.setItem('isSchoolTeacher', schoolExp);
+        localStorage.setItem('hasVehicle', vehicle);
+        localStorage.setItem('userSubjects', JSON.stringify(subjects));
+        localStorage.setItem('userLocalities', JSON.stringify(localities));
+        if (matchedGroups.length > 0) localStorage.setItem('userClasses', JSON.stringify(matchedGroups));
+        
+        setIsTutorFetched(true);
+      }
+    }
+  }, [activeUser, tutors, isTutorFetched]);
 
   const fetchTutorDetails = () => {
     if (!tutorIdInput.trim()) return;
@@ -136,17 +399,24 @@ export default function App() {
         playTapSound();
         const name = (tutor['Full Name'] || (tutor as any).fullName || tutor.Name || '').toString();
         const gender = (tutor.Gender || (tutor as any).gender || 'Male').toString();
-        const city = (tutor['Preferred City'] || (tutor as any).preferredCity || (tutor as any).City || 'Ghaziabad').toString();
+        const city = (tutor['Preferred City'] || (tutor as any).preferredCity || (tutor as any).City || 'All').toString();
         const classGroup = (tutor['Preferred Class Group'] || (tutor as any).preferredClassGroup || (tutor as any).classGroup || '').toString();
 
         setUserName(toTitleCase(name));
         setUserGender(toTitleCase(gender));
         setUserCity(toTitleCase(city));
         
-        // Match Class Groups
+        // Match Class Groups - Enforce single selection
         const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
         const matchedGroups = groups.filter(g => classGroup.toLowerCase().includes(g.toLowerCase().replace('class ', '')));
-        if (matchedGroups.length > 0) setUserClasses(matchedGroups);
+        if (matchedGroups.length > 0) {
+          const singleGroup = [matchedGroups[0]];
+          setUserClasses(singleGroup);
+          localStorage.setItem('userClasses', JSON.stringify(singleGroup));
+        } else {
+          setUserClasses([]);
+          localStorage.setItem('userClasses', JSON.stringify([]));
+        }
         
         // Save to LocalStorage
         localStorage.setItem('userName', toTitleCase(name));
@@ -161,6 +431,174 @@ export default function App() {
       }
       setIsFetchingTutor(false);
     }, 800);
+  };
+
+  const handleEmailSignIn = async () => {
+    if (!email || !password) {
+      setAuthError('Please enter both email and password.');
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      const url = isNative ? 'https://doableindia.com/app_auth.php' : '/api/auth/signin';
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'signin', // Required for direct PHP calls
+          email, 
+          password 
+        })
+      });
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        const userData = { email: data.user.email, userType: data.user.userType, uid: data.user.id };
+        setCustomUser(userData);
+        localStorage.setItem('customUser', JSON.stringify(userData));
+        setUserType(data.user.userType);
+        localStorage.setItem('userType', data.user.userType);
+        playTapSound();
+        setShowProfileSetup(false);
+        setShowOnboarding(false);
+      } else {
+        setAuthError(data.message || 'Invalid email or password.');
+      }
+    } catch (error: any) {
+      console.error('Sign In Error:', error);
+      setAuthError('Connection error. Please try again.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleEmailSignUp = async () => {
+    if (!email || !password) {
+      setAuthError('Please enter both email and password.');
+      return;
+    }
+    if (password.length < 6) {
+      setAuthError('Password should be at least 6 characters.');
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      const url = isNative ? 'https://doableindia.com/app_auth.php' : '/api/auth/signup';
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'signup', // Required for direct PHP calls
+          email, 
+          password, 
+          userType: userType || 'teacher' 
+        })
+      });
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        const userData = { email: email, userType: userType || 'teacher', uid: data.userId };
+        setCustomUser(userData);
+        localStorage.setItem('customUser', JSON.stringify(userData));
+        setUserType(userType || 'teacher');
+        localStorage.setItem('userType', userType || 'teacher');
+        playTapSound();
+        setShowProfileSetup(false);
+        setShowOnboarding(false);
+      } else {
+        setAuthError(data.message || 'Failed to sign up.');
+      }
+    } catch (error: any) {
+      console.error('Sign Up Error:', error);
+      setAuthError('Connection error. Please try again.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setAuthError('Please enter your email address.');
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      const url = isNative ? 'https://doableindia.com/app_auth.php' : '/api/auth/forgot-password';
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'forgot_password', // Required for direct PHP calls
+          email 
+        })
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        setAuthMode('reset');
+        setAuthError(null);
+      } else {
+        setAuthError(data.message || 'Failed to send reset PIN.');
+      }
+    } catch (error: any) {
+      setAuthError('Connection error.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPin || !newPassword || !confirmPassword) {
+      setAuthError('Please fill all fields.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setAuthError('Passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setAuthError('Password must be at least 6 characters.');
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      const url = isNative ? 'https://doableindia.com/app_auth.php' : '/api/auth/reset-password';
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'reset_password', // Required for direct PHP calls
+          email, 
+          pin: resetPin, 
+          password: newPassword 
+        })
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        alert('Password updated successfully. Please Sign In.');
+        setAuthMode('signin');
+        setResetPin('');
+        setNewPassword('');
+        setRetypePassword('');
+      } else {
+        setAuthError(data.message || 'Reset failed.');
+      }
+    } catch (error: any) {
+      setAuthError('Connection error.');
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
   const mainScrollRef = useRef<HTMLDivElement>(null);
@@ -338,7 +776,16 @@ export default function App() {
 
   const loadData = async () => {
     try {
-      if (leads.length === 0 && tutors.length === 0) setLoading(true);
+      // 1. Instantly load from cache if available
+      const cachedLeads = localStorage.getItem('cachedLeads');
+      const cachedTutors = localStorage.getItem('cachedTutors');
+      
+      if (cachedLeads) setLeads(JSON.parse(cachedLeads));
+      if (cachedTutors) setTutors(JSON.parse(cachedTutors));
+
+      if (leads.length === 0 && tutors.length === 0 && !cachedLeads) {
+        setLoading(true);
+      }
       
       const isNative = Capacitor.isNativePlatform();
 
@@ -358,20 +805,37 @@ export default function App() {
         
         if (leadsRes.data) {
            const data = typeof leadsRes.data === 'string' ? JSON.parse(leadsRes.data) : leadsRes.data;
-           if (data.status === 'success') setLeads(data.data);
-           else if (Array.isArray(data)) setLeads(data);
+           if (data.status === 'success') {
+             setLeads(data.data);
+             localStorage.setItem('cachedLeads', JSON.stringify(data.data));
+           } else if (Array.isArray(data)) {
+             setLeads(data);
+             localStorage.setItem('cachedLeads', JSON.stringify(data));
+           }
         }
 
         if (tutorsRes.data) {
            const data = typeof tutorsRes.data === 'string' ? JSON.parse(tutorsRes.data) : tutorsRes.data;
-           if (data.status === 'success') setTutors(data.data);
-           else if (Array.isArray(data)) setTutors(data);
+           if (data.status === 'success') {
+             setTutors(data.data);
+             localStorage.setItem('cachedTutors', JSON.stringify(data.data));
+           } else if (Array.isArray(data)) {
+             setTutors(data);
+             localStorage.setItem('cachedTutors', JSON.stringify(data));
+           }
         }
       } else {
         const [leadsRes, tutorsRes] = await Promise.all([fetch(LEADS_URL), fetch(TUTORS_URL)]);
         const [leadsJson, tutorsJson] = await Promise.all([leadsRes.json(), tutorsRes.json()]);
-        if (leadsJson.status === 'success') setLeads(leadsJson.data);
-        if (tutorsJson.status === 'success') setTutors(tutorsJson.data);
+        
+        if (leadsJson.status === 'success') {
+          setLeads(leadsJson.data);
+          localStorage.setItem('cachedLeads', JSON.stringify(leadsJson.data));
+        }
+        if (tutorsJson.status === 'success') {
+          setTutors(tutorsJson.data);
+          localStorage.setItem('cachedTutors', JSON.stringify(tutorsJson.data));
+        }
       }
     } catch (err) {
       console.error('❌ Error loading data:', err);
@@ -398,9 +862,23 @@ export default function App() {
       console.error('❌ Leads Firestore Error:', err);
       setDbStatus('Error');
     });
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => { 
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => { 
       console.log('Auth State Changed:', user ? user.email : 'No User');
       setCurrentUser(user); 
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.userType) {
+              setUserType(userData.userType as UserType);
+              localStorage.setItem('userType', userData.userType);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching user profile:', err);
+        }
+      }
     });
     return () => { unsubscribeLeads(); unsubscribeAuth(); };
   }, []);
@@ -454,9 +932,9 @@ export default function App() {
   };
 
   const isAdminUser = useMemo(() => {
-    const email = currentUser?.email?.toLowerCase().trim();
+    const email = activeUser?.email?.toLowerCase().trim();
     return email === 'd9717018219@gmail.com' || email === 'doableindia@gmail.com';
-  }, [currentUser]);
+  }, [activeUser]);
 
   const toggleShortlist = useCallback((id: string, e?: React.MouseEvent) => {
     if (e) { e.stopPropagation(); e.preventDefault(); }
@@ -520,13 +998,30 @@ export default function App() {
       // Classes Filter
       if (jobFilterClasses.length > 0) {
         const jobClass = (l.Class || '').toLowerCase();
-        if (!jobFilterClasses.some(cls => jobClass.includes(cls.toLowerCase()))) return false;
+        const matchesClass = jobFilterClasses.some(cls => {
+          // Direct match
+          if (jobClass.includes(cls.toLowerCase())) return true;
+          // Group mapping match
+          const mappedClasses = CLASS_GROUP_MAPPING[cls];
+          if (mappedClasses && mappedClasses.some(m => jobClass.includes(m.toLowerCase()))) return true;
+          return false;
+        });
+        if (!matchesClass) return false;
       }
 
       // Gender Filter
       if (jobFilterGender !== 'All') {
         const jobGender = (l.Gender || '').toLowerCase();
-        if (!jobGender.includes(jobFilterGender.toLowerCase()) && !jobGender.includes('any')) return false;
+        const filterGender = jobFilterGender.toLowerCase();
+        
+        // Exact match or 'any' in job
+        if (jobGender === filterGender || jobGender === 'any') return true;
+        
+        // Handle cases where jobGender might be "Male/Female" or "Female/Male"
+        if (filterGender === 'male' && jobGender.includes('male') && !jobGender.includes('female')) return true;
+        if (filterGender === 'female' && jobGender.includes('female')) return true;
+        
+        return false;
       }
 
       if (jobSearchQuery) {
@@ -580,13 +1075,30 @@ export default function App() {
       // Classes Filter
       if (tutorFilterClasses.length > 0) {
         const tutorClass = (t['Preferred Class Group'] || '').toLowerCase();
-        if (!tutorFilterClasses.some(cls => tutorClass.includes(cls.toLowerCase()))) return false;
+        const matchesClass = tutorFilterClasses.some(cls => {
+          // Direct match
+          if (tutorClass.includes(cls.toLowerCase())) return true;
+          // Group mapping match
+          const mappedClasses = CLASS_GROUP_MAPPING[cls];
+          if (mappedClasses && mappedClasses.some(m => tutorClass.includes(m.toLowerCase()))) return true;
+          return false;
+        });
+        if (!matchesClass) return false;
       }
 
       // Gender Filter
       if (tutorFilterGender !== 'All') {
         const tutorGender = (t.Gender || '').toLowerCase();
-        if (!tutorGender.includes(tutorFilterGender.toLowerCase())) return false;
+        const filterGender = tutorFilterGender.toLowerCase();
+        
+        // Exact match or 'any' (unlikely for tutors but for safety)
+        if (tutorGender === filterGender || tutorGender === 'any') return true;
+        
+        // Handle cases like "Male/Female"
+        if (filterGender === 'male' && tutorGender.includes('male') && !tutorGender.includes('female')) return true;
+        if (filterGender === 'female' && tutorGender.includes('female')) return true;
+        
+        return false;
       }
 
       if (tutorSearchQuery) {
@@ -647,6 +1159,138 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans select-none overflow-x-hidden relative" ref={mainScrollRef}>
       <audio ref={audioRef} preload="auto" />
+
+      {/* Onboarding & Auth Flow Overlay */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <div className="fixed inset-0 z-[20000] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/90 backdrop-blur-md" />
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-full max-w-sm">
+              {!userType ? (
+                <div className="space-y-6 text-center">
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Welcome to DoAble</h2>
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">How would you like to continue?</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <button 
+                      onClick={() => { playTapSound(); setUserType('parent'); }}
+                      className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                        <LucideUser size={24} strokeWidth={3} />
+                      </div>
+                      <div className="text-left">
+                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">I'm a Parent</h4>
+                        <p className="text-[10px] font-bold text-slate-400">Looking for professional tutors</p>
+                      </div>
+                    </button>
+                    <button 
+                      onClick={() => { playTapSound(); setUserType('teacher'); }}
+                      className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                        <GraduationCap size={24} strokeWidth={3} />
+                      </div>
+                      <div className="text-left">
+                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">I'm a Tutor</h4>
+                        <p className="text-[10px] font-bold text-slate-400">Want to join the elite network</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-[40px] p-8 shadow-2xl space-y-6">
+                  <div className="flex justify-between items-center">
+                    <button onClick={() => setUserType(null)} className="text-slate-300 hover:text-slate-500"><ChevronRight size={20} className="rotate-180" /></button>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">
+                      {authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Create Account' : authMode === 'forgot' ? 'Forgot Password' : 'Reset Password'}
+                    </h3>
+                    <div className="w-5" />
+                  </div>
+
+                  <div className="space-y-4">
+                    {authMode !== 'reset' ? (
+                      <>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Email Address</label>
+                          <div className="relative">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                          </div>
+                        </div>
+
+                        {authMode !== 'forgot' && (
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Password</label>
+                            <div className="relative">
+                              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                        <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                          <p className="text-[10px] font-bold text-primary text-center leading-relaxed">Enter the 6-digit PIN sent to <br/><span className="underline">{email}</span></p>
+                        </div>
+                        
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Security PIN</label>
+                          <div className="relative">
+                            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                            <input type="text" maxLength={6} value={resetPin} onChange={(e) => setResetPin(e.target.value)} placeholder="000000" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-center text-lg font-black tracking-[1em] text-slate-700 outline-none focus:border-primary transition-all" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">New Password</label>
+                          <div className="relative">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 chars" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Confirm Password</label>
+                          <div className="relative">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                            <input type="password" value={confirmPassword} onChange={(e) => setRetypePassword(e.target.value)} placeholder="Repeat password" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {authError && <div className="text-rose-500 text-[10px] font-bold px-1 flex items-center gap-1.5"><AlertCircle size={12} /> {authError}</div>}
+
+                    <button 
+                      onClick={authMode === 'signin' ? handleEmailSignIn : authMode === 'signup' ? handleEmailSignUp : authMode === 'forgot' ? handleForgotPassword : handleResetPassword}
+                      disabled={isAuthLoading}
+                      className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      {isAuthLoading ? <Loader2 size={16} className="animate-spin" /> : (authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Sign Up' : authMode === 'forgot' ? 'Send PIN' : 'Verify & Reset')}
+                    </button>
+
+                    <div className="flex flex-col gap-3 pt-2">
+                      {authMode === 'signin' && (
+                        <>
+                          <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest">Forgot Password?</button>
+                          <div className="h-px bg-slate-100 w-full" />
+                          <button onClick={() => { setAuthMode('signup'); setAuthError(null); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
+                        </>
+                      )}
+                      {(authMode === 'signup' || authMode === 'forgot' || authMode === 'reset') && (
+                        <button onClick={() => { setAuthMode('signin'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Back to <span className="text-primary underline">Sign In</span></button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <style>{`
         :root {
@@ -770,9 +1414,8 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Footer Actions */}
                   <div className="pt-6 px-6 pb-[calc(1.5rem+var(--safe-area-bottom,20px))] flex gap-3 sticky bottom-0 bg-white border-t border-slate-50">
-                    <button onClick={currentClearFilters} className="flex-1 bg-slate-100 text-slate-900 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all">Reset</button>
+                    <button onClick={currentClearFilters} className="flex-1 bg-[#7A2153] text-white py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-[#7A2153]/20">Reset</button>
                     <button onClick={() => setShowAdvancedFilterDrawer(false)} className="flex-[2] bg-primary text-white py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all">Show Results</button>
                   </div>
                </div>
@@ -864,11 +1507,14 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#6C3475] via-[#4A2350] to-[#6C3475] px-5 pb-2 flex items-center justify-between shadow-[0_4px_30px_rgba(0,0,0,0.2)] border-b border-white/10 relative overflow-hidden pt-[calc(0.4rem+var(--safe-area-top,20px))]">
-        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+      <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#2E1065] via-[#4C1D95] to-[#DB2777] px-5 pb-3 flex items-center justify-between shadow-[0_10px_40px_rgba(46,16,101,0.3)] border-b border-white/10 relative overflow-hidden pt-[calc(0.6rem+var(--safe-area-top,20px))]">
+        <div className="absolute top-0 left-0 w-full h-full bg-black/5" />
+        <div className="absolute -top-24 -left-20 w-48 h-48 bg-pink-500/10 blur-3xl rounded-full" />
         <div className="flex flex-col relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
-          <span className="text-[18px] font-[900] text-white tracking-tighter leading-none [text-shadow:_0_2px_10px_rgba(0,0,0,0.3)]">DoAble India</span>
-          <span className="text-[7.5px] font-black text-purple-100/80 uppercase tracking-[0.2em] mt-1.5">Elite Private Tuition Network {debugClicks > 3 && ' [DEBUG ON]'}</span>
+          <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none [text-shadow:_0_2px_15px_rgba(0,0,0,0.4)]">DoAble India</span>
+          <span className="text-[7.5px] font-black text-white/80 uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5">
+            Premium Home Tuition Network <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse" /> {debugClicks > 3 && ' [DEBUG ON]'}
+          </span>
         </div>
         <div className="flex items-center gap-3 relative z-10">
              <div className="flex items-center gap-1.5 bg-white/5 backdrop-blur-xl p-0.5 rounded-2xl border border-white/10">
@@ -877,7 +1523,7 @@ export default function App() {
                   {unseenAlertsCount > 0 && <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center rounded-full border border-white shadow-lg animate-pulse">{unseenAlertsCount}</span>}
                 </button>
                 <div className="w-[1px] h-3 bg-white/10" />
-                <button onClick={() => setShowProfileSetup(true)} className="p-1.5 text-white hover:text-white transition-all active:scale-90"><LucideUser size={18} strokeWidth={2.5} color="#FFFFFF" /></button>
+                <button onClick={() => { playTapSound(); if (!activeUser) { setAuthMode('signin'); setShowOnboarding(true); } else { setShowProfileSetup(true); } }} className="p-1.5 text-white hover:text-white transition-all active:scale-90"><LucideUser size={18} strokeWidth={2.5} color="#FFFFFF" /></button>
               </div>
         </div>
       </header>
@@ -931,7 +1577,7 @@ export default function App() {
           />
        )}
        {activeTab === 'alerts' && (
-          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={currentUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={currentUser?.email} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
+          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={activeUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={activeUser?.email} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
        )}
        {activeTab === 'support' && (<SupportView userName={userName} userType={userType} userCity={userCity} />)}
        {activeTab === 'concierge' && (<ParentHubView userName={userName} playTapSound={playTapSound} setActiveTab={setActiveTab} setShowFormModal={setShowFormModal} setFormType={setFormType} />)}
@@ -1197,9 +1843,9 @@ export default function App() {
                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-[calc(8rem+var(--safe-area-bottom,20px))]">
                   {/* Quick Stats Grid */}
                   <div className="grid grid-cols-2 gap-2.5">
-                    <DetailStat emoji="🎓" label="Qualification" value={selectedTutor['Qualification(s)']?.split(',')[0] || 'Graduate'} color="bg-purple-600" />
+                    <DetailStat emoji="🎓" label="Qualification" value={(selectedTutor['Qualification(s)'] || 'Graduate').toString().replace(/[\[\]"]/g, '').split(',')[0]} color="bg-purple-600" />
                     <DetailStat emoji="📚" label="Experience" value={selectedTutor.Experience || '1-3 Years'} color="bg-emerald-600" />
-                    <DetailStat emoji="🏫" label="Class Group" value={selectedTutor['Preferred Class Group'] || 'All Classes'} color="bg-blue-600" />
+                    <DetailStat emoji="🏫" label="Class Group" value={(selectedTutor['Preferred Class Group'] || 'All Classes').toString().replace(/[\[\]"]/g, '')} color="bg-blue-600" />
                     <DetailStat emoji="👩‍🏫" label="School Teacher" value={selectedTutor['School Exp.'] || 'No'} color="bg-orange-500" />
                   </div>
 
@@ -1210,7 +1856,7 @@ export default function App() {
                        <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Expert Subjects</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                       {(selectedTutor['Preferred Subject(s)'] || 'General').split(/[;,]/).map((s, i) => (
+                       {(selectedTutor['Preferred Subject(s)'] || 'General').toString().replace(/[\[\]"]/g, '').split(/[;,]/).map((s, i) => (
                          <span key={i} className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700">📖 {s.trim()}</span>
                        ))}
                     </div>
@@ -1270,7 +1916,7 @@ export default function App() {
                        <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Teaching Localities</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                       {(selectedTutor['Preferred Location(s)'] || selectedTutor['Address'] || 'Citywide').split(/[;,]/).map((l, i) => {
+                       {(selectedTutor['Preferred Location(s)'] || selectedTutor['Address'] || 'Citywide').toString().replace(/[\[\]"]/g, '').split(/[;,]/).map((l, i) => {
                          const cleanLocality = l.toString().split('-')[0].trim();
                          return (
                            <span key={i} className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700">📍 {cleanLocality}</span>
@@ -1332,57 +1978,61 @@ export default function App() {
           <div onClick={() => setShowProfileSetup(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
           <div className="relative bg-white w-full max-w-[340px] rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
              <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
-                <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900">Profile Setup</h3>
+                <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900">
+                  {activeUser ? `${userType === 'teacher' ? 'Tutor' : 'Parent'} Profile` : 'Profile Setup'}
+                </h3>
                 <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm transition-all"><X size={16} /></button>
              </div>
              <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
                 <div className="space-y-6">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-[1000] uppercase text-slate-900 ml-1 tracking-[0.2em]">I'm here as...</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { id: 'parent', label: 'Parent', icon: '👨‍👩‍👧‍👦', desc: 'Looking for a Tutor' },
-                        { id: 'teacher', label: 'Teacher', icon: '👩‍🏫', desc: 'Looking for Jobs' }
-                      ].map(type => (
-                        <button 
-                          key={type.id} 
-                          onClick={() => { 
-                            playTapSound(); 
-                            const newType = type.id as UserType;
-                            setUserType(newType); 
-                            localStorage.setItem('userType', type.id);
-                            setActiveTab('home');
-                            setTutorStatus(null);
-                            setIsTutorFetched(false);
+                  {!activeUser && (
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-[1000] uppercase text-slate-900 ml-1 tracking-[0.2em]">I'm here as...</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { id: 'parent', label: 'Parent', icon: '👨‍👩‍👧‍👦', desc: 'Looking for a Tutor' },
+                          { id: 'teacher', label: 'Teacher', icon: '👩‍🏫', desc: 'Looking for Jobs' }
+                        ].map(type => (
+                          <button 
+                            key={type.id} 
+                            onClick={() => { 
+                              playTapSound(); 
+                              const newType = type.id as UserType;
+                              setUserType(newType); 
+                              localStorage.setItem('userType', type.id);
+                              setActiveTab('home');
+                              setTutorStatus(null);
+                              setIsTutorFetched(false);
 
-                            // Clear Details for fresh start in new role
-                            setUserName(null);
-                            setUserGender('All');
-                            setUserCity('Ghaziabad');
-                            setUserClasses([]);
-                            
-                            localStorage.removeItem('userName');
-                            localStorage.removeItem('userGender');
-                            localStorage.setItem('userCity', 'Ghaziabad');
-                            localStorage.removeItem('userClasses');
-                          }} 
-                          className={cn(
-                            "py-5 rounded-[24px] border-2 flex flex-col items-center gap-1 transition-all relative overflow-hidden", 
-                            userType === type.id ? "border-primary bg-primary/5 text-primary shadow-inner" : "border-slate-100 text-slate-400 bg-white"
-                          )}
-                        >
-                          <span className="text-2xl mb-1">{type.icon}</span>
-                          <span className="text-[10px] font-black uppercase tracking-tight">{type.label}</span>
-                          <span className="text-[8px] font-bold opacity-60">{type.desc}</span>
-                          {userType === type.id && (
-                            <motion.div layoutId="role-check" className="absolute top-2 right-2 w-4 h-4 bg-primary text-white rounded-full flex items-center justify-center">
-                              <Check size={10} strokeWidth={4} />
-                            </motion.div>
-                          )}
-                        </button>
-                      ))}
+                              // Clear Details for fresh start in new role
+                              setUserName(null);
+                              setUserGender('All');
+                              setUserCity('All');
+                              setUserClasses([]);
+                              
+                              localStorage.removeItem('userName');
+                              localStorage.removeItem('userGender');
+                              localStorage.setItem('userCity', 'All');
+                              localStorage.removeItem('userClasses');
+                            }} 
+                            className={cn(
+                              "py-5 rounded-[24px] border-2 flex flex-col items-center gap-1 transition-all relative overflow-hidden", 
+                              userType === type.id ? "border-primary bg-primary/5 text-primary shadow-inner" : "border-slate-100 text-slate-400 bg-white"
+                            )}
+                          >
+                            <span className="text-2xl mb-1">{type.icon}</span>
+                            <span className="text-[10px] font-black uppercase tracking-tight">{type.label}</span>
+                            <span className="text-[8px] font-bold opacity-60">{type.desc}</span>
+                            {userType === type.id && (
+                              <motion.div layoutId="role-check" className="absolute top-2 right-2 w-4 h-4 bg-primary text-white rounded-full flex items-center justify-center">
+                                <Check size={10} strokeWidth={4} />
+                              </motion.div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <AnimatePresence mode="wait">
                     <motion.div 
@@ -1394,213 +2044,385 @@ export default function App() {
                     >
                       {userType === 'teacher' && (
                         <div className="space-y-4">
-                           <div className="grid grid-cols-2 gap-2">
-                             <button 
-                               onClick={() => { playTapSound(); setTutorStatus('registered'); }} 
-                               className={cn(
-                                 "py-3 rounded-xl font-[900] uppercase text-[9px] transition-all shadow-md active:scale-95", 
-                                 tutorStatus === 'registered' 
-                                   ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-purple-200" 
-                                   : "bg-white border-2 border-slate-100 text-slate-400"
-                               )}
-                             >
-                               Sign In
-                             </button>
-                             <button 
-                               onClick={() => { playTapSound(); setTutorStatus('new'); setIsTutorFetched(false); }} 
-                               className={cn(
-                                 "py-3 rounded-xl font-[900] uppercase text-[9px] transition-all shadow-md active:scale-95", 
-                                 tutorStatus === 'new' 
-                                   ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-indigo-200" 
-                                   : "bg-white border-2 border-slate-100 text-slate-400"
-                               )}
-                             >
-                               Sign Up
-                             </button>
-                           </div>
-
-                           {tutorStatus === 'registered' && !isTutorFetched && (
-                             <div className="bg-slate-900 rounded-[28px] p-6 space-y-4 shadow-xl">
-                               <div className="space-y-1.5">
-                                 <label className="text-[10px] font-black uppercase text-white/40 ml-1 tracking-widest">Verify Identity</label>
-                                 <div className="relative">
-                                    <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" size={16} />
-                                    <input 
-                                      type="text" 
-                                      value={tutorIdInput} 
-                                      onChange={(e) => setTutorIdInput(e.target.value)} 
-                                      placeholder="Enter your Tutor ID" 
-                                      className="w-full bg-white/5 border border-white/5 rounded-2xl py-3.5 pl-10 pr-12 text-white font-bold placeholder:text-white/20 outline-none focus:border-primary/50 transition-all text-sm" 
-                                    />
-                                    <button 
-                                      onClick={fetchTutorDetails} 
-                                      disabled={isFetchingTutor || !tutorIdInput} 
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-primary text-white rounded-xl flex items-center justify-center active:scale-90 transition-all disabled:opacity-30 shadow-lg"
-                                    >
-                                      {isFetchingTutor ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} strokeWidth={3} />}
-                                    </button>
-                                 </div>
-                               </div>
-                               {tutorFetchError && (
-                                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 text-rose-400 text-[9px] font-bold px-1">
-                                    <AlertCircle size={10} /> {tutorFetchError}
-                                 </motion.div>
-                               )}
-                               <div className="space-y-2">
-                                 <p className="text-[8.5px] font-medium text-white/30 px-1 leading-relaxed">Entering your ID will automatically fill your profile details from our records.</p>
-                                 <button onClick={() => { playTapSound(); setActiveTab('support'); setShowProfileSetup(false); }} className="text-[8.5px] font-black text-primary uppercase tracking-widest px-1 hover:underline">Don't remember your Tutor ID?</button>
-                               </div>
-                             </div>
-                           )}
-
-                           {tutorStatus === 'new' && (
-                              <div className="bg-gradient-to-br from-[#572149] to-[#3a1631] rounded-[28px] p-6 text-white space-y-4 shadow-xl">
-                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10"><Sparkles size={20} className="text-amber-300 fill-amber-300" /></div>
-                                    <div className="min-w-0">
-                                       <h4 className="text-[13px] font-black tracking-tight truncate">Become an Elite Tutor</h4>
-                                       <p className="text-[9px] font-bold text-white/60 uppercase tracking-widest leading-none mt-0.5">Join the network</p>
-                                    </div>
-                                 </div>
-                                 <p className="text-[10.5px] font-medium leading-relaxed opacity-90">Start your journey with India's most prestigious tuition network. Click below to register.</p>
-                                 <button onClick={() => { playTapSound(); setFormType('teacher'); setShowFormModal(true); }} className="w-full bg-white text-[#572149] py-4 rounded-xl font-[1000] text-[10px] uppercase tracking-[0.2em] shadow-2xl active:scale-[0.98] transition-all">Join the Elite</button>
-                              </div>
-                           )}
+                           {/* Individual auth buttons removed in favor of unified Onboarding flow */}
                         </div>
                       )}
 
-                      {(userType === 'parent' || (userType === 'teacher' && tutorStatus === 'registered' && isTutorFetched)) && (
-                        <>
-                          <div className="space-y-2">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? "Student's Full Name" : "Full Name"}</label>
-                             <input 
-                               type="text" 
-                               value={userName || ''} 
-                               onChange={(e) => { if (!isTutorFetched) { setUserName(e.target.value); localStorage.setItem('userName', e.target.value); } }} 
-                               readOnly={isTutorFetched}
-                               placeholder={userType === 'parent' ? "e.g. Aryan Sharma" : "e.g. Deepak Sharma"} 
-                               className={cn(
-                                 "w-full p-4 rounded-2xl border font-bold outline-none transition-all text-sm",
-                                 isTutorFetched ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-100 focus:border-primary text-slate-700"
+                      {(userType === 'parent' || (userType === 'teacher' && activeUser)) && (
+                        <div className="space-y-6">
+                          {/* Top Profile Header (Pic) */}
+                          <div className="flex flex-col items-center py-6 bg-gradient-to-br from-slate-50 to-white rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary via-indigo-500 to-purple-500" />
+                            <div className="relative">
+                              {profilePhoto ? (
+                                <img src={profilePhoto} alt="User" className="w-28 h-28 rounded-full border-4 border-white shadow-2xl object-cover ring-4 ring-primary/5" />
+                              ) : activeUser?.photoURL ? (
+                                <img src={activeUser.photoURL} alt="User" className="w-28 h-28 rounded-full border-4 border-white shadow-2xl object-cover ring-4 ring-primary/5" />
+                              ) : (
+                                <div className="w-28 h-28 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-white shadow-2xl ring-4 ring-primary/5">
+                                  <LucideUser size={56} />
+                                </div>
+                              )}
+                              <label className="absolute bottom-1 right-1 w-9 h-9 bg-primary text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white cursor-pointer active:scale-90 transition-all hover:bg-primary/90 z-10">
+                                <Camera size={18} strokeWidth={3} />
+                                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                              </label>
+                            </div>
+                            <h4 className="mt-4 text-base font-black text-slate-800 uppercase tracking-widest">{userName || activeUser?.displayName || 'Welcome'}</h4>
+                            <div className="flex flex-col items-center gap-1 mt-1">
+                               {userType === 'teacher' && (
+                                 <p className="text-[11px] font-black text-primary uppercase tracking-widest mb-1">
+                                   🆔 Tutor ID: {localStorage.getItem('tutorId') || 'NEW_USER'}
+                                 </p>
                                )}
-                             />
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? "Tutor's Gender Preference" : "My Gender"}</label>
-                            <div className="grid grid-cols-3 gap-2">
-                              {['Male', 'Female', 'Any'].map(gender => (
-                                <button 
-                                  key={gender} 
-                                  disabled={isTutorFetched}
-                                  onClick={() => { playTapSound(); setUserGender(gender); localStorage.setItem('userGender', gender); }} 
-                                  className={cn(
-                                    "py-3.5 rounded-xl border font-black uppercase text-[10px] transition-all", 
-                                    userGender === gender ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white",
-                                    isTutorFetched && userGender !== gender && "opacity-30 grayscale"
-                                  )}
-                                >
-                                  {gender}
-                                </button>
-                              ))}
+                               <p className="text-[10px] font-bold text-slate-400">{activeUser?.email}</p>
+                               <div className="flex items-center gap-2">
+                                 <div className="px-3 py-1 bg-primary/10 text-primary rounded-full text-[9px] font-black uppercase tracking-wider border border-primary/10">{userType}</div>
+                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Verified Member</span>
+                               </div>
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? "City where you need Service?" : "Preferred City"}</label>
-                            <div className="relative group">
-                              <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                              <select 
-                                value={userCity} 
-                                disabled={isTutorFetched}
-                                onChange={(e) => { 
-                                  const newCity = e.target.value;
-                                  setUserCity(newCity); 
-                                  setCityFilter(newCity.toLowerCase() === 'all' ? 'all' : newCity.toLowerCase());
-                                  localStorage.setItem('userCity', newCity); 
-                                }} 
-                                className={cn(
-                                  "w-full border rounded-2xl p-4 pl-10 text-sm font-bold outline-none transition-all appearance-none",
-                                  isTutorFetched ? "bg-slate-100 border-slate-200 text-slate-500" : "bg-slate-50 border-slate-100 focus:border-primary focus:bg-white text-slate-700"
-                                )}
-                              >
-                                <option value="All">0. All Cities (Everywhere)</option>
-                                {CITIES_LIST.map((city, i) => <option key={city} value={city}>{i + 1}. {city}</option>)}
-                              </select>
-                            </div>
-                          </div>
-
+                          {/* 1. PERSONAL DETAILS SECTION (Student) */}
                           <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? "Class Group Preference" : "Class Group"}</label>
-                            <div className="grid grid-cols-2 gap-2">
-                              {['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'].map(cls => (
-                                <button 
-                                  key={cls} 
-                                  disabled={isTutorFetched}
-                                  onClick={() => {
-                                    playTapSound();
-                                    const next = userClasses.includes(cls) ? userClasses.filter(x => x !== cls) : [...userClasses, cls];
-                                    setUserClasses(next);
-                                    localStorage.setItem('userClasses', JSON.stringify(next));
-                                  }} 
-                                  className={cn(
-                                    "px-3 py-3 rounded-xl border font-bold text-[9px] transition-all", 
-                                    userClasses.includes(cls) ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white",
-                                    isTutorFetched && !userClasses.includes(cls) && "opacity-30"
-                                  )}
-                                >
-                                  {cls}
-                                </button>
-                              ))}
+                            <div className="flex items-center gap-2 px-2">
+                               <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500"><LucideUser size={14} /></div>
+                               <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{userType === 'parent' ? 'Student Details' : 'Personal Details'}</h3>
+                            </div>
+                            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
+                              {/* Name */}
+                              <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                <div className="space-y-0.5">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">{userType === 'parent' ? "Student's Name" : "Legal Name"}</label>
+                                  <div className="text-sm font-bold text-slate-700">{userName || "Not set"}</div>
+                                </div>
+                                <button onClick={() => { 
+                                  const val = prompt("Enter name:", userName || "");
+                                  if (val !== null) { setUserName(val); localStorage.setItem('userName', val); }
+                                }} className="p-2 text-slate-200 hover:text-primary transition-all"><Edit3 size={16} /></button>
+                              </div>
+
+                              {/* Phone - Only for teachers */}
+                              {userType === 'teacher' && (
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Phone Number</label>
+                                    <div className="text-sm font-bold text-slate-700">{userPhone || "Not linked"}</div>
+                                  </div>
+                                  <button onClick={() => { 
+                                    const val = prompt("Enter your phone number:", userPhone || "");
+                                    if (val !== null) { setUserPhone(val); localStorage.setItem('userPhone', val); }
+                                  }} className="p-2 text-slate-200 hover:text-primary transition-all"><Edit3 size={16} /></button>
+                                </div>
+                              )}
+
+                              {/* DOB & Age - Only for teachers */}
+                              {userType === 'teacher' && (
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Date of Birth & Age</label>
+                                    <div className="text-sm font-bold text-slate-700">{userDob || "YYYY-MM-DD"} {userAge ? `(${userAge} yrs)` : ''}</div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <input 
+                                      type="date" 
+                                      value={userDob} 
+                                      onChange={(e) => { setUserDob(e.target.value); localStorage.setItem('userDob', e.target.value); }}
+                                      className="bg-slate-50 text-[10px] font-bold p-1.5 rounded-lg border-none outline-none" 
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Gender Preference */}
+                              <div className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-all">
+                                <div className="space-y-0.5">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">{userType === 'parent' ? "Tutor Gender Preference" : "Gender Identity"}</label>
+                                  <div className="text-sm font-bold text-slate-700">{userGender || "Any"}</div>
+                                </div>
+                                <div className="flex gap-1">
+                                  {['Male', 'Female', 'Any'].map(g => (
+                                    <button key={g} onClick={() => { playTapSound(); setUserGender(g); localStorage.setItem('userGender', g); }} className={cn("px-2.5 py-1 rounded-lg text-[9px] font-black uppercase transition-all", userGender === g ? "bg-primary text-white shadow-md" : "bg-slate-50 text-slate-300")}>{g}</button>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           </div>
 
-                          {isTutorFetched && (
-                            <div className="pt-2">
-                              <button 
-                                onClick={() => { playTapSound(); setFormType('teacher'); setShowFormModal(true); }}
-                                className="w-full py-3 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
-                              >
-                                 <Edit3 size={14} /> Update my details
-                              </button>
-                              <p className="text-center text-[8px] font-medium text-slate-400 mt-2 px-4 leading-snug italic">Fields are locked for verified accounts. Tap above to request an update.</p>
+                          {/* 2. ABOUT ME SECTION (Only for Teachers) */}
+                          {userType === 'teacher' && (
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 px-2">
+                                 <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500"><BookText size={14} /></div>
+                                 <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">About Me</h3>
+                              </div>
+                              <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm group">
+                                <textarea 
+                                  value={aboutMe}
+                                  onChange={(e) => { setAboutMe(e.target.value); localStorage.setItem('aboutMe', e.target.value); }}
+                                  placeholder="Describe your experience, teaching methodology..."
+                                  className="w-full min-h-[100px] text-[13px] font-medium text-slate-600 leading-relaxed outline-none border-none resize-none bg-transparent placeholder:text-slate-200"
+                                />
+                              </div>
                             </div>
                           )}
-                        </>
+
+                          {/* 3. PROFESSIONAL DETAILS (Only for Teachers) */}
+                          {userType === 'teacher' && (
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 px-2">
+                                 <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-500"><Briefcase size={14} /></div>
+                                 <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">Professional Details</h3>
+                              </div>
+                              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
+                                {/* Qualification */}
+                                <div className="p-4 space-y-3 group hover:bg-slate-50/50 transition-all">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Qualifications (Multi-select)</label>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {QUALIFICATIONS_LIST.map(q => {
+                                      const active = userQualifications.includes(q);
+                                      return (
+                                        <button 
+                                          key={q} 
+                                          onClick={() => {
+                                            playTapSound();
+                                            const next = active ? userQualifications.filter(x => x !== q) : [...userQualifications, q];
+                                            setUserQualifications(next);
+                                            localStorage.setItem('userQualifications', JSON.stringify(next));
+                                          }}
+                                          className={cn(
+                                            "px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all border",
+                                            active ? "bg-primary text-white border-primary shadow-sm" : "bg-white text-slate-400 border-slate-100"
+                                          )}
+                                        >
+                                          {q}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Experience */}
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Work Experience</label>
+                                    <div className="text-sm font-bold text-slate-700">{userExperience || "Not selected"}</div>
+                                  </div>
+                                  <select 
+                                    value={userExperience} 
+                                    onChange={(e) => { setUserExperience(e.target.value); localStorage.setItem('userExperience', e.target.value); }}
+                                    className="bg-slate-50 text-slate-500 text-[9px] font-bold p-2 rounded-xl border-none outline-none max-w-[120px]"
+                                  >
+                                    <option value="">Select</option>
+                                    {EXPERIENCE_LIST.map(exp => <option key={exp} value={exp}>{exp}</option>)}
+                                  </select>
+                                </div>
+
+                                {/* School Teacher */}
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">School Teacher?</label>
+                                    <div className="text-sm font-bold text-slate-700">{isSchoolTeacher}</div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {['Yes', 'No'].map(v => (
+                                      <button key={v} onClick={() => { setIsSchoolTeacher(v); localStorage.setItem('isSchoolTeacher', v); }} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", isSchoolTeacher === v ? "bg-amber-100 text-amber-600 border border-amber-200" : "bg-slate-50 text-slate-300 border border-transparent")}>{v}</button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Own Vehicle */}
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Own Vehicle?</label>
+                                    <div className="text-sm font-bold text-slate-700">{hasVehicle}</div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {['Yes', 'No'].map(v => (
+                                      <button key={v} onClick={() => { setHasVehicle(v); localStorage.setItem('hasVehicle', v); }} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", hasVehicle === v ? "bg-emerald-100 text-emerald-600 border border-emerald-200" : "bg-slate-50 text-slate-300 border border-transparent")}>{v}</button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 4. ACADEMIC EXPERTISE SECTION (Class & Subjects) */}
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 px-2">
+                               <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500"><BookOpen size={14} /></div>
+                               <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{userType === 'parent' ? 'Requirement Details' : 'Academic Expertise'}</h3>
+                            </div>
+                            <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm space-y-4">
+                              {/* Class Groups */}
+                              <div className="space-y-2">
+                                <label className="text-[9px] font-black uppercase text-slate-300 tracking-widest">{userType === 'parent' ? "Student's Class" : "Class Group (Select one)"}</label>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {CLASSES_LIST.map(cls => {
+                                    const active = userClasses.includes(cls);
+                                    return (
+                                      <button 
+                                        key={cls} 
+                                        onClick={() => {
+                                          playTapSound();
+                                          const next = [cls]; // Single selection
+                                          setUserClasses(next);
+                                          localStorage.setItem('userClasses', JSON.stringify(next));
+                                          setUserSubjects([]); // Reset subjects
+                                          localStorage.setItem('userSubjects', JSON.stringify([]));
+                                        }}
+                                        className={cn(
+                                          "px-3 py-2 rounded-xl text-[9px] font-black uppercase transition-all border",
+                                          active ? "bg-primary text-white border-primary shadow-md" : "bg-white text-slate-400 border-slate-100"
+                                        )}
+                                      >
+                                        {cls}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Subjects */}
+                              {userClasses.length > 0 && (
+                                <div className="space-y-2 pt-2 border-t border-slate-50">
+                                  <label className="text-[9px] font-black uppercase text-slate-300 tracking-widest">Subjects</label>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {Array.from(new Set(userClasses.flatMap(cls => CLASS_SUBJECTS_DATA[cls] || []))).map(sub => {
+                                      const active = userSubjects.includes(sub);
+                                      return (
+                                        <button 
+                                          key={sub} 
+                                          onClick={() => {
+                                            const next = active ? userSubjects.filter(x => x !== sub) : [...userSubjects, sub];
+                                            setUserSubjects(next);
+                                            localStorage.setItem('userSubjects', JSON.stringify(next));
+                                          }}
+                                          className={cn(
+                                            "px-2.5 py-1.5 rounded-lg text-[8px] font-bold uppercase transition-all",
+                                            active ? "bg-emerald-500 text-white shadow-sm" : "bg-slate-50 text-slate-400"
+                                          )}
+                                        >
+                                          {sub}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 5. LOCATIONS SECTION */}
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 px-2">
+                               <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500"><MapPin size={14} /></div>
+                               <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{userType === 'parent' ? 'Select Location' : 'Preferred Locations'}</h3>
+                            </div>
+                            <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm space-y-4">
+                              <div className="space-y-2">
+                                <label className="text-[9px] font-black uppercase text-slate-300 tracking-widest">City</label>
+                                <select 
+                                  value={userCity} 
+                                  onChange={(e) => { 
+                                    const val = e.target.value;
+                                    setUserCity(val); 
+                                    localStorage.setItem('userCity', val); 
+                                    setUserLocalities([]); // Reset localities when city changes
+                                    localStorage.setItem('userLocalities', JSON.stringify([]));
+                                  }}
+                                  className="w-full bg-slate-50 p-3 rounded-2xl text-xs font-bold text-slate-600 border-none outline-none"
+                                >
+                                  {['All', ...CITIES_LIST].map(city => <option key={city} value={city}>{city}</option>)}
+                                </select>
+                              </div>
+
+                              {userCity !== 'All' && (() => {
+                                const cityKey = Object.keys(CITY_TO_LOCATIONS_DATA).find(k => k.toLowerCase() === userCity.toLowerCase());
+                                const localities = cityKey ? CITY_TO_LOCATIONS_DATA[cityKey] : null;
+                                if (!localities) return null;
+                                return (
+                                  <div className="space-y-2">
+                                    <label className="text-[9px] font-black uppercase text-slate-300 tracking-widest">Specific Localities</label>
+                                    <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto p-1">
+                                      {localities.map(loc => {
+                                        const active = userLocalities.includes(loc);
+                                        return (
+                                          <button 
+                                            key={loc} 
+                                            onClick={() => {
+                                              const next = active ? userLocalities.filter(x => x !== loc) : [...userLocalities, loc];
+                                              setUserLocalities(next);
+                                              localStorage.setItem('userLocalities', JSON.stringify(next));
+                                            }}
+                                            className={cn(
+                                              "px-2.5 py-1.5 rounded-lg text-[8px] font-bold uppercase transition-all",
+                                              active ? "bg-orange-500 text-white shadow-sm" : "bg-slate-50 text-slate-400"
+                                            )}
+                                          >
+                                            {loc}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+
+                          <div className="pt-4 border-t border-slate-50">
+                             <button 
+                               onClick={() => { playTapSound(); handleUpdateProfile(); setShowProfileSetup(false); }}
+                               className="w-full py-4 rounded-2xl bg-primary text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
+                             >
+                                <Save size={16} className="mr-2 inline-block" /> Save & Close
+                             </button>
+                             <p className="text-center text-[8px] font-bold text-slate-300 uppercase tracking-[0.2em] mt-6">Last sync: {new Date().toLocaleDateString()}</p>
+                          </div>
+                        </div>
                       )}
                     </motion.div>
                   </AnimatePresence>
                 </div>
 
                 <div className="space-y-4 pt-4 border-t border-slate-100">
-                     {currentUser ? (
+                     {activeUser ? (
                        <div className="space-y-3">
-                         <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                           {currentUser.photoURL ? (
-                             <img src={currentUser.photoURL} alt="User" className="w-10 h-10 rounded-full border border-white shadow-sm" />
-                           ) : (
-                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary"><LucideUser size={20} /></div>
-                           )}
-                           <div className="min-w-0">
-                             <div className="text-[11px] font-black text-slate-900 truncate">{currentUser.displayName || 'Signed In'}</div>
-                             <div className="text-[9px] font-bold text-slate-400 truncate">{currentUser.email}</div>
+                         <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 relative group">
+                           <div className="relative">
+                             {profilePhoto ? (
+                               <img src={profilePhoto} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" />
+                             ) : activeUser.photoURL ? (
+                               <img src={activeUser.photoURL} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" />
+                             ) : (
+                               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-white shadow-md">
+                                 <LucideUser size={24} />
+                               </div>
+                             )}
+                             <label className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg border-2 border-white cursor-pointer active:scale-90 transition-all">
+                               <Camera size={12} strokeWidth={3} />
+                               <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                             </label>
+                           </div>
+                           <div className="min-w-0 flex-1">
+                             <div className="text-[12px] font-black text-slate-900 truncate">{userName || activeUser.displayName || 'Signed In'}</div>
+                             <div className="text-[10px] font-bold text-slate-400 truncate">{activeUser.email}</div>
                            </div>
                          </div>
+
                          {isAdminUser && (
                            <button onClick={() => { playTapSound(); setActiveTab('admin'); setShowProfileSetup(false); }} className="w-full bg-slate-900 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all">
                              <Settings size={16} /> Admin Panel
                            </button>
                          )}
-                         <button onClick={() => { playTapSound(); auth.signOut(); }} className="w-full bg-rose-50 text-rose-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+                         <button onClick={handleLogout} className="w-full bg-rose-50 text-rose-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all">
                            <LogOut size={16} /> Sign Out
                          </button>
                        </div>
                      ) : null}
                    </div>
-
-                   {(userType === 'parent' || (userType === 'teacher' && isTutorFetched)) && (
-                     <button onClick={() => { playTapSound(); setShowProfileSetup(false); }} className="w-full bg-primary text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all mt-6">Save & Close</button>
-                   )}
 
                    <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-2">DoAble India Network • v1.13.1</div>                   
                 </div>

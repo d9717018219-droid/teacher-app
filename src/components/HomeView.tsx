@@ -17,9 +17,12 @@ import {
   Heart,
   Zap,
   Globe,
+  Home,
   ArrowRight,
   Sparkles,
-  Clock
+  Clock,
+  ShieldCheck,
+  TrendingUp
 } from 'lucide-react';
 import { JobLead, TutorProfile, UserType } from '../types';
 import { cn, formatCurrency, getJobId, getTutorId, toTitleCase } from '../utils';
@@ -46,78 +49,85 @@ interface HomeViewProps {
   onShortlistToggle: (id: string, e: React.MouseEvent) => void;
 }
 
-export default function HomeView({
+export const HomeView: React.FC<HomeViewProps> = ({
   userName,
   userType,
   userCity,
+  activeLeadsCount,
+  activeTutorsCount,
+  featuredJobs,
+  featuredTutors,
   playTapSound,
   setFormType,
   setShowFormModal,
   setActiveTab,
-  setShowFilterDrawer,
   getDynamicGreeting,
-  featuredJobs,
-  featuredTutors,
+  setShowFilterDrawer,
   onJobClick,
   onTutorClick,
   shortlistedIds,
   onShortlistToggle
-}: HomeViewProps) {
+}) => {
   const [currentBanner, setCurrentBanner] = React.useState(0);
   const banners = [
     {
-      title: "Elite Network 🎓",
+      title: "Elite Network",
+      emoji: "🎓",
       sub: "Established 2022 ✨",
       desc: "Connect with the most prestigious private educators across the nation.",
-      bg: "linear-gradient(135deg, #354B61, #243342)",
-      accent: "#fbbf24",
+      bg: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
+      accent: "#fde047",
       icon: <GraduationCap size={72} />,
       cta: "Join the Elite",
-      type: 'teacher',
+      type: 'teacher' as const,
       text: "text-white"
     },
     {
-      title: "Premium Tuition ⭐",
+      title: "Premium Tuition",
+      emoji: "⭐",
       sub: "Excellence Redefined 🏆",
       desc: "Experience world-class learning with our verified top-tier educators.",
-      bg: "linear-gradient(135deg, #417C85, #2d585e)",
-      accent: "#fbbf24",
+      bg: "linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)",
+      accent: "#fde047",
       icon: <Star size={72} />,
       cta: "Find Experts",
-      type: 'parent',
+      type: 'parent' as const,
       text: "text-white"
     },
     {
-      title: "Direct Connect ⚡",
+      title: "Direct Connect",
+      emoji: "⚡",
       sub: "Pure Transparency 💎",
       desc: "Direct contact with leads. No intermediaries. Just pure opportunity.",
-      bg: "linear-gradient(135deg, #854174, #5c2d50)",
-      accent: "#fbbf24",
+      bg: "linear-gradient(135deg, #f43f5e 0%, #ec4899 100%)",
+      accent: "#fde047",
       icon: <Zap size={72} />,
       cta: "Get Started",
-      type: 'teacher',
+      type: 'teacher' as const,
       text: "text-white"
     },
     {
-      title: "100+ Cities 📍",
+      title: "113+ Cities",
+      emoji: "📍",
       sub: "Pan India Reach 🇮🇳",
       desc: "The largest network of elite tutors operating in every major Indian city.",
-      bg: "linear-gradient(135deg, #614185, #442d5c)",
-      accent: "#fbbf24",
+      bg: "linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)",
+      accent: "#fde047",
       icon: <MapPin size={72} />,
       cta: "Explore Map",
-      type: 'parent',
+      type: 'parent' as const,
       text: "text-white"
     },
     {
-      title: "Global Impact 🌍",
+      title: "Global Impact",
+      emoji: "🌍",
       sub: "World Class Reach ✈️",
       desc: "Transcending boundaries to provide elite education on a global scale.",
-      bg: "linear-gradient(135deg, #854152, #5c2d38)",
-      accent: "#fbbf24",
+      bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+      accent: "#fde047",
       icon: <Globe size={72} />,
       cta: "Global Portal",
-      type: 'parent',
+      type: 'parent' as const,
       text: "text-white"
     }
   ];
@@ -127,28 +137,27 @@ export default function HomeView({
       setCurrentBanner(prev => (prev + 1) % banners.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [banners.length]);
 
   return (
-    <div className="flex flex-col gap-6 pb-32 bg-[#FAFBFF] font-sans">
-      
-      {/* 1. Greeting Section */}
+    <div className="space-y-6 pb-24">
+      {/* 1. Header Section */}
       <section className="px-5 pt-4">
         <div className="flex justify-between items-start">
-          <div className="flex flex-col gap-0.5 overflow-hidden">
-            <h1 className="text-[18px] font-[900] text-[#0F172A] tracking-tighter whitespace-nowrap">
-              Welcome, {userName || (userType === 'teacher' ? 'Educator' : 'Parent')} 👋
+          <div className="flex flex-col gap-0.5 overflow-hidden flex-1">
+            <h1 className="text-[18px] font-[900] text-[#0F172A] tracking-tighter whitespace-nowrap truncate">
+              Welcome, <span className="text-primary">{userName ? toTitleCase(userName).split(' ')[0] : (userType === 'teacher' ? 'Educator' : 'Parent')}</span> <span className="text-amber-400">👋</span>
             </h1>
-            <p className="text-[#64748B] text-[10.5px] font-[500] tracking-tight">
+            <p className="text-[#64748B] text-[10.5px] font-[500] tracking-tight whitespace-nowrap truncate">
               {getDynamicGreeting()} Let's create impact today.
             </p>
           </div>
           <button 
             onClick={() => { playTapSound(); setShowFilterDrawer(true); }}
-            className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-full border border-slate-100 text-[#0F172A] text-[10px] font-bold shadow-sm active:scale-90 transition-all shrink-0"
+            className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-full border border-slate-100 text-[#0F172A] text-[10px] font-bold shadow-sm active:scale-95 transition-all shrink-0 ml-2"
           >
-            <MapPin size={12} className="text-primary" />
-            <span className="tracking-tight">{toTitleCase(userCity) || 'All'}</span>
+            <MapPin size={11} className="text-[#2563EB]" />
+            <span className="tracking-tight uppercase">{userCity || 'City'}</span>
             <ChevronDown size={10} className="text-slate-300" />
           </button>
         </div>
@@ -168,7 +177,7 @@ export default function HomeView({
               style={{ background: banners[currentBanner].bg }}
             >
               {/* Animated Right-Side Icon */}
-              <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-20">
                  <motion.div 
                    animate={{ 
                      y: [0, -12, 0],
@@ -180,28 +189,31 @@ export default function HomeView({
                      repeat: Infinity, 
                      ease: "easeInOut" 
                    }}
-                   className="w-16 h-16 rounded-[24px] bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-2xl"
                  >
-                    {React.cloneElement(banners[currentBanner].icon as React.ReactElement, { size: 32, className: "opacity-100", color: "#fbbf24" })}
+                    {React.cloneElement(banners[currentBanner].icon as React.ReactElement, { size: 80, color: "#fde047" })}
                  </motion.div>
               </div>
 
               <div className="relative z-10">
                 <div className="space-y-0.5 mb-2.5">
-                  <span className="text-[9px] font-black uppercase tracking-[0.15em]" style={{ color: banners[currentBanner].accent }}>
-                    {banners[currentBanner].sub}
+                  <span className="text-[9px] font-black uppercase tracking-[0.15em] flex items-center gap-1.5" style={{ color: banners[currentBanner].accent }}>
+                    {banners[currentBanner].sub.split(' ').map((word, i) => 
+                      /[\u2700-\u27bf]|[\u1f300-\u1f5ff]|[\u1f600-\u1f64f]|[\u1f680-\u1f6ff]|[\u2600-\u26ff]|[\ud83c\udde0-\ud83c\uddff]|[\ud83c\udf00-\ud83c\udfff]|[\ud83d\udc00-\ud83d\udfff]|[\ud83e\udd00-\ud83e\udfff]/.test(word) 
+                        ? <span key={i} className="text-amber-400">{word}</span> 
+                        : <span key={i}>{word}</span>
+                    )}
                   </span>
-                  <h2 className={cn("text-[21px] font-[900] tracking-tighter leading-none", (banners[currentBanner] as any).text)}>
-                    {banners[currentBanner].title}
+                  <h2 className={cn("text-[21px] font-[900] tracking-tighter leading-none whitespace-nowrap", banners[currentBanner].text)}>
+                    {banners[currentBanner].title} <span className="text-amber-400">{banners[currentBanner].emoji}</span>
                   </h2>
                 </div>
                 
-                <p className={cn("text-[9.5px] font-medium mb-4 leading-snug max-w-[200px] opacity-80", (banners[currentBanner] as any).text)}>
+                <p className={cn("text-[9.5px] font-medium mb-4 leading-snug max-w-[200px] opacity-80", banners[currentBanner].text)}>
                   {banners[currentBanner].desc}
                 </p>
-                
-                <button 
-                  onClick={() => { playTapSound(); setFormType(banners[currentBanner].type as any); setShowFormModal(true); }}
+
+                <button
+                  onClick={() => { playTapSound(); setFormType(banners[currentBanner].type); setShowFormModal(true); }}
                   className="bg-white/15 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl flex items-center gap-2 active:scale-95 transition-all shadow-md w-fit"
                 >
                   <span className="text-[9px] font-black uppercase tracking-widest text-white">{banners[currentBanner].cta}</span>
@@ -213,30 +225,30 @@ export default function HomeView({
         </div>
       </section>
 
-      {/* 3. Explore Opportunities Section */}
+      {/* 3. Quick Actions Section */}
       <section className="px-5 space-y-2.5">
         <div className="flex justify-between items-center">
-          <h3 className="text-[16px] font-bold text-[#0F172A] tracking-tight">Explore Opportunities</h3>
+          <h3 className="text-[16px] font-bold text-[#0F172A] tracking-tight font-sans">Quick Actions</h3>
           <button onClick={() => setActiveTab('jobs')} className="text-[11.5px] font-[600] text-[#2563EB] tracking-tight">
             View all
           </button>
         </div>
         
         <div className="flex justify-between gap-1.5 overflow-hidden">
-          <ExploreCard icon={<Briefcase size={14} fill="white" className="text-white" />} label="Jobs" sub="Openings" onClick={() => setActiveTab('jobs')} iconBg="bg-purple-500" />
-          <ExploreCard icon={<GraduationCap size={14} fill="white" className="text-white" />} label="Tutors" sub="Experts" onClick={() => setActiveTab('tutors')} iconBg="bg-emerald-500" />
+          <ExploreCard icon={<Briefcase size={14} fill="white" className="text-white" />} label="Jobs" sub="Live" onClick={() => setActiveTab('jobs')} iconBg="bg-purple-500" />
+          <ExploreCard icon={<GraduationCap size={14} fill="white" className="text-white" />} label="Tutors" sub="Elite" onClick={() => setActiveTab('tutors')} iconBg="bg-emerald-500" />
           <ExploreCard icon={<CreditCard size={14} fill="white" className="text-white" />} label="Pay" sub="Now" onClick={() => { playTapSound(); window.open("https://zohosecurepay.in/checkout/i9db4wt2-verz1l6gn6ogo/Make-a-secure-payment-now", "_system"); }} iconBg="bg-orange-500" />
-          <ExploreCard icon={<Calendar size={14} fill="white" className="text-white" />} label="Trial" sub="Book now" onClick={() => { setFormType('parent'); setShowFormModal(true); }} iconBg="bg-pink-500" />
-          <ExploreCard icon={<MessageCircle size={14} fill="white" className="text-white" />} label="Help" sub="Support" onClick={() => setActiveTab('support')} iconBg="bg-[#347475]" />
+          <ExploreCard icon={<Calendar size={14} fill="white" className="text-white" />} label="Trial" sub="Book" onClick={() => { setFormType('parent'); setShowFormModal(true); }} iconBg="bg-pink-500" />
+          <ExploreCard icon={<MessageCircle size={14} fill="white" className="text-white" />} label="Help" sub="Care" onClick={() => setActiveTab('support')} iconBg="bg-[#347475]" />
         </div>
       </section>
 
-      {/* 4. Our Impact Section */}
+      {/* 4. Impact Statistics Section (Moved up here) */}
       <section className="px-5">
         <div className="bg-white border border-slate-100 rounded-[24px] p-4 space-y-3 shadow-sm">
           <div className="space-y-0.5 px-1">
-            <h3 className="text-[15px] font-[900] text-[#0F172A] tracking-tighter uppercase">Our Network</h3>
-            <p className="text-[#64748B] text-[10px] font-bold tracking-tight opacity-70">Empowering abilities across India.</p>
+            <h3 className="text-[15px] font-bold text-[#0F172A] tracking-tight">Impact Statistics</h3>
+            <p className="text-[#64748B] text-[10px] font-medium tracking-tight opacity-70">Empowering abilities across India.</p>
           </div>
           
           <div className="flex items-center justify-between gap-1 pt-2">
@@ -247,6 +259,80 @@ export default function HomeView({
             <ImpactStat icon={<MapPin size={14} className="text-rose-500" fill="currentColor" />} value="113+" label="Cities" label2="Network" />
             <div className="w-[1px] h-5 bg-slate-100" />
             <ImpactStat icon={<Star size={14} className="text-amber-500" fill="currentColor" />} value="4.8" label="Average" label2="Rating" />
+          </div>
+        </div>
+      </section>
+
+      {/* Why Parents Choose Us Section */}
+      <section className="px-5">
+        <div className="bg-white border border-slate-100 rounded-[24px] p-5 space-y-4 shadow-sm">
+          <div className="space-y-0.5 px-1">
+            <h3 className="text-[15px] font-bold text-[#0F172A] tracking-tight">Why Parents Trust Us</h3>
+            <p className="text-[#64748B] text-[10px] font-medium tracking-tight opacity-70">Empowering your child's learning journey.</p>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-2 pt-1">
+            <div className="flex flex-col items-center text-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                <ShieldCheck size={18} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-700 leading-tight">Verified Experts</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <CreditCard size={18} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-700 leading-tight">No Service Charge</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                <Home size={18} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-700 leading-tight">At Student's Place</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                <TrendingUp size={18} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-700 leading-tight">Proven Results</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Why Tutors Choose Us Section */}
+      <section className="px-5">
+        <div className="bg-white border border-slate-100 rounded-[24px] p-5 space-y-4 shadow-sm">
+          <div className="space-y-0.5 px-1">
+            <h3 className="text-[15px] font-bold text-[#0F172A] tracking-tight">The Expert's Choice</h3>
+            <p className="text-[#64748B] text-[10px] font-medium tracking-tight opacity-70">Fueling the future of elite educators.</p>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-2 pt-1">
+            <div className="flex flex-col items-center text-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <Zap size={18} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-700 leading-tight">Direct Leads</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+                <ShieldCheck size={18} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-700 leading-tight">No Upfront Fees</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                <MessageCircle size={18} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-700 leading-tight">Dedicated Support</span>
+            </div>
+            <div className="flex flex-col items-center text-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                <Sparkles size={18} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-700 leading-tight">Elite Network</span>
+            </div>
           </div>
         </div>
       </section>
@@ -312,50 +398,42 @@ export default function HomeView({
               </motion.div>
             ))
           ) : (
-             <div className="py-10 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest bg-white rounded-[32px] border border-dashed border-slate-200">
-               Syncing Experts...
-             </div>
+            <div className="py-10 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest bg-white rounded-[32px] border border-dashed border-slate-200">
+               Discovering Talent...
+            </div>
           )}
         </div>
       </section>
     </div>
   );
-}
+};
 
-function ExploreCard({ icon, label, sub, onClick, iconBg = "bg-slate-50" }: { 
-  icon: React.ReactNode; 
-  label: string; 
-  sub: string;
-  onClick: () => void;
-  iconBg?: string;
-}) {
-  return (
-    <button 
-      onClick={onClick}
-      className="flex-shrink-0 bg-white p-2 rounded-[16px] flex flex-col items-center text-center gap-1 shadow-sm border border-slate-100 active:scale-95 transition-all flex-1 min-w-0"
-    >
-      <div className={cn("w-7 h-7 rounded-xl flex items-center justify-center mb-0.5 shadow-sm", iconBg)}>
-        {icon}
-      </div>
-      <div className="space-y-0.5 w-full overflow-hidden">
-        <span className="block text-[10px] font-[900] text-[#0F172A] truncate w-full tracking-tighter leading-none">{label}</span>
-        <span className="block text-[8px] text-[#64748B] font-[600] leading-none truncate w-full tracking-tighter opacity-80">{sub}</span>
-      </div>
-    </button>
-  );
-}
+export default HomeView;
 
-function ImpactStat({ icon, value, label, label2 }: { icon: React.ReactNode; value: string; label: string; label2: string }) {
-  return (
-    <div className="flex flex-col items-center flex-1 text-center min-w-0">
-      <div className="flex items-center gap-1 mb-0.5">
-        {icon}
-        <span className="text-[13px] font-[800] text-[#0F172A] tracking-tighter whitespace-nowrap leading-none">{value}</span>
-      </div>
-      <div className="flex flex-col leading-none">
-         <span className="text-[8px] font-[700] text-[#64748B] tracking-tight opacity-70 truncate">{label}</span>
-         <span className="text-[8px] font-[700] text-[#64748B] tracking-tight opacity-70 truncate">{label2}</span>
-      </div>
+const ExploreCard = ({ icon, label, sub, onClick, iconBg }: { icon: React.ReactNode, label: string, sub: string, onClick: () => void, iconBg: string }) => (
+  <button 
+    onClick={onClick}
+    className="flex-1 flex flex-col items-center gap-1.5 p-2 bg-white border border-slate-100 rounded-[20px] shadow-sm active:scale-95 transition-all group"
+  >
+    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110", iconBg)}>
+      {React.cloneElement(icon as React.ReactElement, { size: 12 })}
     </div>
-  );
-}
+    <div className="text-center">
+      <div className="text-[9.5px] font-black text-slate-800 uppercase tracking-tight leading-none">{label}</div>
+      <div className="text-[7.5px] font-bold text-slate-400 uppercase tracking-tighter leading-none mt-0.5">{sub}</div>
+    </div>
+  </button>
+);
+
+const ImpactStat = ({ icon, value, label, label2 }: { icon: React.ReactNode, value: string, label: string, label2: string }) => (
+  <div className="flex-1 flex flex-col items-center text-center gap-1">
+    <div className="flex items-center gap-1.5">
+       {icon}
+       <span className="text-[13px] font-black text-slate-900 tracking-tight">{value}</span>
+    </div>
+    <div className="flex flex-col -space-y-1">
+      <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-[0.1em]">{label}</span>
+      <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-[0.1em]">{label2}</span>
+    </div>
+  </div>
+);

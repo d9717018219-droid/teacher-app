@@ -27,6 +27,23 @@ export function formatPostedDate(dateStr: string | undefined) {
   return date.toLocaleString('en-IN', options);
 }
 
+export function formatWhatsAppStyle(date: Date) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (targetDate.getTime() === today.getTime()) {
+    return 'Today';
+  } else if (targetDate.getTime() === yesterday.getTime()) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  }
+}
+
 const listA = ["Ghaziabad", "Faridabad", "Delhi", "Ahmedabad", "Mumbai", "Pune", "Chandigarh", "Mohali", "Panchkula", "Bhopal", "Indore", "Guwahati", "Jaipur"];
 const listB = ["Gurgaon", "Noida", "Greater Noida", "Chennai", "Hyderabad", "Bangalore", "Patna", "Lucknow", "Kanpur"];
 
@@ -102,6 +119,11 @@ export function getTutorId(tutor: any): string {
 /**
  * Robust WhatsApp redirection for mobile apps
  */
+export function cleanValue(val: any): string {
+  if (val === null || val === undefined) return '';
+  return val.toString().replace(/[\[\]"]/g, '');
+}
+
 export function openWhatsApp(text: string) {
   const phone = '9971969197';
   const url = `https://wa.me/91${phone}?text=${encodeURIComponent(text)}`;
