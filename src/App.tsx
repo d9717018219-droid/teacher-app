@@ -85,6 +85,40 @@ const EXPERIENCE_LIST = [
 export default function App() {
   const [leads, setLeads] = useState<JobLead[]>([]);
   const [firestoreLeads, setFirestoreLeads] = useState<JobLead[]>([]);
+  const [showSelectionDrawer, setShowSelectionDrawer] = useState<{
+    type: 'qualification' | 'experience' | 'classGroup' | 'subjects' | 'localities' | null;
+    title: string;
+    options: string[];
+    selected: string[];
+    isMulti: boolean;
+  } | null>(null);
+
+  const handleSelection = (value: string) => {
+    if (!showSelectionDrawer) return;
+    const { type, isMulti, selected } = showSelectionDrawer;
+    playTapSound();
+
+    if (isMulti) {
+      const next = selected.includes(value) ? selected.filter(v => v !== value) : [...selected, value];
+      setShowSelectionDrawer({ ...showSelectionDrawer, selected: next });
+      
+      if (type === 'qualification') { setUserQualifications(next); localStorage.setItem('userQualifications', JSON.stringify(next)); }
+      if (type === 'subjects') { setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }
+      if (type === 'localities') { setUserLocalities(next); localStorage.setItem('userLocalities', JSON.stringify(next)); }
+    } else {
+      const next = [value];
+      setShowSelectionDrawer(null); // Close on single select
+
+      if (type === 'experience') { setUserExperience(value); localStorage.setItem('userExperience', value); }
+      if (type === 'classGroup') { 
+        setUserClasses(next); 
+        localStorage.setItem('userClasses', JSON.stringify(next)); 
+        setUserSubjects([]); // Reset subjects on class change
+        localStorage.setItem('userSubjects', JSON.stringify([]));
+      }
+    }
+  };
+
   const [tutors, setTutors] = useState<TutorProfile[]>([]);
 
   // Auth State
@@ -2128,7 +2162,23 @@ export default function App() {
                                     <input 
                                       type="date" 
                                       value={userDob} 
-                                      onChange={(e) => { setUserDob(e.target.value); localStorage.setItem('userDob', e.target.value); }}
+                                      onChange={(e) => { 
+                                        const date = e.target.value;
+                                        setUserDob(date); 
+                                        localStorage.setItem('userDob', date); 
+                                        if (date) {
+                                          const birthDate = new Date(date);
+                                          const today = new Date();
+                                          let age = today.getFullYear() - birthDate.getFullYear();
+                                          const m = today.getMonth() - birthDate.getMonth();
+                                          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                            age--;
+                                          }
+                                          const ageStr = age.toString();
+                                          setUserAge(ageStr);
+                                          localStorage.setItem('userAge', ageStr);
+                                        }
+                                      }}
                                       className="bg-slate-50 text-[10px] font-bold p-1.5 rounded-lg border-none outline-none" 
                                     />
                                   </div>
@@ -2177,30 +2227,25 @@ export default function App() {
                               </div>
                               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
                                 {/* Qualification */}
-                                <div className="p-4 space-y-3 group hover:bg-slate-50/50 transition-all">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Qualifications (Multi-select)</label>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {QUALIFICATIONS_LIST.map(q => {
-                                      const active = userQualifications.includes(q);
-                                      return (
-                                        <button 
-                                          key={q} 
-                                          onClick={() => {
-                                            playTapSound();
-                                            const next = active ? userQualifications.filter(x => x !== q) : [...userQualifications, q];
-                                            setUserQualifications(next);
-                                            localStorage.setItem('userQualifications', JSON.stringify(next));
-                                          }}
-                                          className={cn(
-                                            "px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all border",
-                                            active ? "bg-primary text-white border-primary shadow-sm" : "bg-white text-slate-400 border-slate-100"
-                                          )}
-                                        >
-                                          {q}
-                                        </button>
-                                      );
-                                    })}
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Qualifications</label>
+                                    <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">
+                                      {userQualifications.length > 0 ? cleanValue(userQualifications.join(', ')) : "Not selected"}
+                                    </div>
                                   </div>
+                                  <button 
+                                    onClick={() => setShowSelectionDrawer({
+                                      type: 'qualification',
+                                      title: 'Select Qualifications',
+                                      options: QUALIFICATIONS_LIST,
+                                      selected: userQualifications,
+                                      isMulti: true
+                                    })}
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                  >
+                                    <Edit3 size={16} />
+                                  </button>
                                 </div>
 
                                 {/* Experience */}
@@ -2209,14 +2254,18 @@ export default function App() {
                                     <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Work Experience</label>
                                     <div className="text-sm font-bold text-slate-700">{userExperience || "Not selected"}</div>
                                   </div>
-                                  <select 
-                                    value={userExperience} 
-                                    onChange={(e) => { setUserExperience(e.target.value); localStorage.setItem('userExperience', e.target.value); }}
-                                    className="bg-slate-50 text-slate-500 text-[9px] font-bold p-2 rounded-xl border-none outline-none max-w-[120px]"
+                                  <button 
+                                    onClick={() => setShowSelectionDrawer({
+                                      type: 'experience',
+                                      title: 'Select Experience',
+                                      options: EXPERIENCE_LIST,
+                                      selected: userExperience ? [userExperience] : [],
+                                      isMulti: false
+                                    })}
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
                                   >
-                                    <option value="">Select</option>
-                                    {EXPERIENCE_LIST.map(exp => <option key={exp} value={exp}>{exp}</option>)}
-                                  </select>
+                                    <Edit3 size={16} />
+                                  </button>
                                 </div>
 
                                 {/* School Teacher */}
@@ -2254,61 +2303,48 @@ export default function App() {
                                <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500"><BookOpen size={14} /></div>
                                <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{userType === 'parent' ? 'Requirement Details' : 'Academic Expertise'}</h3>
                             </div>
-                            <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm space-y-4">
+                            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
                               {/* Class Groups */}
-                              <div className="space-y-2">
-                                <label className="text-[9px] font-black uppercase text-slate-300 tracking-widest">{userType === 'parent' ? "Student's Class" : "Class Group (Select one)"}</label>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {CLASSES_LIST.map(cls => {
-                                    const active = userClasses.includes(cls);
-                                    return (
-                                      <button 
-                                        key={cls} 
-                                        onClick={() => {
-                                          playTapSound();
-                                          const next = [cls]; // Single selection
-                                          setUserClasses(next);
-                                          localStorage.setItem('userClasses', JSON.stringify(next));
-                                          setUserSubjects([]); // Reset subjects
-                                          localStorage.setItem('userSubjects', JSON.stringify([]));
-                                        }}
-                                        className={cn(
-                                          "px-3 py-2 rounded-xl text-[9px] font-black uppercase transition-all border",
-                                          active ? "bg-primary text-white border-primary shadow-md" : "bg-white text-slate-400 border-slate-100"
-                                        )}
-                                      >
-                                        {cls}
-                                      </button>
-                                    );
-                                  })}
+                              <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                <div className="space-y-0.5">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">{userType === 'parent' ? "Student's Class" : "Class Group"}</label>
+                                  <div className="text-sm font-bold text-slate-700">{userClasses.length > 0 ? userClasses[0] : "Not selected"}</div>
                                 </div>
+                                <button 
+                                  onClick={() => setShowSelectionDrawer({
+                                    type: 'classGroup',
+                                    title: 'Select Class Group',
+                                    options: CLASSES_LIST,
+                                    selected: userClasses,
+                                    isMulti: false
+                                  })}
+                                  className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                >
+                                  <Edit3 size={16} />
+                                </button>
                               </div>
 
                               {/* Subjects */}
                               {userClasses.length > 0 && (
-                                <div className="space-y-2 pt-2 border-t border-slate-50">
-                                  <label className="text-[9px] font-black uppercase text-slate-300 tracking-widest">Subjects</label>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {Array.from(new Set(userClasses.flatMap(cls => CLASS_SUBJECTS_DATA[cls] || []))).map(sub => {
-                                      const active = userSubjects.includes(sub);
-                                      return (
-                                        <button 
-                                          key={sub} 
-                                          onClick={() => {
-                                            const next = active ? userSubjects.filter(x => x !== sub) : [...userSubjects, sub];
-                                            setUserSubjects(next);
-                                            localStorage.setItem('userSubjects', JSON.stringify(next));
-                                          }}
-                                          className={cn(
-                                            "px-2.5 py-1.5 rounded-lg text-[8px] font-bold uppercase transition-all",
-                                            active ? "bg-emerald-500 text-white shadow-sm" : "bg-slate-50 text-slate-400"
-                                          )}
-                                        >
-                                          {sub}
-                                        </button>
-                                      );
-                                    })}
+                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Expert Subjects</label>
+                                    <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">
+                                      {userSubjects.length > 0 ? userSubjects.join(', ') : "Select Subjects"}
+                                    </div>
                                   </div>
+                                  <button 
+                                    onClick={() => setShowSelectionDrawer({
+                                      type: 'subjects',
+                                      title: 'Select Subjects',
+                                      options: Array.from(new Set(userClasses.flatMap(cls => CLASS_SUBJECTS_DATA[cls] || []))),
+                                      selected: userSubjects,
+                                      isMulti: true
+                                    })}
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                  >
+                                    <Edit3 size={16} />
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -2320,9 +2356,12 @@ export default function App() {
                                <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500"><MapPin size={14} /></div>
                                <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{userType === 'parent' ? 'Select Location' : 'Preferred Locations'}</h3>
                             </div>
-                            <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm space-y-4">
-                              <div className="space-y-2">
-                                <label className="text-[9px] font-black uppercase text-slate-300 tracking-widest">City</label>
+                            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
+                              <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                <div className="space-y-0.5">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">City</label>
+                                  <div className="text-sm font-bold text-slate-700">{userCity}</div>
+                                </div>
                                 <select 
                                   value={userCity} 
                                   onChange={(e) => { 
@@ -2332,7 +2371,7 @@ export default function App() {
                                     setUserLocalities([]); // Reset localities when city changes
                                     localStorage.setItem('userLocalities', JSON.stringify([]));
                                   }}
-                                  className="w-full bg-slate-50 p-3 rounded-2xl text-xs font-bold text-slate-600 border-none outline-none"
+                                  className="bg-slate-50 text-slate-500 text-[9px] font-bold p-2 rounded-xl border-none outline-none max-w-[120px]"
                                 >
                                   {['All', ...CITIES_LIST].map(city => <option key={city} value={city}>{city}</option>)}
                                 </select>
@@ -2343,29 +2382,25 @@ export default function App() {
                                 const localities = cityKey ? CITY_TO_LOCATIONS_DATA[cityKey] : null;
                                 if (!localities) return null;
                                 return (
-                                  <div className="space-y-2">
-                                    <label className="text-[9px] font-black uppercase text-slate-300 tracking-widest">Specific Localities</label>
-                                    <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto p-1">
-                                      {localities.map(loc => {
-                                        const active = userLocalities.includes(loc);
-                                        return (
-                                          <button 
-                                            key={loc} 
-                                            onClick={() => {
-                                              const next = active ? userLocalities.filter(x => x !== loc) : [...userLocalities, loc];
-                                              setUserLocalities(next);
-                                              localStorage.setItem('userLocalities', JSON.stringify(next));
-                                            }}
-                                            className={cn(
-                                              "px-2.5 py-1.5 rounded-lg text-[8px] font-bold uppercase transition-all",
-                                              active ? "bg-orange-500 text-white shadow-sm" : "bg-slate-50 text-slate-400"
-                                            )}
-                                          >
-                                            {loc}
-                                          </button>
-                                        );
-                                      })}
+                                  <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Specific Localities</label>
+                                      <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">
+                                        {userLocalities.length > 0 ? userLocalities.join(', ') : "Select Localities"}
+                                      </div>
                                     </div>
+                                    <button 
+                                      onClick={() => setShowSelectionDrawer({
+                                        type: 'localities',
+                                        title: 'Select Localities',
+                                        options: localities,
+                                        selected: userLocalities,
+                                        isMulti: true
+                                      })}
+                                      className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                    >
+                                      <Edit3 size={16} />
+                                    </button>
                                   </div>
                                 );
                               })()}
@@ -2429,6 +2464,74 @@ export default function App() {
              </div>
           </div>
         )}
+
+      <AnimatePresence>
+        {showSelectionDrawer && (
+          <div className="fixed inset-0 z-[16000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSelectionDrawer(null)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="relative bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+                 <div className="space-y-0.5">
+                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">{showSelectionDrawer.title}</h3>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                     {showSelectionDrawer.isMulti ? 'Multi-select enabled' : 'Choose one option'}
+                   </p>
+                 </div>
+                 <button onClick={() => setShowSelectionDrawer(null)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm transition-all">
+                   <X size={16} />
+                 </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                {showSelectionDrawer.options.map(opt => {
+                  const active = showSelectionDrawer.selected.includes(opt);
+                  return (
+                    <button 
+                      key={opt}
+                      onClick={() => handleSelection(opt)}
+                      className={cn(
+                        "w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all active:scale-[0.98]",
+                        active ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-slate-50 bg-white text-slate-600 hover:border-slate-100"
+                      )}
+                    >
+                      <span className="text-[13px] font-bold tracking-tight">{opt}</span>
+                      <div className={cn(
+                        "w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all",
+                        active ? "bg-primary border-primary" : "border-slate-200"
+                      )}>
+                        {active && <Check size={14} strokeWidth={4} className="text-white" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {showSelectionDrawer.isMulti && (
+                <div className="p-5 border-t border-slate-100 bg-slate-50/50">
+                  <button 
+                    onClick={() => setShowSelectionDrawer(null)}
+                    className="w-full py-4 rounded-2xl bg-slate-900 text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
+                  >
+                    Done ({showSelectionDrawer.selected.length} Selected)
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {showFormModal && (
         <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4">
