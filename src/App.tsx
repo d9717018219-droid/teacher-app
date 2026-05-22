@@ -1640,7 +1640,11 @@ export default function App() {
        {activeTab === 'admin' && (
          <div className="px-6 py-10">
            {isAdminUser ? (
-             <AdminPanel currentCity={userCity} />
+             <AdminPanel 
+            currentCity={userCity} 
+            tutors={tutors}
+            playTapSound={playTapSound}
+          />
            ) : (
              <PasscodeLogin 
                onSuccess={() => setActiveTab('admin')} 
