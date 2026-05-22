@@ -30,6 +30,16 @@ import {
   CLASS_GROUP_MAPPING,
   CITY_TO_LOCATIONS_DATA} from './constants';
 
+// ─── Dynamic Font Scaling ──────────────────────────────────────────
+function getDynamicFontSize(text: string, baseSize: number = 14): string {
+  if (!text) return `${baseSize}px`;
+  const len = text.length;
+  if (len < 20) return `${baseSize}px`;
+  if (len < 40) return `${baseSize - 2}px`;
+  if (len < 60) return `${baseSize - 3}px`;
+  return `${baseSize - 4}px`;
+}
+
 // ─── Dynamic greeting ───────────────────────────────────────────────
 function getDynamicGreeting(): string {
   const hour = new Date().getHours();
@@ -2253,9 +2263,12 @@ export default function App() {
                               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
                                 {/* Qualification */}
                                 <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5">
+                                  <div className="space-y-0.5 flex-1 min-w-0 mr-4">
                                     <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Qualifications</label>
-                                    <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">
+                                    <div 
+                                      className="font-bold text-slate-700 leading-tight"
+                                      style={{ fontSize: getDynamicFontSize(userQualifications.join(', ')) }}
+                                    >
                                       {userQualifications.length > 0 ? cleanValue(userQualifications.join(', ')) : "Not selected"}
                                     </div>
                                   </div>
@@ -2267,7 +2280,7 @@ export default function App() {
                                       selected: userQualifications,
                                       isMulti: true
                                     })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
                                   >
                                     <Edit3 size={16} />
                                   </button>
@@ -2321,9 +2334,14 @@ export default function App() {
 
                                 {/* Available Days */}
                                 <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5">
+                                  <div className="space-y-0.5 flex-1 min-w-0 mr-4">
                                     <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Available Days</label>
-                                    <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{userDays || "Not selected"}</div>
+                                    <div 
+                                      className="font-bold text-slate-700 leading-tight"
+                                      style={{ fontSize: getDynamicFontSize(userDays) }}
+                                    >
+                                      {userDays || "Not selected"}
+                                    </div>
                                   </div>
                                   <button 
                                     onClick={() => setShowSelectionDrawer({
@@ -2333,7 +2351,7 @@ export default function App() {
                                       selected: userDays ? userDays.split(', ').map(s => s.trim()) : [],
                                       isMulti: true
                                     })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
                                   >
                                     <Edit3 size={16} />
                                   </button>
@@ -2341,9 +2359,14 @@ export default function App() {
 
                                 {/* Preferred Time */}
                                 <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5">
+                                  <div className="space-y-0.5 flex-1 min-w-0 mr-4">
                                     <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Preferred Time</label>
-                                    <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{userTime || "Not selected"}</div>
+                                    <div 
+                                      className="font-bold text-slate-700 leading-tight"
+                                      style={{ fontSize: getDynamicFontSize(userTime) }}
+                                    >
+                                      {userTime || "Not selected"}
+                                    </div>
                                   </div>
                                   <button 
                                     onClick={() => setShowSelectionDrawer({
@@ -2353,7 +2376,7 @@ export default function App() {
                                       selected: userTime ? userTime.split(', ').map(s => s.trim()) : [],
                                       isMulti: true
                                     })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
                                   >
                                     <Edit3 size={16} />
                                   </button>
@@ -2392,9 +2415,12 @@ export default function App() {
                               {/* Subjects */}
                               {userClasses.length > 0 && (
                                 <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5">
+                                  <div className="space-y-0.5 flex-1 min-w-0 mr-4">
                                     <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Expert Subjects</label>
-                                    <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">
+                                    <div 
+                                      className="font-bold text-slate-700 leading-tight"
+                                      style={{ fontSize: getDynamicFontSize(userSubjects.join(', ')) }}
+                                    >
                                       {userSubjects.length > 0 ? userSubjects.join(', ') : "Select Subjects"}
                                     </div>
                                   </div>
@@ -2406,7 +2432,7 @@ export default function App() {
                                       selected: userSubjects,
                                       isMulti: true
                                     })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
                                   >
                                     <Edit3 size={16} />
                                   </button>
@@ -2448,9 +2474,12 @@ export default function App() {
                                 if (!localities) return null;
                                 return (
                                   <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                    <div className="space-y-0.5">
+                                    <div className="space-y-0.5 flex-1 min-w-0 mr-4">
                                       <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Specific Localities</label>
-                                      <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">
+                                      <div 
+                                        className="font-bold text-slate-700 leading-tight"
+                                        style={{ fontSize: getDynamicFontSize(userLocalities.join(', ')) }}
+                                      >
                                         {userLocalities.length > 0 ? userLocalities.join(', ') : "Select Localities"}
                                       </div>
                                     </div>
@@ -2462,7 +2491,7 @@ export default function App() {
                                         selected: userLocalities,
                                         isMulti: true
                                       })}
-                                      className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
+                                      className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
                                     >
                                       <Edit3 size={16} />
                                     </button>
