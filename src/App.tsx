@@ -2224,13 +2224,21 @@ export default function App() {
                                  <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500"><BookText size={14} /></div>
                                  <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">About Me</h3>
                               </div>
-                              <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm group">
+                              <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm group space-y-4">
                                 <textarea 
                                   value={aboutMe}
                                   onChange={(e) => { setAboutMe(e.target.value); localStorage.setItem('aboutMe', e.target.value); }}
-                                  placeholder="Describe your experience, teaching methodology..."
-                                  className="w-full min-h-[100px] text-[13px] font-medium text-slate-600 leading-relaxed outline-none border-none resize-none bg-transparent placeholder:text-slate-200"
+                                  placeholder="Write a short, catchy bio. Mention your teaching style and why parents should hire you. (e.g., 'Passionate about making Maths easy for kids through fun shortcuts.')"
+                                  className="w-full min-h-[120px] text-[13px] font-medium text-slate-600 leading-relaxed outline-none border-none resize-none bg-transparent placeholder:text-slate-300"
                                 />
+                                <div className="pt-3 border-t border-slate-50">
+                                   <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100/50">
+                                      <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 leading-relaxed">
+                                        <span>💡</span> 
+                                        <span>Pro-Tip: You can use AI like ChatGPT or Gemini. Limit 100 words</span>
+                                      </p>
+                                   </div>
+                                </div>
                               </div>
                             </div>
                           )}
