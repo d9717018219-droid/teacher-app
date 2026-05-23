@@ -131,3 +131,37 @@ export function openWhatsApp(text: string) {
   // '_system' tells Capacitor to open the URL in the system browser/app
   window.open(url, '_system');
 }
+
+// ─── IndexedDB Storage for Large Data ─────────────────────────────
+const DB_NAME = 'DoAbleUserAppDB';
+const STORE_NAME = 'appCache';
+
+export async function saveToLargeStorage(key: string, data: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(data, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getFromLargeStorage(key: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const getReq = tx.objectStore(STORE_NAME).get(key);
+      getReq.onsuccess = () => resolve(getReq.result);
+      tx.onerror = () => reject(tx.error);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}

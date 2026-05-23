@@ -22,7 +22,7 @@ import { ParentHubView } from './components/ParentHubView';
 
 import { requestNotificationPermission } from './firebase';
 import { useNotifications } from './hooks/useNotifications';
-import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp, cleanValue } from './utils';
+import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp, cleanValue, saveToLargeStorage, getFromLargeStorage } from './utils';
 import { 
   CITIES_LIST, 
   CLASSES_LIST,
@@ -277,6 +277,7 @@ export default function App() {
         if (data && data.status === 'success') {
           if (data.tutor_id) {
             localStorage.setItem('tutorId', data.tutor_id);
+            setTutorId(data.tutor_id);
           }
           await loadData();
           setActiveToast({ title: 'Success', body: 'Profile updated successfully!' });
@@ -343,6 +344,7 @@ export default function App() {
 
   const [userCity, setUserCity] = useState<string>(localStorage.getItem('userCity') || 'Delhi');
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('userName'));
+  const [tutorId, setTutorId] = useState<string | null>(localStorage.getItem('tutorId'));
   const [userGender, setUserGender] = useState<string | null>(localStorage.getItem('userGender') || 'All');
   const [userType, setUserType] = useState<UserType | null>(localStorage.getItem('userType') as UserType);
   const [userClasses, setUserClasses] = useState<string[]>(() => {
@@ -502,7 +504,10 @@ export default function App() {
         setUserSubjects(subjects);
         setUserLocalities(localities);
 
-        if (tutorId) localStorage.setItem('tutorId', tutorId);
+        if (tutorId) {
+          localStorage.setItem('tutorId', tutorId);
+          setTutorId(tutorId);
+        }
         
         // Match Class Groups - Enforce single selection
         const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
@@ -946,10 +951,10 @@ export default function App() {
     try {
       // 1. Instantly load from cache if available
       const cachedLeads = localStorage.getItem('cachedLeads');
-      const cachedTutors = localStorage.getItem('cachedTutors');
+      const cachedTutors = await getFromLargeStorage('cachedTutors');
       
       if (cachedLeads) setLeads(JSON.parse(cachedLeads));
-      if (cachedTutors) setTutors(JSON.parse(cachedTutors));
+      if (cachedTutors) setTutors(cachedTutors);
 
       if (leads.length === 0 && tutors.length === 0 && !cachedLeads) {
         setLoading(true);
@@ -984,12 +989,12 @@ export default function App() {
 
         if (tutorsRes.data) {
            const data = typeof tutorsRes.data === 'string' ? JSON.parse(tutorsRes.data) : tutorsRes.data;
-           if (data.status === 'success') {
+           if (Array.isArray(data.data)) {
              setTutors(data.data);
-             localStorage.setItem('cachedTutors', JSON.stringify(data.data));
+             await saveToLargeStorage('cachedTutors', data.data);
            } else if (Array.isArray(data)) {
              setTutors(data);
-             localStorage.setItem('cachedTutors', JSON.stringify(data));
+             await saveToLargeStorage('cachedTutors', data);
            }
         }
       } else {
@@ -1002,7 +1007,7 @@ export default function App() {
         }
         if (tutorsJson.status === 'success') {
           setTutors(tutorsJson.data);
-          localStorage.setItem('cachedTutors', JSON.stringify(tutorsJson.data));
+          await saveToLargeStorage('cachedTutors', tutorsJson.data);
         }
       }
     } catch (err) {
@@ -1760,7 +1765,7 @@ export default function App() {
        )}
        {activeTab === 'support' && (<SupportView userName={userName} userType={userType} userCity={userCity} />)}
        {activeTab === 'concierge' && (<ParentHubView userName={userName} playTapSound={playTapSound} setActiveTab={setActiveTab} setShowFormModal={setShowFormModal} setFormType={setFormType} />)}
-       {activeTab === 'earnings' && (<EarningsView leads={leads} firestoreLeads={firestoreLeads} userName={userName} userCity={userCity} playTapSound={playTapSound} setSelectedJob={setSelectedJob} />)}
+       {activeTab === 'earnings' && (<EarningsView leads={leads} firestoreLeads={firestoreLeads} userName={userName} userCity={userCity} tutorId={tutorId} playTapSound={playTapSound} setSelectedJob={setSelectedJob} />)}
        {activeTab === 'admin' && (
          <div className="px-6 py-10">
            {isAdminUser ? (

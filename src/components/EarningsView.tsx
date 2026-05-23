@@ -38,6 +38,7 @@ interface EarningsViewProps {
   firestoreLeads: JobLead[];
   userName?: string | null;
   userCity?: string | null;
+  tutorId?: string | null;
   playTapSound: () => void;
   setSelectedJob: (job: JobLead | null) => void;
 }
@@ -65,7 +66,7 @@ const CARD_ACCENTS = [
   { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100', iconBg: 'bg-purple-600' },
 ];
 
-export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLeads, userName, userCity, playTapSound, setSelectedJob }) => {
+export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLeads, userName, userCity, tutorId, playTapSound, setSelectedJob }) => {
   const [orderIdInput, setOrderIdInput] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
   const [assignedBookings, setAssignedBookings] = useState<any[]>([]);
@@ -81,17 +82,26 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
   }, [myEarnings]);
 
   useEffect(() => {
-    const tId = localStorage.getItem('tutorId');
-    if (!tId || tId === 'NEW_USER') return;
+    const tId = tutorId || localStorage.getItem('tutorId');
+    console.log('[EarningsView] Fetching bookings for tutorId:', tId);
+    
+    if (!tId || tId === 'NEW_USER' || tId === 'NEW') {
+      console.log('[EarningsView] Early return: tutorId is empty or NEW');
+      setAssignedBookings([]);
+      return;
+    }
 
     const q = query(collection(db, 'assigned_bookings'), where('tutorId', '==', tId));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log('[EarningsView] Real-time data received:', data.length, 'bookings found.');
       setAssignedBookings(data);
-    }, (err) => console.log('Error fetching assigned bookings:', err));
+    }, (err) => {
+      console.error('[EarningsView] Firestore Error:', err);
+    });
 
     return () => unsubscribe();
-  }, []);
+  }, [tutorId]);
 
   const fetchJobDetails = () => {
     if (!orderIdInput.trim()) return;
@@ -349,6 +359,11 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
                       <p>This is a service update regarding your assigned demo session. Please review the booking information below 👇</p>
                       
                       <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 my-5 space-y-3">
+                        <div className="flex items-start gap-2">
+                          <span className="shrink-0 text-[14px]">🆔</span> 
+                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Order ID</span> <span className="font-black text-primary text-[13px]">{b.orderId || `DEMO-${b.id.slice(-4).toUpperCase()}`}</span></div>
+                        </div>
+                        <div className="h-px bg-blue-100/50 w-full" />
                         <div className="flex items-start gap-2">
                           <span className="shrink-0 text-[14px]">😎</span> 
                           <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Client Name</span> <span className="font-black text-slate-900 text-[13px]">{b.clientName || 'N/A'}</span></div>
