@@ -2157,16 +2157,16 @@ export default function App() {
       </AnimatePresence>
 
       {showProfileSetup && (
-        <div className="fixed inset-0 z-[12000] flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4">
           <div onClick={() => setShowProfileSetup(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-          <div className="relative bg-white w-full max-w-[340px] rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-             <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+          <div className="relative bg-[#F8FAFC] w-full max-w-[360px] rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[92vh]">
+             <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
                 <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900">
                   {activeUser ? `${userType === 'teacher' ? 'Tutor' : 'Parent'} Profile` : 'Profile Setup'}
                 </h3>
-                <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm transition-all"><X size={16} /></button>
+                <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition-all"><X size={16} /></button>
              </div>
-             <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                 <div className="space-y-6">
                   {!activeUser && (
                     <div className="space-y-3">
@@ -2232,78 +2232,61 @@ export default function App() {
                       )}
 
                       {(userType === 'parent' || (userType === 'teacher' && activeUser)) && (
-                        <div className="space-y-6">
-                          {/* Top Profile Header (Pic) */}
-                          <div className="flex flex-col items-center py-6 bg-gradient-to-br from-slate-50 to-white rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary via-indigo-500 to-purple-500" />
-                            <div className="relative">
+                        <div className="space-y-4">
+                          {/* Top Profile Header (Pic) Compact */}
+                          <div className="flex items-center gap-4 p-4 bg-white rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+                            <div className="relative shrink-0">
                               {profilePhoto ? (
-                                <img src={profilePhoto} alt="User" className="w-28 h-28 rounded-full border-4 border-white shadow-2xl object-cover ring-4 ring-primary/5" />
+                                <img src={profilePhoto} alt="User" className="w-16 h-16 rounded-full border-2 border-slate-100 object-cover" />
                               ) : activeUser?.photoURL ? (
-                                <img src={activeUser.photoURL} alt="User" className="w-28 h-28 rounded-full border-4 border-white shadow-2xl object-cover ring-4 ring-primary/5" />
+                                <img src={activeUser.photoURL} alt="User" className="w-16 h-16 rounded-full border-2 border-slate-100 object-cover" />
                               ) : (
-                                <div className="w-28 h-28 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-white shadow-2xl ring-4 ring-primary/5">
-                                  <LucideUser size={56} />
+                                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-slate-100">
+                                  <LucideUser size={32} />
                                 </div>
                               )}
-                              <label className="absolute bottom-1 right-1 w-9 h-9 bg-primary text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white cursor-pointer active:scale-90 transition-all hover:bg-primary/90 z-10">
-                                <Camera size={18} strokeWidth={3} />
+                              <label className="absolute -bottom-1 -right-1 w-7 h-7 bg-primary text-white rounded-full flex items-center justify-center shadow-lg border-2 border-white cursor-pointer active:scale-90 transition-all z-10">
+                                <Camera size={14} strokeWidth={3} />
                                 <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                               </label>
                             </div>
-                            <h4 className="mt-4 text-base font-black text-slate-800 uppercase tracking-widest">{userName || activeUser?.displayName || 'Welcome'}</h4>
-                            <div className="flex flex-col items-center gap-1 mt-1">
-                               {userType === 'teacher' && (
-                                 <div className="flex flex-col items-center gap-1 mb-1.5 mt-1">
-                                   <p className="text-[12px] font-black text-primary uppercase tracking-widest bg-primary/5 px-3 py-1 rounded-lg border border-primary/10">
-                                     🆔 Tutor ID: {localStorage.getItem('tutorId') || 'NEW_USER'}
-                                   </p>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest truncate">{userName || activeUser?.displayName || 'Welcome'}</h4>
+                              <p className="text-[9px] font-bold text-slate-400 truncate mb-1">{activeUser?.email}</p>
+                              {userType === 'teacher' && (
+                                 <div className="flex flex-col gap-0.5">
+                                   <p className="text-[10px] font-black text-primary uppercase tracking-widest">🆔 ID: {localStorage.getItem('tutorId') || 'NEW'}</p>
                                    {activeUser?.metadata?.creationTime && (
-                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                                       <Calendar size={10} className="text-slate-300" />
-                                       User Since: {new Date(activeUser.metadata.creationTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} <span className="text-primary bg-primary/10 px-1.5 py-0.5 rounded ml-0.5">({Math.max(0, Math.floor((Date.now() - new Date(activeUser.metadata.creationTime).getTime()) / (1000 * 60 * 60 * 24)))} days)</span>
+                                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                                       Since: {new Date(activeUser.metadata.creationTime).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
                                      </p>
                                    )}
                                  </div>
                                )}
-                               <p className="text-[10px] font-bold text-slate-400">{activeUser?.email}</p>
-                               <div className="flex items-center gap-2">
-                                 <div className="px-3 py-1 bg-primary/10 text-primary rounded-full text-[9px] font-black uppercase tracking-wider border border-primary/10">{userType}</div>
-                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Verified Member</span>
-                               </div>
                             </div>
                           </div>
 
-                          {/* 1. PERSONAL DETAILS SECTION (Student) */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 px-2">
-                               <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500"><LucideUser size={14} /></div>
-                               <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{userType === 'parent' ? 'Student Details' : 'Personal Details'}</h3>
-                            </div>
-                            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
+                          {/* Grid for Inputs (2 Columns to save vertical space) */}
+                          <div className="grid grid-cols-2 gap-3">
                               {/* Name */}
-                              <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                              <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
                                 <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">{userType === 'parent' ? "Student's Name" : "Legal Name"}</label>
-                                  <div className="text-sm font-bold text-slate-700">{userName || "Not set"}</div>
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Name</label>
+                                  <div className="text-[11px] font-bold text-slate-700 truncate">{userName || "Not set"}</div>
                                 </div>
-                                <button onClick={() => { 
-                                  const val = prompt("Enter name:", userName || "");
-                                  if (val !== null) { setUserName(val); localStorage.setItem('userName', val); }
-                                }} className="p-2 text-slate-200 hover:text-primary transition-all"><Edit3 size={16} /></button>
+                                <button onClick={() => { const val = prompt("Enter name:", userName || ""); if (val !== null) { setUserName(val); localStorage.setItem('userName', val); }}} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
                               </div>
 
-                              {/* Phone - Only for teachers */}
+                              {/* Phone */}
                               {userType === 'teacher' && (
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
                                   <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Phone Number</label>
-                                    <div className="text-sm font-bold text-slate-700">{userPhone || "Not linked"}</div>
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Phone</label>
+                                    <div className="text-[11px] font-bold text-slate-700 truncate">{userPhone || "Not set"}</div>
                                   </div>
                                   <button onClick={() => { 
                                     const cleanPhone = userPhone ? userPhone.replace('+91 ', '').replace('+91', '') : '';
-                                    const val = prompt("Enter your 10-digit phone number:", cleanPhone);
+                                    const val = prompt("Enter phone:", cleanPhone);
                                     if (val !== null) { 
                                       const digits = val.replace(/\D/g, '').slice(-10);
                                       if (digits.length === 10) {
@@ -2314,63 +2297,41 @@ export default function App() {
                                         alert("Please enter exactly 10 digits.");
                                       }
                                     }
-                                  }} className="p-2 text-slate-200 hover:text-primary transition-all"><Edit3 size={16} /></button>
+                                  }} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
                                 </div>
                               )}
 
-                              {/* DOB & Age - Only for teachers */}
+                              {/* DOB */}
                               {userType === 'teacher' && (
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                                <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative overflow-hidden">
                                   <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Date of Birth & Age</label>
-                                    <div className="text-sm font-bold text-slate-700">{userDob || "YYYY-MM-DD"} {userAge ? `(${userAge} yrs)` : ''}</div>
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Age (DOB)</label>
+                                    <div className="text-[11px] font-bold text-slate-700 truncate">{userAge ? `${userAge} yrs` : 'Not set'}</div>
                                   </div>
-                                  <div className="relative">
-                                    <input 
-                                      type="date" 
-                                      id="dob-input"
-                                      value={userDob} 
-                                      onChange={(e) => { 
-                                        const date = e.target.value;
-                                        setUserDob(date); 
-                                        localStorage.setItem('userDob', date); 
-                                        if (date) {
-                                          const birthDate = new Date(date);
-                                          const today = new Date();
-                                          let age = today.getFullYear() - birthDate.getFullYear();
-                                          const m = today.getMonth() - birthDate.getMonth();
-                                          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-                                            age--;
-                                          }
-                                          const ageStr = age.toString();
-                                          setUserAge(ageStr);
-                                          localStorage.setItem('userAge', ageStr);
-                                        }
-                                      }}
-                                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10" 
-                                    />
-                                    <button 
-                                      className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
-                                    >
-                                      <Edit3 size={16} />
-                                    </button>
-                                  </div>
+                                  <input type="date" value={userDob} onChange={(e) => { const date = e.target.value; setUserDob(date); localStorage.setItem('userDob', date); if (date) { const birthDate = new Date(date); const today = new Date(); let age = today.getFullYear() - birthDate.getFullYear(); const m = today.getMonth() - birthDate.getMonth(); if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) { age--; } const ageStr = age.toString(); setUserAge(ageStr); localStorage.setItem('userAge', ageStr); } }} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10" />
+                                  <button className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Calendar size={12} /></button>
                                 </div>
                               )}
 
-                              {/* Gender Preference */}
-                              <div className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-all">
+                              {/* Gender */}
+                              <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
                                 <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">{userType === 'parent' ? "Tutor Gender Preference" : "Gender Identity"}</label>
-                                  <div className="text-sm font-bold text-slate-700">{userGender || "Any"}</div>
-                                </div>
-                                <div className="flex gap-1">
-                                  {['Male', 'Female', 'Any'].map(g => (
-                                    <button key={g} onClick={() => { playTapSound(); setUserGender(g); localStorage.setItem('userGender', g); }} className={cn("px-2.5 py-1 rounded-lg text-[9px] font-black uppercase transition-all", userGender === g ? "bg-primary text-white shadow-md" : "bg-slate-50 text-slate-300")}>{g}</button>
-                                  ))}
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Gender</label>
+                                  <select value={userGender} onChange={(e) => { setUserGender(e.target.value); localStorage.setItem('userGender', e.target.value); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
+                                    <option value="Any">Any</option><option value="Male">Male</option><option value="Female">Female</option>
+                                  </select>
                                 </div>
                               </div>
-                            </div>
+                              
+                              {/* City */}
+                              <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative col-span-2">
+                                <div className="space-y-0.5">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">City</label>
+                                  <select value={userCity} onChange={(e) => { setUserCity(e.target.value); localStorage.setItem('userCity', e.target.value); setUserLocalities([]); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
+                                    {['All', ...CITIES_LIST].map(city => <option key={city} value={city}>{city}</option>)}
+                                  </select>
+                                </div>
+                              </div>
                           </div>
 
                           {/* 2. ABOUT ME SECTION (Only for Teachers) */}
@@ -2406,126 +2367,35 @@ export default function App() {
                                  <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-500"><Briefcase size={14} /></div>
                                  <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">Professional Details</h3>
                               </div>
-                              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
-                                {/* Qualification */}
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5 flex-1 min-w-0 mr-4">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Qualifications</label>
-                                    <div 
-                                      className="font-bold text-slate-700 leading-tight"
-                                      style={{ fontSize: getDynamicFontSize(userQualifications.join(', ')) }}
-                                    >
-                                      {userQualifications.length > 0 ? cleanValue(userQualifications.join(', ')) : "Not selected"}
-                                    </div>
-                                  </div>
-                                  <button 
-                                    onClick={() => setShowSelectionDrawer({
-                                      type: 'qualification',
-                                      title: 'Select Qualifications',
-                                      options: QUALIFICATIONS_LIST,
-                                      selected: userQualifications,
-                                      isMulti: true
-                                    })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
-                                  >
-                                    <Edit3 size={16} />
-                                  </button>
-                                </div>
-
+                              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-3 grid grid-cols-2 gap-3">
                                 {/* Experience */}
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Work Experience</label>
-                                    <div className="text-sm font-bold text-slate-700">{userExperience || "Not selected"}</div>
-                                  </div>
-                                  <button 
-                                    onClick={() => setShowSelectionDrawer({
-                                      type: 'experience',
-                                      title: 'Select Experience',
-                                      options: EXPERIENCE_LIST,
-                                      selected: userExperience ? [userExperience] : [],
-                                      isMulti: false
-                                    })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
-                                  >
-                                    <Edit3 size={16} />
-                                  </button>
+                                <div className="p-2 border border-slate-100 rounded-xl relative group">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Experience</label>
+                                  <div className="text-[10px] font-bold text-slate-700 truncate mt-1">{userExperience || "Not selected"}</div>
+                                  <button onClick={() => setShowSelectionDrawer({ type: 'experience', title: 'Experience', options: EXPERIENCE_LIST, selected: userExperience ? [userExperience] : [], isMulti: false })} className="absolute right-1 top-1 p-1 bg-slate-50 text-slate-400 rounded-md"><Edit3 size={10} /></button>
                                 </div>
-
-                                {/* School Teacher */}
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">School Teacher?</label>
-                                    <div className="text-sm font-bold text-slate-700">{isSchoolTeacher}</div>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    {['Yes', 'No'].map(v => (
-                                      <button key={v} onClick={() => { setIsSchoolTeacher(v); localStorage.setItem('isSchoolTeacher', v); }} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", isSchoolTeacher === v ? "bg-amber-100 text-amber-600 border border-amber-200" : "bg-slate-50 text-slate-300 border border-transparent")}>{v}</button>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Own Vehicle */}
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Own Vehicle?</label>
-                                    <div className="text-sm font-bold text-slate-700">{hasVehicle}</div>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    {['Yes', 'No'].map(v => (
-                                      <button key={v} onClick={() => { setHasVehicle(v); localStorage.setItem('hasVehicle', v); }} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", hasVehicle === v ? "bg-emerald-100 text-emerald-600 border border-emerald-200" : "bg-slate-50 text-slate-300 border border-transparent")}>{v}</button>
-                                    ))}
-                                  </div>
-                                </div>
-
                                 {/* Available Days */}
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5 flex-1 min-w-0 mr-4">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Available Days</label>
-                                    <div 
-                                      className="font-bold text-slate-700 leading-tight"
-                                      style={{ fontSize: getDynamicFontSize(userDays) }}
-                                    >
-                                      {userDays || "Not selected"}
-                                    </div>
-                                  </div>
-                                  <button 
-                                    onClick={() => setShowSelectionDrawer({
-                                      type: 'days',
-                                      title: 'Select Available Days',
-                                      options: DAYS_LIST,
-                                      selected: userDays ? userDays.split(', ').map(s => s.trim()) : [],
-                                      isMulti: true
-                                    })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
-                                  >
-                                    <Edit3 size={16} />
-                                  </button>
+                                <div className="p-2 border border-slate-100 rounded-xl relative group">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Days</label>
+                                  <div className="text-[10px] font-bold text-slate-700 truncate mt-1">{userDays || "Not selected"}</div>
+                                  <button onClick={() => setShowSelectionDrawer({ type: 'days', title: 'Days', options: DAYS_LIST, selected: userDays ? userDays.split(', ') : [], isMulti: true })} className="absolute right-1 top-1 p-1 bg-slate-50 text-slate-400 rounded-md"><Edit3 size={10} /></button>
                                 </div>
-
                                 {/* Preferred Time */}
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5 flex-1 min-w-0 mr-4">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Preferred Time</label>
-                                    <div 
-                                      className="font-bold text-slate-700 leading-tight"
-                                      style={{ fontSize: getDynamicFontSize(userTime) }}
-                                    >
-                                      {userTime || "Not selected"}
-                                    </div>
+                                <div className="p-2 border border-slate-100 rounded-xl relative group col-span-2">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Preferred Time</label>
+                                  <div className="text-[10px] font-bold text-slate-700 truncate mt-1">{userTime || "Not selected"}</div>
+                                  <button onClick={() => setShowSelectionDrawer({ type: 'time', title: 'Preferred Time', options: TIME_LIST, selected: userTime ? userTime.split(', ') : [], isMulti: true })} className="absolute right-2 top-2 p-1 bg-slate-50 text-slate-400 rounded-md"><Edit3 size={12} /></button>
+                                </div>
+                                {/* School Teacher & Vehicle dropdowns */}
+                                <div className="col-span-2 flex justify-between gap-3 border-t border-slate-50 pt-2">
+                                  <div className="flex-1">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">School Exp?</label>
+                                    <select value={isSchoolTeacher} onChange={(e) => { setIsSchoolTeacher(e.target.value); localStorage.setItem('isSchoolTeacher', e.target.value); }} className="w-full bg-transparent text-[10px] font-bold text-slate-700 mt-1 outline-none"><option value="Yes">Yes</option><option value="No">No</option></select>
                                   </div>
-                                  <button 
-                                    onClick={() => setShowSelectionDrawer({
-                                      type: 'time',
-                                      title: 'Select Preferred Time',
-                                      options: TIME_LIST,
-                                      selected: userTime ? userTime.split(', ').map(s => s.trim()) : [],
-                                      isMulti: true
-                                    })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
-                                  >
-                                    <Edit3 size={16} />
-                                  </button>
+                                  <div className="flex-1">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Vehicle?</label>
+                                    <select value={hasVehicle} onChange={(e) => { setHasVehicle(e.target.value); localStorage.setItem('hasVehicle', e.target.value); }} className="w-full bg-transparent text-[10px] font-bold text-slate-700 mt-1 outline-none"><option value="Yes">Yes</option><option value="No">No</option></select>
+                                  </div>
                                 </div>
                               </div>
                             </div>
