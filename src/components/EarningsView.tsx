@@ -82,11 +82,12 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
   }, [myEarnings]);
 
   useEffect(() => {
-    const tId = tutorId || localStorage.getItem('tutorId');
+    const rawId = tutorId || localStorage.getItem('tutorId');
+    const tId = rawId ? String(rawId).trim() : '';
     console.log('[EarningsView] Fetching bookings for tutorId:', tId);
     
-    if (!tId || tId === 'NEW_USER' || tId === 'NEW') {
-      console.log('[EarningsView] Early return: tutorId is empty or NEW');
+    if (!tId || tId === 'NEW_USER' || tId === 'NEW' || tId === 'null') {
+      console.log('[EarningsView] Early return: tutorId is invalid:', tId);
       setAssignedBookings([]);
       return;
     }
@@ -94,7 +95,7 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
     const q = query(collection(db, 'assigned_bookings'), where('tutorId', '==', tId));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log('[EarningsView] Real-time data received:', data.length, 'bookings found.');
+      console.log('[EarningsView] Real-time data received:', data.length, 'bookings found for', tId);
       setAssignedBookings(data);
     }, (err) => {
       console.error('[EarningsView] Firestore Error:', err);

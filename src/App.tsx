@@ -949,6 +949,12 @@ export default function App() {
 
   const loadData = async () => {
     try {
+      // Cleanup old bulky localStorage cache if it exists
+      if (localStorage.getItem('cachedTutors')) {
+        localStorage.removeItem('cachedTutors');
+        console.log('🗑️ Old localStorage cache purged.');
+      }
+
       // 1. Instantly load from cache if available
       const cachedLeads = localStorage.getItem('cachedLeads');
       const cachedTutors = await getFromLargeStorage('cachedTutors');

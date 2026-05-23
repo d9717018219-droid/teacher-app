@@ -39,6 +39,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // ASSIGNED BOOKINGS
+    match /assigned_bookings/{bookingId} {
+      allow read, write: if true; 
+    }
+
     // USER NOTIFICATIONS
     match /user_notifications/{deviceId}/{document=**} {
       allow read, write: if true; 
