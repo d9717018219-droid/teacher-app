@@ -201,13 +201,36 @@ export default function App() {
         };
 
         console.log(`Syncing teacher profile to ${url}...`, profileData);
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(profileData)
-        });
-        const data = await response.json();
+        let data;
+        if (isNative) {
+          const response = await CapacitorHttp.post({
+            url: url,
+            headers: { 'Content-Type': 'application/json' },
+            data: profileData
+          });
+          data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+        } else {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(profileData)
+          });
+          data = await response.json();
+        }
         console.log('Teacher profile sync response:', data);
+        
+        // Refresh local data to reflect changes
+        if (data && data.status === 'success') {
+          if (data.tutor_id) {
+            localStorage.setItem('tutorId', data.tutor_id);
+          }
+          await loadData();
+          setActiveToast({ title: 'Success', body: 'Profile updated successfully!' });
+          setTimeout(() => setActiveToast(null), 3000);
+        } else {
+          setActiveToast({ title: 'Update Failed', body: data?.message || 'Server error occurred' });
+          setTimeout(() => setActiveToast(null), 5000);
+        }
       } 
       else if (userType === 'parent') {
         const url = isNative ? 'https://doableindia.com/parent_api.php' : '/api/profile/parent/update';
@@ -232,13 +255,32 @@ export default function App() {
         };
 
         console.log(`Syncing parent profile to ${url}...`, parentData);
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(parentData)
-        });
-        const data = await response.json();
+        let data;
+        if (isNative) {
+          const response = await CapacitorHttp.post({
+            url: url,
+            headers: { 'Content-Type': 'application/json' },
+            data: parentData
+          });
+          data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+        } else {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(parentData)
+          });
+          data = await response.json();
+        }
         console.log('Parent profile sync response:', data);
+        
+        if (data && data.status === 'success') {
+          await loadData();
+          setActiveToast({ title: 'Success', body: 'Profile updated successfully!' });
+          setTimeout(() => setActiveToast(null), 3000);
+        } else {
+          setActiveToast({ title: 'Update Failed', body: data?.message || 'Server error occurred' });
+          setTimeout(() => setActiveToast(null), 5000);
+        }
       }
     } catch (error) {
       console.error('Error syncing profile:', error);
@@ -353,6 +395,7 @@ export default function App() {
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('userType'));
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [showPassword, setShowPassword] = useState(false);
   const [tutorStatus, setTutorStatus] = useState<'registered' | 'new' | null>(null);
   
   // Profile Auto-fill Logic
@@ -719,18 +762,35 @@ export default function App() {
   useEffect(() => {
     setAlertsLoading(true);
     
-    const initializeAlerts = async () => {
+    // 1. Primary Real-time Sync
+    const q = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        // Ensure timestamp is consistent
+        timestamp: (doc.data() as any).timestamp?.toDate?.() || new Date((doc.data() as any).timestamp || Date.now())
+      })) as Alert[];
+      
+      console.log(`SYNC_SUCCESS: ${data.length} alerts.`);
+      setAlerts(data);
+      setAlertsLoading(false);
+      setIsServerData(true);
+    }, (err) => {
+      console.error('Snapshot Error, falling back to REST:', err);
+      // 2. Fallback REST Sync (if Firestore listener fails due to network/perms)
+      initializeAlertsFallback();
+    });
+
+    const initializeAlertsFallback = async () => {
       try {
         const API_KEY = "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s";
         const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=50&key=${API_KEY}`;
         
-        const response = await fetch(REST_URL).catch(e => {
-           console.error('REST ERROR: ' + e.message);
-           throw e;
-        });
-
+        const response = await fetch(REST_URL);
         const data = await response.json();
-        if (data.documents && data.documents.length > 0) {
+        
+        if (data.documents) {
           const initialData = data.documents.map((doc: any) => {
             const parts = doc.name.split('/');
             const fields = doc.fields || {};
@@ -740,25 +800,24 @@ export default function App() {
               sender: fields.sender?.stringValue || 'System',
               type: fields.type?.stringValue || 'info',
               city: fields.city?.stringValue || 'All',
+              gender: fields.gender?.stringValue || 'Any',
+              targetClass: fields.targetClass?.stringValue || 'All',
+              targetUserType: fields.targetUserType?.stringValue || 'all',
+              localities: fields.localities?.arrayValue?.values?.map((v: any) => v.stringValue) || [],
               timestamp: fields.timestamp?.timestampValue || new Date().toISOString()
             };
           }) as Alert[];
           
-          console.log(`REST_SUCCESS: ${initialData.length} docs.`);
           setAlerts(initialData);
-          setAlertsLoading(false);
-        } else {
-          console.log('REST: 0 docs');
           setAlertsLoading(false);
         }
       } catch (e: any) {
-        console.error('Final sync error:', e);
+        console.error('Fallback Error:', e);
         setAlertsLoading(false);
       }
     };
 
-    initializeAlerts();
-    return () => {};
+    return () => unsubscribe();
   }, [userCity]); // Re-subscribe if userCity changes for filtering logic within listener if needed
 
   const [debugClicks, setDebugClicks] = useState(0);
@@ -1118,6 +1177,11 @@ export default function App() {
 
   const finalTutors = useMemo(() => {
     return tutors.filter(t => {
+      // 🚨 CRITICAL: Visibility Check
+      // Only show 'Active' tutors. Hide 'Hidden' or 'Blocked' profiles.
+      const status = (t.Status || '').toString().toLowerCase();
+      if (status === 'hidden' || status === 'blocked') return false;
+
       const cityVal = (t['Preferred City'] || (t as any).preferredCity || (t as any).City || (t as any).city || 'India').toString().toLowerCase();
       if (!isCityMatch(cityVal, tutorCityFilter)) return false;
 
@@ -1280,7 +1344,10 @@ export default function App() {
                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Password</label>
                             <div className="relative">
                               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px]">
+                                {showPassword ? "🙈" : "👁️"}
+                              </button>
                             </div>
                           </div>
                         )}
@@ -1303,7 +1370,10 @@ export default function App() {
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">New Password</label>
                           <div className="relative">
                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 chars" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                            <input type={showPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 chars" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px]">
+                              {showPassword ? "🙈" : "👁️"}
+                            </button>
                           </div>
                         </div>
 
@@ -1311,7 +1381,7 @@ export default function App() {
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Confirm Password</label>
                           <div className="relative">
                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                            <input type="password" value={confirmPassword} onChange={(e) => setRetypePassword(e.target.value)} placeholder="Repeat password" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                            <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setRetypePassword(e.target.value)} placeholder="Repeat password" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                           </div>
                         </div>
                       </div>
@@ -1585,7 +1655,7 @@ export default function App() {
 
       <main className="container mx-auto p-0 sm:p-[10px] max-w-[1200px] pb-32">
        {activeTab === 'home' && (
-          <HomeView userName={userName} userType={userType} userCity={userCity} activeLeadsCount={finalJobs.length} activeTutorsCount={finalTutors.length} featuredJobs={finalJobs.slice(0, 3)} featuredTutors={finalTutors.slice(0, 3)} playTapSound={playTapSound} setFormType={setFormType} setShowFormModal={setShowFormModal} setActiveTab={setActiveTab} setShowFilterDrawer={setShowFilterDrawer} getDynamicGreeting={getDynamicGreeting} onJobClick={setSelectedJob} onTutorClick={setSelectedTutor} shortlistedIds={shortlistedIds} onShortlistToggle={toggleShortlist} />
+          <HomeView userName={userName} userType={userType} userCity={userCity} activeLeadsCount={finalJobs.length} activeTutorsCount={finalTutors.length} featuredJobs={finalJobs.slice(0, 3)} featuredTutors={finalTutors.slice(0, 3)} playTapSound={playTapSound} setFormType={setFormType} setShowFormModal={setShowFormModal} onSignUpClick={() => { setAuthMode('signup'); setShowOnboarding(true); }} setActiveTab={setActiveTab} setShowFilterDrawer={setShowFilterDrawer} getDynamicGreeting={getDynamicGreeting} onJobClick={setSelectedJob} onTutorClick={setSelectedTutor} shortlistedIds={shortlistedIds} onShortlistToggle={toggleShortlist} />
         )}
        {activeTab === 'jobs' && (
           <JobsView 
@@ -1632,7 +1702,7 @@ export default function App() {
           />
        )}
        {activeTab === 'alerts' && (
-          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={activeUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={activeUser?.email} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
+          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userLocalities={userLocalities} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={activeUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={activeUser?.email} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
        )}
        {activeTab === 'support' && (<SupportView userName={userName} userType={userType} userCity={userCity} />)}
        {activeTab === 'concierge' && (<ParentHubView userName={userName} playTapSound={playTapSound} setActiveTab={setActiveTab} setShowFormModal={setShowFormModal} setFormType={setFormType} />)}
@@ -2170,8 +2240,18 @@ export default function App() {
                                     <div className="text-sm font-bold text-slate-700">{userPhone || "Not linked"}</div>
                                   </div>
                                   <button onClick={() => { 
-                                    const val = prompt("Enter your phone number:", userPhone || "");
-                                    if (val !== null) { setUserPhone(val); localStorage.setItem('userPhone', val); }
+                                    const cleanPhone = userPhone ? userPhone.replace('+91 ', '').replace('+91', '') : '';
+                                    const val = prompt("Enter your 10-digit phone number:", cleanPhone);
+                                    if (val !== null) { 
+                                      const digits = val.replace(/\D/g, '').slice(-10);
+                                      if (digits.length === 10) {
+                                        const formatted = "+91 " + digits;
+                                        setUserPhone(formatted); 
+                                        localStorage.setItem('userPhone', formatted);
+                                      } else {
+                                        alert("Please enter exactly 10 digits.");
+                                      }
+                                    }
                                   }} className="p-2 text-slate-200 hover:text-primary transition-all"><Edit3 size={16} /></button>
                                 </div>
                               )}

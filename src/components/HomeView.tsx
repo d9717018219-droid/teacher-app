@@ -40,6 +40,7 @@ interface HomeViewProps {
   playTapSound: () => void;
   setFormType: (type: 'parent' | 'teacher') => void;
   setShowFormModal: (show: boolean) => void;
+  onSignUpClick: () => void;
   setActiveTab: (tab: 'home' | 'jobs' | 'tutors' | 'alerts' | 'admin' | 'support' | 'shortlist' | 'payments') => void;
   getDynamicGreeting: () => string;
   setShowFilterDrawer: (show: boolean) => void;
@@ -60,6 +61,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   playTapSound,
   setFormType,
   setShowFormModal,
+  onSignUpClick,
   setActiveTab,
   getDynamicGreeting,
   setShowFilterDrawer,
@@ -154,11 +156,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
           <button 
             onClick={() => { playTapSound(); setShowFilterDrawer(true); }}
-            className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-full border border-slate-100 text-[#0F172A] text-[10px] font-bold shadow-sm active:scale-95 transition-all shrink-0 ml-2"
+            className="flex items-center gap-1 bg-white px-2 py-1 rounded-full border border-slate-100 text-[#0F172A] text-[9px] font-bold shadow-sm active:scale-95 transition-all shrink-0 ml-1.5"
           >
-            <MapPin size={11} className="text-[#2563EB]" />
-            <span className="tracking-tight uppercase">{userCity || 'City'}</span>
-            <ChevronDown size={10} className="text-slate-300" />
+            <MapPin size={10} className="text-[#2563EB]" />
+            <span className="tracking-tight uppercase max-w-[65px] truncate">{userCity || 'City'}</span>
+            <ChevronDown size={9} className="text-slate-300" />
           </button>
         </div>
       </section>
@@ -177,7 +179,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               style={{ background: banners[currentBanner].bg }}
             >
               {/* Animated Right-Side Icon */}
-              <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-20">
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-60">
                  <motion.div 
                    animate={{ 
                      y: [0, -12, 0],
@@ -190,7 +192,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                      ease: "easeInOut" 
                    }}
                  >
-                    {React.cloneElement(banners[currentBanner].icon as React.ReactElement, { size: 80, color: "#fde047" })}
+                    {React.cloneElement(banners[currentBanner].icon as React.ReactElement, { size: 80, color: "#FFD700" })}
                  </motion.div>
               </div>
 
@@ -216,7 +218,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </p>
 
                 <button
-                  onClick={() => { playTapSound(); setFormType(banners[currentBanner].type); setShowFormModal(true); }}
+                  onClick={() => { playTapSound(); onSignUpClick(); }}
                   className="bg-white/15 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl flex items-center gap-2 active:scale-95 transition-all shadow-md w-fit"
                 >
                   <span className="text-[9px] font-black uppercase tracking-widest text-white">{banners[currentBanner].cta}</span>

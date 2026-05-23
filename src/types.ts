@@ -52,6 +52,7 @@ export interface Alert {
   id: string;
   message: string;
   city: string;
+  localities?: string[];
   gender?: string;
   targetClass?: string;
   targetUserType?: UserType | 'all';

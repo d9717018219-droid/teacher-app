@@ -257,6 +257,19 @@ body {
   gap: 12px !important;
 }
 
+/* Hide the 'Powered by n8n' footer and any branding */
+#support-chat-mount .n8n-chat-window-footer,
+#support-chat-mount .n8n-chat-footer,
+#support-chat-mount a[href*="n8n.io"] {
+  display: none !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Prevent iOS launcher/webview auto-zoom on input focus */
 input, textarea, select {
   font-size: 16px !important;
@@ -273,4 +286,15 @@ input, textarea, select {
 /* Hide the floating launcher bubble */
 .n8n-chat-launcher, .n8n-chat-toggle {
   display: none !important;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

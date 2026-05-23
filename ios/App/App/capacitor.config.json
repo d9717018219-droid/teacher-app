@@ -2,7 +2,12 @@
 	"appId": "com.doableindia",
 	"appName": "DoAble India",
 	"webDir": "dist",
-	"server": {},
+	"server": {
+		"allowNavigation": [
+			"*"
+		],
+		"hostname": "localhost"
+	},
 	"plugins": {
 		"GoogleAuth": {
 			"scopes": [

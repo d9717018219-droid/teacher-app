@@ -54,37 +54,39 @@ export const TutorsView: React.FC<TutorsViewProps> = ({
 
       <div className="flex flex-col gap-2.5 sticky top-[64px] z-50 bg-[#F8FAFC]/95 backdrop-blur-md py-2 -mx-5 px-5 no-line sticky-fix border-b border-slate-100/50">
          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setShowAdvancedFilterDrawer(true)} 
-              className="h-9 px-3 bg-white border border-slate-100 rounded-xl flex items-center gap-1.5 text-slate-500 hover:text-primary transition-all active:scale-95 shadow-sm"
-            >
-              <Filter size={13} strokeWidth={2.5} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Filter</span>
-            </button>
             <div className="flex-1 relative group">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" size={12} />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#191445] transition-colors" size={11} />
               <input 
                 type="text" 
                 placeholder="Search Name or Tutor ID..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-slate-100 rounded-xl h-9 pl-9 pr-6 text-[11px] font-bold focus:outline-none focus:border-primary transition-all shadow-sm"
+                className="w-full bg-white border border-slate-100 rounded-xl h-9 pl-8 pr-6 text-[7px] placeholder:text-[7px] font-bold focus:outline-none focus:border-primary transition-all shadow-sm"
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
-                  <X size={12} />
+                  <X size={11} />
                 </button>
               )}
             </div>
          </div>
-         <div className="flex flex-wrap items-center gap-1.5 px-0.5">
-            {(cityFilter !== 'all' || filterLocalities.length > 0 || filterClasses.length > 0 || filterGender !== 'All') && (
-              <FilterChip icon={<X size={9} />} label="Clear" onClick={clearFilters} isClear />
-            )}
-            <FilterChip icon={<MapPin size={9} />} label={toTitleCase(cityFilter === 'all' ? 'City' : cityFilter)} active={cityFilter !== 'all'} onClick={() => setShowQuickPicker('city')} />
-            <FilterChip icon={<MapPin size={9} />} label={filterLocalities.length > 0 ? `${filterLocalities.length} Locs` : 'Area'} active={filterLocalities.length > 0} onClick={() => setShowQuickPicker('locality')} />
-            <FilterChip icon={<BookOpen size={9} />} label={filterClasses.length > 0 ? `${filterClasses.length} Cls` : 'Class'} active={filterClasses.length > 0} onClick={() => setShowQuickPicker('class')} />
-            <FilterChip icon={<LucideUser size={9} />} label={filterGender !== 'All' ? filterGender : 'Gender'} active={filterGender !== 'All'} onClick={() => setShowQuickPicker('gender')} />
+         <div className="flex items-center gap-2 w-full">
+            <div className="flex-1 flex items-center gap-1.5 px-0.5 overflow-x-auto no-scrollbar pb-1">
+              {(cityFilter !== 'all' || filterLocalities.length > 0 || filterClasses.length > 0 || filterGender !== 'All') && (
+                <FilterChip icon={<X size={9} />} label="Clear" onClick={clearFilters} isClear />
+              )}
+              <FilterChip icon={<MapPin size={9} />} label={toTitleCase(cityFilter === 'all' ? 'City' : cityFilter)} active={cityFilter !== 'all'} onClick={() => setShowQuickPicker('city')} />
+              <FilterChip icon={<MapPin size={9} />} label={filterLocalities.length > 0 ? `${filterLocalities.length} Locs` : 'Area'} active={filterLocalities.length > 0} onClick={() => setShowQuickPicker('locality')} />
+              <FilterChip icon={<BookOpen size={9} />} label={filterClasses.length > 0 ? `${filterClasses.length} Cls` : 'Class'} active={filterClasses.length > 0} onClick={() => setShowQuickPicker('class')} />
+              <FilterChip icon={<LucideUser size={9} />} label={filterGender !== 'All' ? filterGender : 'Gender'} active={filterGender !== 'All'} onClick={() => setShowQuickPicker('gender')} />
+              <div className="min-w-[10px] h-1" />
+            </div>
+            <button 
+              onClick={() => setShowAdvancedFilterDrawer(true)} 
+              className="h-8 w-8 shrink-0 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-[#191445] transition-all active:scale-95 shadow-sm mb-1"
+            >
+              <Filter size={13} strokeWidth={2.5} />
+            </button>
          </div>
       </div>
 
@@ -94,8 +96,8 @@ export const TutorsView: React.FC<TutorsViewProps> = ({
            <span className="font-bold text-slate-400 text-[11px] ml-1.5">Tutors found</span>
          </div>
          <div className="flex items-center gap-2">
-           <span className="text-[10px] font-black text-slate-300 tracking-tight">Sort:</span>
-           <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="bg-transparent text-[11px] font-black text-slate-700 tracking-tight outline-none cursor-pointer">
+           <span className="text-[10px] font-black text-[#191445] tracking-tight">Sort:</span>
+           <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="bg-transparent text-[8.5px] font-black text-[#191445] tracking-tight outline-none cursor-pointer">
              <option value="newest">Newest First</option>
              <option value="fee_high">Salary: High to Low</option>
              <option value="fee_low">Salary: Low to High</option>
@@ -152,7 +154,7 @@ function FilterChip({ icon, label, active, onClick, isClear }: { icon: React.Rea
       className={cn(
         "flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black transition-all whitespace-nowrap active:scale-95 shadow-sm border uppercase tracking-tighter",
         isClear 
-          ? "bg-gradient-to-r from-rose-500 to-rose-600 text-white border-rose-400" 
+          ? "bg-[#7A2153] text-white border-[#7A2153]" 
           : active 
             ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-blue-400 shadow-blue-100" 
             : "bg-white text-slate-500 border-slate-100 hover:border-slate-200"

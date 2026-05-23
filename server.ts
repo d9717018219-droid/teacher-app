@@ -74,6 +74,96 @@ async function startServer() {
     }
   });
 
+  app.post('/api/auth/signup', express.json(), async (req, res) => {
+    try {
+      console.log('Forwarding signup to Hostinger...');
+      const response = await fetch('https://doableindia.com/app_auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'signup', ...req.body })
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  app.post('/api/auth/signin', express.json(), async (req, res) => {
+    try {
+      console.log('Forwarding signin to Hostinger...');
+      const response = await fetch('https://doableindia.com/app_auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'signin', ...req.body })
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  app.post('/api/auth/forgot-password', express.json(), async (req, res) => {
+    try {
+      console.log('Forwarding forgot-password to Hostinger...');
+      const response = await fetch('https://doableindia.com/app_auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'forgot_password', ...req.body })
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  app.post('/api/auth/reset-password', express.json(), async (req, res) => {
+    try {
+      console.log('Forwarding reset-password to Hostinger...');
+      const response = await fetch('https://doableindia.com/app_auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset_password', ...req.body })
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  app.post('/api/profile/update', express.json(), async (req, res) => {
+    try {
+      console.log('Forwarding profile update to Hostinger...');
+      const response = await fetch('https://doableindia.com/api_copy.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  app.post('/api/profile/parent/update', express.json(), async (req, res) => {
+    try {
+      console.log('Forwarding parent profile update to Hostinger...');
+      const response = await fetch('https://doableindia.com/parent_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
   const distPath = path.join(process.cwd(), 'dist');
 
   if (process.env.NODE_ENV !== 'production') {

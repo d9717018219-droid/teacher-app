@@ -45,16 +45,42 @@ export const sendAlertNotification = onDocumentCreated({
         
         const registrationTokensSet = new Set<string>();
 
+        const targetCity = newValue.city || "All";
+        const targetUserType = newValue.targetUserType || "all";
+        const targetClass = newValue.targetClass || "All";
+        const targetGender = newValue.gender || "Any";
+
         tokensSnap.forEach(doc => {
             const data = doc.data();
             const token = data.token || doc.id;
-            if (token && typeof token === 'string' && token.length > 20) {
-                registrationTokensSet.add(token);
+            
+            if (!token || typeof token !== 'string' || token.length <= 20) return;
+
+            // City Filter
+            if (targetCity !== "All" && data.city && data.city !== targetCity) return;
+
+            // User Type Filter
+            if (targetUserType !== "all" && data.userType && data.userType !== targetUserType) return;
+
+            // Gender Filter
+            if (targetGender !== "Any" && data.gender && data.gender !== targetGender) return;
+
+            // Class Filter - Check if targetClass is in user's classes array
+            if (targetClass !== "All") {
+                const userClasses = data.classes || [];
+                // If targetClass is like "Class 10", and userClasses is ["Class 10", "Class 11"]
+                if (Array.isArray(userClasses)) {
+                    if (!userClasses.includes(targetClass)) return;
+                } else if (typeof userClasses === 'string') {
+                    if (userClasses !== targetClass) return;
+                }
             }
+
+            registrationTokensSet.add(token);
         });
 
         const registrationTokens = Array.from(registrationTokensSet);
-        console.log("📊 Target tokens:", registrationTokens.length);
+        console.log(`📊 Filtered tokens: ${registrationTokens.length} (City: ${targetCity}, Type: ${targetUserType}, Class: ${targetClass})`);
 
         if (registrationTokens.length === 0) return;
 

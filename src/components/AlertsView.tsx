@@ -5,7 +5,7 @@ import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, UserType } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Info, AlertTriangle, CheckCircle, Zap, ExternalLink, Clock, X, MessageSquare, Phone, Mail, ChevronRight, Settings, User as UserIcon, CreditCard, Play, Volume2, Instagram, Facebook, Linkedin, Twitter, Calendar, Filter, ChevronDown } from 'lucide-react';
-import { cn, getCityPhone, formatCurrency, openWhatsApp } from '../utils';
+import { cn, getCityPhone, formatCurrency, openWhatsApp, formatWhatsAppStyle } from '../utils';
 
 import { createChat } from '@n8n/chat';
 import '@n8n/chat/style.css';
@@ -16,6 +16,7 @@ interface AlertsViewProps {
   city: string;
   userGender?: string | null;
   userClasses?: string[];
+  userLocalities?: string[];
   userType?: UserType | null;
   isAdminUser?: boolean;
   onAdminClick?: () => void;
@@ -100,7 +101,14 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
       animate={{ opacity: 1, scale: 1 }}
       className="bg-white rounded-[32px] border border-slate-100 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden relative"
     >
-      <div className="p-7 space-y-6">
+      {/* Diagnostic Overlay */}
+      <div className="mx-7 mt-7 p-2 bg-slate-900 rounded-xl text-[8px] font-mono text-slate-300 grid grid-cols-2 gap-2">
+        <div><span className="text-amber-400">Target City:</span> {alert.city || 'All'}</div>
+        <div><span className="text-amber-400">Target Role:</span> {alert.targetUserType || 'All'}</div>
+        <div className="col-span-2"><span className="text-amber-400">Target Locs:</span> {JSON.stringify(alert.localities || [])}</div>
+      </div>
+
+      <div className="p-7 space-y-6 pt-4">
         {/* Header */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -147,8 +155,9 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
               <span className="text-sm">⏳</span>
               <span className="text-[9px] font-black uppercase tracking-widest">Last Date: {lastDate}</span>
             </div>
-            <div className="text-[8px] font-black text-slate-300 uppercase tracking-widest">
-              {timestampDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+            <div className="text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter flex items-center gap-1.5">
+              <Clock size={10} strokeWidth={3} />
+              {formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
             </div>
           </div>
         </div>
@@ -180,7 +189,7 @@ const FormattedMessage: React.FC<{ text: string }> = ({ text }) => {
 };
 
 const AlertsView: React.FC<AlertsViewProps> = ({ 
-  city, userGender, userClasses, userType, 
+  city, userGender, userClasses, userLocalities, userType, 
   isAdminUser, onAdminClick, currentUser, showFormModal, setShowFormModal,
   setUserCity, setUserGender, setUserClasses, setUserType,
   userName, setUserName, initialTab = 'feed',
@@ -217,31 +226,86 @@ const AlertsView: React.FC<AlertsViewProps> = ({
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all'>('all');
 
   const filterAlertsByDate = (items: Alert[]) => {
-    let results = items;
+    if (dateFilter === 'all') return items;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
 
-    // Filter by date
-    if (dateFilter !== 'all') {
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      const yesterdayStart = todayStart - (24 * 60 * 60 * 1000);
-      const weekStart = todayStart - (7 * 24 * 60 * 60 * 1000);
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-      results = results.filter(a => {
-        const timestamp = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : (a.timestamp ? new Date(a.timestamp).getTime() : Date.now());
-        
-        if (dateFilter === 'today') return timestamp >= todayStart;
-        if (dateFilter === 'yesterday') return timestamp >= yesterdayStart && timestamp < todayStart;
-        if (dateFilter === 'week') return timestamp >= weekStart;
-        if (dateFilter === 'month') return timestamp >= monthStart;
-        return true;
-      });
-    }
-
-    return results;
+    return items.filter(a => {
+      const t = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || Date.now());
+      if (dateFilter === 'today') return t >= today;
+      if (dateFilter === 'yesterday') return t >= yesterday && t < today;
+      if (dateFilter === 'week') return t >= lastWeek;
+      return true;
+    });
   };
 
-  const filteredAlerts = filterAlertsByDate(alerts);
+  const filterAlertsByTargeting = (items: Alert[]) => {
+    const userCityLower = (city || '').toString().toLowerCase().trim();
+    const userTypeLower = (userType || '').toString().toLowerCase().trim();
+    const userGenderLower = (userGender || '').toString().toLowerCase().trim();
+    const uLocs = (userLocalities || []).map(l => l.toLowerCase().trim());
+
+    return items.filter(a => {
+      const aData = a as any;
+      // 1. City Filter - ABSOLUTE MATCH
+      const targetCity = (a.city || aData.City || 'All').toString().toLowerCase().trim();
+      if (targetCity !== 'all' && userCityLower !== targetCity) {
+        console.log(`[Targeting] Rejecting Alert ${a.id}: City mismatch. User: "${userCityLower}", Target: "${targetCity}"`);
+        return false;
+      }
+
+      // 1.5 Localities Filter - STRICT MATCH
+      const targetLocs = (a.localities || aData.Localities || []);
+      if (Array.isArray(targetLocs) && targetLocs.length > 0) {
+        // If an alert targets specific localities, user MUST be in one of them
+        const hasLocMatch = targetLocs.some(l => {
+          const tLoc = l.toLowerCase().trim();
+          return uLocs.some(uLoc => uLoc === tLoc || uLoc.includes(tLoc) || tLoc.includes(uLoc));
+        });
+
+        if (!hasLocMatch) {
+          console.log(`[Targeting] Rejecting Alert ${a.id}: Locality mismatch. User Areas: [${uLocs.join(', ')}], Target Areas: [${targetLocs.join(', ')}]`);
+          return false;
+        }
+      }
+
+      // 2. User Type Filter
+      const targetUserRole = (a.targetUserType || aData.targetUserType || 'all').toString().toLowerCase().trim();
+      if (targetUserRole !== 'all' && userTypeLower && userTypeLower !== targetUserRole) {
+        console.log(`[Targeting] Rejecting Alert ${a.id}: Role mismatch. User: "${userTypeLower}", Target: "${targetUserRole}"`);
+        return false;
+      }
+
+      // 3. Gender Filter
+      const targetGender = (a.gender || aData.Gender || 'Any').toString().toLowerCase().trim();
+      if (targetGender !== 'any' && userGenderLower && userGenderLower !== targetGender) {
+        console.log(`[Targeting] Rejecting Alert ${a.id}: Gender mismatch. User: "${userGenderLower}", Target: "${targetGender}"`);
+        return false;
+      }
+
+      // 4. Class Filter
+      const targetClassStr = (a.targetClass || aData.targetClass || 'All').toString().toLowerCase().trim();
+      if (targetClassStr !== 'all' && userClasses && userClasses.length > 0) {
+        const matchesClass = userClasses.some(c => {
+          const uCls = c.toLowerCase().trim().replace('class ', '');
+          const tCls = targetClassStr.toLowerCase().trim().replace('class ', '');
+          return tCls.includes(uCls) || uCls.includes(tCls);
+        });
+        if (!matchesClass) {
+          console.log(`[Targeting] Rejecting Alert ${a.id}: Class mismatch. User Classes: [${userClasses.join(', ')}], Target: "${targetClassStr}"`);
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  const filteredAlerts = filterAlertsByDate(filterAlertsByTargeting(alerts));
 
   const [fcmToken, setFcmToken] = useState(localStorage.getItem('fcmToken') || 'Not Registered');
   const [fcmError, setFcmError] = useState<string | null>(null);
@@ -316,14 +380,14 @@ const AlertsView: React.FC<AlertsViewProps> = ({
           {[
             { id: 'all', label: 'All Alerts' },
             { id: 'today', label: 'Today' },
-            { id: 'week', label: 'This Week' },
-            { id: 'month', label: 'This Month' }
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: 'week', label: 'This Week' }
           ].map((f) => (
             <button
               key={f.id}
               onClick={() => { playTapSound(); setDateFilter(f.id as any); }}
               className={cn(
-                "px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-2",
+                "px-3 py-1.5 rounded-xl text-[8.5px] font-black uppercase tracking-tight whitespace-nowrap transition-all border-2",
                 dateFilter === f.id 
                   ? "bg-primary border-primary text-white shadow-lg scale-105" 
                   : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
@@ -382,6 +446,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
                 filteredAlerts.filter(a => !hiddenAlertIds.includes(a.id)).map((alert) => {
                   const msg = (alert.message || (alert as any).Message || '').toString();
                   const isJobAlert = msg.includes('📢') || msg.toLowerCase().includes('tuition job alert');
+                  const timestampDate = alert.timestamp?.toDate ? alert.timestamp.toDate() : new Date(alert.timestamp || Date.now());
                   
                   if (isJobAlert) {
                     return <JobAlertCard key={alert.id} alert={alert} onHide={() => hideAlert(alert.id)} />;
@@ -389,11 +454,24 @@ const AlertsView: React.FC<AlertsViewProps> = ({
 
                   return (
                     <div key={alert.id} className={cn("p-6 rounded-[32px] border-2 shadow-sm relative transition-all hover:scale-[1.01]", getBg(alert.type))}>
+                      {/* Diagnostic Overlay (Visible to All during Debug) */}
+                      <div className="mb-4 p-2 bg-slate-900 rounded-xl text-[8px] font-mono text-slate-300 grid grid-cols-2 gap-2">
+                        <div><span className="text-amber-400">Target City:</span> {alert.city || 'All'}</div>
+                        <div><span className="text-amber-400">Target Role:</span> {alert.targetUserType || 'All'}</div>
+                        <div className="col-span-2"><span className="text-amber-400">Target Locs:</span> {JSON.stringify(alert.localities || [])}</div>
+                      </div>
+
                       <div className="flex gap-4">
                         <div className="shrink-0 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">{getIcon(alert.type)}</div>
                         <div className="flex-1">
                           <div className="font-black text-[10px] uppercase mb-1 tracking-wider text-slate-500">{alert.sender || 'System Broadcast'}</div>
                           <FormattedMessage text={msg} />
+                          
+                          {/* WhatsApp Style Timestamp */}
+                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter">
+                            <Clock size={10} strokeWidth={3} />
+                            {formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </div>
                         </div>
                         <button onClick={() => hideAlert(alert.id)} className="text-slate-400 hover:text-slate-600 transition-colors shrink-0"><X size={18} /></button>
                       </div>
