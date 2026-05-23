@@ -3,7 +3,7 @@ import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser
 import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc, getDocsFromServer, enableNetwork } from 'firebase/firestore';
 import { db, auth, auth as firebaseAuth } from './firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
-import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -155,6 +155,9 @@ export default function App() {
   const [customUser, setCustomUser] = useState<any>(JSON.parse(localStorage.getItem('customUser') || 'null'));
   const activeUser = currentUser || customUser;
 
+  const [deleteProfileText, setDeleteProfileText] = useState('');
+  const [isDeletingProfile, setIsDeletingProfile] = useState(false);
+
   const handleLogout = () => {
     playTapSound();
     auth.signOut();
@@ -164,6 +167,57 @@ export default function App() {
     setUserType(null);
     setShowOnboarding(true);
     setAuthMode('signin');
+  };
+
+  const handleDeleteProfile = async () => {
+    if (deleteProfileText !== 'DELETE') {
+      alert("Please type DELETE to confirm.");
+      return;
+    }
+    if (!window.confirm("Are you absolutely sure? This will delete your profile completely.")) return;
+
+    setIsDeletingProfile(true);
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      const apiUrl = isNative ? 'https://doableindia.com/api_copy.php' : '/api-crm/api_copy.php';
+
+      const tutorId = localStorage.getItem('tutorId');
+      
+      const payload: any = {
+        action: 'delete',
+        Email: activeUser?.email
+      };
+      if (tutorId) {
+         payload['Tutor ID'] = tutorId;
+         payload['Order_ID'] = tutorId;
+      }
+
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        body: JSON.stringify(payload)
+      });
+      
+      if (!res.ok) throw new Error("Failed to communicate with the server.");
+      
+      // Attempt to delete Firebase Auth user if it's a current FirebaseUser
+      if (currentUser) {
+        try {
+          await deleteUser(currentUser);
+        } catch (e: any) {
+          console.warn("Could not delete Firebase auth directly, they might need to re-authenticate: ", e.message);
+        }
+      }
+
+      alert("Profile deleted successfully.");
+      handleLogout();
+    } catch (error: any) {
+      console.error(error);
+      alert("Failed to delete profile: " + error.message);
+    } finally {
+      setIsDeletingProfile(false);
+    }
   };
 
   const handleUpdateProfile = async () => {
@@ -2200,9 +2254,17 @@ export default function App() {
                             <h4 className="mt-4 text-base font-black text-slate-800 uppercase tracking-widest">{userName || activeUser?.displayName || 'Welcome'}</h4>
                             <div className="flex flex-col items-center gap-1 mt-1">
                                {userType === 'teacher' && (
-                                 <p className="text-[11px] font-black text-primary uppercase tracking-widest mb-1">
-                                   🆔 Tutor ID: {localStorage.getItem('tutorId') || 'NEW_USER'}
-                                 </p>
+                                 <div className="flex flex-col items-center gap-1 mb-1.5 mt-1">
+                                   <p className="text-[12px] font-black text-primary uppercase tracking-widest bg-primary/5 px-3 py-1 rounded-lg border border-primary/10">
+                                     🆔 Tutor ID: {localStorage.getItem('tutorId') || 'NEW_USER'}
+                                   </p>
+                                   {activeUser?.metadata?.creationTime && (
+                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                       <Calendar size={10} className="text-slate-300" />
+                                       User Since: {new Date(activeUser.metadata.creationTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} <span className="text-primary bg-primary/10 px-1.5 py-0.5 rounded ml-0.5">({Math.max(0, Math.floor((Date.now() - new Date(activeUser.metadata.creationTime).getTime()) / (1000 * 60 * 60 * 24)))} days)</span>
+                                     </p>
+                                   )}
+                                 </div>
                                )}
                                <p className="text-[10px] font-bold text-slate-400">{activeUser?.email}</p>
                                <div className="flex items-center gap-2">
@@ -2630,9 +2692,33 @@ export default function App() {
                              <Settings size={16} /> Admin Panel
                            </button>
                          )}
-                         <button onClick={handleLogout} className="w-full bg-rose-50 text-rose-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all">
+                         <button onClick={handleLogout} className="w-full bg-rose-50 text-rose-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all mb-4">
                            <LogOut size={16} /> Sign Out
                          </button>
+
+                         {/* Delete Profile Section */}
+                         <div className="pt-4 border-t border-slate-100/50">
+                           <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><AlertCircle size={12} /> Danger Zone</p>
+                           <p className="text-[9px] font-medium text-slate-500 leading-snug mb-3">
+                             Deleting your profile is permanent and cannot be undone. Type <strong className="text-slate-800">DELETE</strong> to confirm.
+                           </p>
+                           <div className="flex items-center gap-2">
+                             <input 
+                               type="text" 
+                               placeholder="Type DELETE" 
+                               value={deleteProfileText}
+                               onChange={(e) => setDeleteProfileText(e.target.value)}
+                               className="flex-1 bg-rose-50/50 border border-rose-100 rounded-xl px-3 py-3 text-[10px] font-black outline-none focus:border-rose-300 text-rose-700 placeholder:text-rose-300"
+                             />
+                             <button 
+                               onClick={handleDeleteProfile} 
+                               disabled={deleteProfileText !== 'DELETE' || isDeletingProfile}
+                               className="shrink-0 bg-rose-500 text-white px-4 py-3 rounded-xl font-black uppercase tracking-widest text-[9px] active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
+                             >
+                               {isDeletingProfile ? <Loader2 size={12} className="animate-spin" /> : "Delete Profile"}
+                             </button>
+                           </div>
+                         </div>
                        </div>
                      ) : null}
                    </div>
