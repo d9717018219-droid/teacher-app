@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 import { 
   TrendingUp, 
   Search, 
@@ -24,7 +26,8 @@ import {
   Target,
   X,
   CreditCard,
-  ShieldCheck
+  ShieldCheck,
+  Navigation
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { JobLead } from '../types';
@@ -65,6 +68,7 @@ const CARD_ACCENTS = [
 export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLeads, userName, userCity, playTapSound, setSelectedJob }) => {
   const [orderIdInput, setOrderIdInput] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
+  const [assignedBookings, setAssignedBookings] = useState<any[]>([]);
   const [myEarnings, setMyEarnings] = useState<EarningRecord[]>(() => {
     const saved = localStorage.getItem('userEarnings');
     return saved ? JSON.parse(saved) : [];
@@ -75,6 +79,19 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
   useEffect(() => {
     localStorage.setItem('userEarnings', JSON.stringify(myEarnings));
   }, [myEarnings]);
+
+  useEffect(() => {
+    const tId = localStorage.getItem('tutorId');
+    if (!tId || tId === 'NEW_USER') return;
+
+    const q = query(collection(db, 'assigned_bookings'), where('tutorId', '==', tId));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAssignedBookings(data);
+    }, (err) => console.log('Error fetching assigned bookings:', err));
+
+    return () => unsubscribe();
+  }, []);
 
   const fetchJobDetails = () => {
     if (!orderIdInput.trim()) return;
@@ -196,31 +213,6 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
     window.open(`tel:${getSupportContact().phone}`, '_system');
   };
 
-  // If no records and not adding, show 'Hired Concierge' Landing Page
-  if (myEarnings.length === 0 && !showAddInput) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 pt-20 space-y-10 max-w-lg mx-auto font-sans min-h-[80vh]">
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-32 h-32 bg-[#7A2157]/10 rounded-[40px] flex items-center justify-center relative">
-          <div className="absolute inset-0 bg-[#7A2157]/5 animate-ping rounded-[40px]" />
-          <Trophy size={60} className="text-[#7A2157] relative z-10" />
-        </motion.div>
-
-        <div className="text-center space-y-3">
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">Are you Hired?</h2>
-          <div className="flex items-center justify-center gap-2">
-            <Sparkles size={18} className="text-amber-500 fill-amber-500" />
-            <p className="text-xl font-extrabold text-[#7A2157] uppercase tracking-tighter">Congratulations! 🎉</p>
-          </div>
-          <p className="text-slate-500 text-sm font-medium leading-relaxed px-4">We're thrilled to see you succeed. Add your job ID below to start tracking your professional earnings and milestones.</p>
-        </div>
-
-        <button onClick={() => { playTapSound(); setShowAddInput(true); }} className="bg-[#7A2157] hover:bg-[#7A2157]/90 text-white px-10 py-5 rounded-[24px] font-black text-sm uppercase tracking-[0.1em] shadow-2xl shadow-[#7A2157]/20 active:scale-95 transition-all flex items-center gap-3">
-          <Plus size={20} strokeWidth={4} /> Add My Job
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col p-5 pb-40 space-y-7 max-w-lg mx-auto font-sans bg-[#FAFBFF]">
       
@@ -311,12 +303,12 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
          </div>
       </div>
 
-      {/* ─── EARNINGS LIST ─── */}
+      {/* ─── MY BOOKINGS ─── */}
       <div className="space-y-5">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
-            <Clock size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em]">Tuition History</h3>
+            <Calendar size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em]">My Bookings</h3>
           </div>
           <button onClick={() => { playTapSound(); setShowAddInput(!showAddInput); setError(null); }} className="bg-[#7A2157] hover:bg-[#7A2157]/90 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg shadow-[#7A2157]/20 active:scale-95 transition-all flex items-center gap-1.5">{showAddInput ? <X size={12} strokeWidth={4} /> : <Plus size={12} strokeWidth={4} />} Add My Job</button>
         </div>
@@ -335,6 +327,128 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
             </motion.div>
           )}
         </AnimatePresence>
+
+        <div className="space-y-4">
+           {assignedBookings.length === 0 ? (
+             <motion.div className="relative bg-white rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-slate-100 overflow-hidden mt-4">
+               {/* Top Accent Bar */}
+               <div className="h-2 w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600" />
+               <div className="p-8 text-center space-y-4 flex flex-col items-center justify-center min-h-[200px]">
+                 <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center"><Calendar size={28}/></div>
+                 <div>
+                   <p className="text-[12px] font-black uppercase tracking-widest text-slate-900">No Demos Assigned</p>
+                   <p className="text-[10px] font-medium text-slate-400 mt-1">When the coordinator assigns a demo, your ticket will appear here.</p>
+                 </div>
+               </div>
+             </motion.div>
+           ) : (
+             assignedBookings.map((b) => (
+                <motion.div key={b.id} layout className="relative bg-white rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-slate-100 overflow-hidden mt-4">
+                  {/* Top Accent Bar */}
+                  <div className="h-2 w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600" />
+
+                  {/* Header */}
+                  <div className="px-6 pt-5 pb-4 flex justify-between items-center border-b border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex items-center justify-center">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"><Calendar size={16} className="text-blue-600"/></div>
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white animate-pulse" />
+                      </div>
+                      <div>
+                        <h4 className="text-[14px] font-black text-slate-900 tracking-tight">New Demo Assigned</h4>
+                        <p className="text-[10px] font-bold text-slate-400">Order ID: #{b.id.slice(-6).toUpperCase()}</p>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 px-3 py-1.5 rounded-xl text-white shadow-md">
+                      <span className="text-[9px] font-black uppercase tracking-widest">Action Required</span>
+                    </div>
+                  </div>
+
+                  {/* Main Content */}
+                  <div className="p-6 space-y-5">
+                    {/* Schedule & Client Row */}
+                    <div className="flex gap-4">
+                      {/* Calendar Block */}
+                      <div className="shrink-0 w-24 flex flex-col items-center justify-center bg-indigo-50/50 rounded-2xl border border-indigo-100 overflow-hidden">
+                        <div className="w-full bg-indigo-500 text-center py-1.5 text-[9px] font-black uppercase text-white tracking-widest">Schedule</div>
+                        <div className="py-2 text-center">
+                          <div className="text-[20px] font-black text-indigo-900 leading-none">{b.schedule?.split(' ')[0] || 'TBD'}</div>
+                          <div className="text-[11px] font-bold text-indigo-500 mt-1">{b.schedule?.split(' ').slice(1).join(' ')}</div>
+                        </div>
+                      </div>
+
+                      {/* Client Info */}
+                      <div className="flex-1 space-y-3 justify-center flex flex-col">
+                        <div>
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Client Name</p>
+                          <p className="text-[16px] font-black text-slate-800 leading-none">{b.clientName || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Contact</p>
+                          <p className="text-[13px] font-bold text-slate-700 leading-none">{b.contact || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Address Box */}
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-start gap-3 relative overflow-hidden group">
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 border border-slate-200">
+                        <MapPin size={14} className="text-rose-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Location</p>
+                        <p className="text-[12px] font-bold text-slate-700 leading-snug">{b.address || 'N/A'}</p>
+                      </div>
+                    </div>
+
+                    {/* Instructions */}
+                    <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-100/50">
+                      <h4 className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                        <AlertCircle size={14} className="text-amber-500" /> Important Instructions
+                      </h4>
+                      <ul className="text-[11px] font-medium text-amber-900/80 space-y-2 pl-1">
+                        <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Contact the client before leaving.</li>
+                        <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Arrive exactly at the scheduled time.</li>
+                        <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Update status post-demo.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="p-3 bg-slate-50 border-t border-slate-100">
+                    <div className="grid grid-cols-4 gap-2">
+                      <button onClick={() => window.open(`https://wa.me/91${(b.contact || '').replace(/[^0-9]/g, '').slice(-10)}?text=${encodeURIComponent(`Hi ${b.clientName || ''}, I am your assigned tutor from DoAble India.`)}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-white hover:bg-emerald-50 text-emerald-600 py-3 rounded-2xl border border-slate-200 shadow-sm active:scale-95 transition-all">
+                        <MessageCircle size={18} />
+                        <span className="text-[8px] font-black uppercase tracking-widest">Chat</span>
+                      </button>
+                      <button onClick={() => window.open(`tel:${b.contact}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-white hover:bg-blue-50 text-blue-600 py-3 rounded-2xl border border-slate-200 shadow-sm active:scale-95 transition-all">
+                        <Phone size={18} />
+                        <span className="text-[8px] font-black uppercase tracking-widest">Call</span>
+                      </button>
+                      <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(b.address || '')}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-white hover:bg-rose-50 text-rose-600 py-3 rounded-2xl border border-slate-200 shadow-sm active:scale-95 transition-all">
+                        <Navigation size={18} />
+                        <span className="text-[8px] font-black uppercase tracking-widest">Maps</span>
+                      </button>
+                      <button onClick={() => window.open('tel:+919971969197', '_system')} className="flex flex-col items-center justify-center gap-1 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl shadow-md active:scale-95 transition-all">
+                        <Phone size={18} className="text-amber-400" />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">Support</span>
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+             ))
+           )}
+        </div>
+      </div>
+
+      {/* ─── EARNINGS LIST ─── */}
+      <div className="space-y-5">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em]">Tuition History</h3>
+          </div>
+        </div>
 
         <div className="space-y-4">
           <AnimatePresence mode="popLayout">
