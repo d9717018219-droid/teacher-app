@@ -330,110 +330,82 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
 
         <div className="space-y-4">
            {assignedBookings.length === 0 ? (
-             <motion.div className="relative bg-white rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-slate-100 overflow-hidden mt-4">
-               {/* Top Accent Bar */}
-               <div className="h-2 w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600" />
-               <div className="p-8 text-center space-y-4 flex flex-col items-center justify-center min-h-[200px]">
-                 <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center"><Calendar size={28}/></div>
-                 <div>
-                   <p className="text-[12px] font-black uppercase tracking-widest text-slate-900">No Demos Assigned</p>
-                   <p className="text-[10px] font-medium text-slate-400 mt-1">When the coordinator assigns a demo, your ticket will appear here.</p>
-                 </div>
+             <motion.div className="bg-white p-6 rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-slate-100 relative overflow-hidden mt-4">
+               <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-300" />
+               <div className="text-center space-y-3 py-6">
+                 <Calendar size={32} className="mx-auto text-slate-300" />
+                 <p className="text-[12px] font-black uppercase tracking-widest text-slate-500">No Demos Assigned</p>
+                 <p className="text-[11px] font-medium text-slate-400 max-w-[200px] mx-auto">You have no active demo sessions right now.</p>
                </div>
              </motion.div>
            ) : (
              assignedBookings.map((b) => (
-                <motion.div key={b.id} layout className="relative bg-white rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-slate-100 overflow-hidden mt-4">
-                  {/* Top Accent Bar */}
-                  <div className="h-2 w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600" />
-
-                  {/* Header */}
-                  <div className="px-6 pt-5 pb-4 flex justify-between items-center border-b border-slate-50">
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex items-center justify-center">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"><Calendar size={16} className="text-blue-600"/></div>
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white animate-pulse" />
-                      </div>
-                      <div>
-                        <h4 className="text-[14px] font-black text-slate-900 tracking-tight">New Demo Assigned</h4>
-                        <p className="text-[10px] font-bold text-slate-400">Order ID: #{b.id.slice(-6).toUpperCase()}</p>
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 px-3 py-1.5 rounded-xl text-white shadow-md">
-                      <span className="text-[9px] font-black uppercase tracking-widest">Action Required</span>
-                    </div>
-                  </div>
-
-                  {/* Main Content */}
-                  <div className="p-6 space-y-5">
-                    {/* Schedule & Client Row */}
-                    <div className="flex gap-4">
-                      {/* Calendar Block */}
-                      <div className="shrink-0 w-24 flex flex-col items-center justify-center bg-indigo-50/50 rounded-2xl border border-indigo-100 overflow-hidden">
-                        <div className="w-full bg-indigo-500 text-center py-1.5 text-[9px] font-black uppercase text-white tracking-widest">Schedule</div>
-                        <div className="py-2 text-center">
-                          <div className="text-[20px] font-black text-indigo-900 leading-none">{b.schedule?.split(' ')[0] || 'TBD'}</div>
-                          <div className="text-[11px] font-bold text-indigo-500 mt-1">{b.schedule?.split(' ').slice(1).join(' ')}</div>
+                <motion.div key={b.id} layout className="bg-white p-6 rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-slate-100 relative overflow-hidden mt-4">
+                  <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
+                  
+                  <div className="space-y-4">
+                    <div className="text-[12px] font-medium text-slate-700 leading-relaxed">
+                      <p className="font-black text-[15px] text-slate-900 mb-2">Hello {userName ? userName.split(' ')[0] : 'Tutor'},</p>
+                      <p>This is a service update regarding your assigned demo session. Please review the booking information below 👇</p>
+                      
+                      <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 my-5 space-y-3">
+                        <div className="flex items-start gap-2">
+                          <span className="shrink-0 text-[14px]">😎</span> 
+                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Client Name</span> <span className="font-black text-slate-900 text-[13px]">{b.clientName || 'N/A'}</span></div>
+                        </div>
+                        <div className="h-px bg-blue-100/50 w-full" />
+                        <div className="flex items-start gap-2">
+                          <span className="shrink-0 text-[14px]">📶</span> 
+                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Contact</span> <span className="font-black text-slate-900 text-[13px]">{b.contact || 'N/A'}</span></div>
+                        </div>
+                        <div className="h-px bg-blue-100/50 w-full" />
+                        <div className="flex items-start gap-2">
+                          <span className="shrink-0 text-[14px]">📍</span> 
+                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Address</span> <span className="font-black text-slate-900 text-[13px] leading-snug">{b.address || 'N/A'}</span></div>
+                        </div>
+                        <div className="h-px bg-blue-100/50 w-full" />
+                        <div className="flex items-start gap-2">
+                          <span className="shrink-0 text-[14px]">🗓️</span> 
+                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Demo Schedule</span> <span className="font-black text-slate-900 text-[13px]">{b.schedule || 'N/A'}</span></div>
                         </div>
                       </div>
 
-                      {/* Client Info */}
-                      <div className="flex-1 space-y-3 justify-center flex flex-col">
-                        <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Client Name</p>
-                          <p className="text-[16px] font-black text-slate-800 leading-none">{b.clientName || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Contact</p>
-                          <p className="text-[13px] font-bold text-slate-700 leading-none">{b.contact || 'N/A'}</p>
-                        </div>
+                      <div className="space-y-2 mb-5 bg-amber-50/50 p-4 rounded-2xl border border-amber-100/50">
+                        <p className="font-black text-amber-800 text-[11px] uppercase tracking-widest flex items-center gap-1.5 mb-3">🔔 Service Instructions:</p>
+                        <ul className="text-[11px] font-medium text-amber-900/80 space-y-2.5 pl-1">
+                          <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Please contact the client before leaving for the location.</li>
+                          <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Be present at the scheduled time and conduct the demo as discussed.</li>
+                          <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> After completion, kindly update the service status for record and tracking.</li>
+                        </ul>
                       </div>
-                    </div>
 
-                    {/* Address Box */}
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-start gap-3 relative overflow-hidden group">
-                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 border border-slate-200">
-                        <MapPin size={14} className="text-rose-500" />
+                      <div className="text-[11px] text-slate-500 mt-4 leading-relaxed">
+                        <p>Regards,</p>
+                        <p className="font-black text-slate-800 text-[12px]">DoAble India Enterprises</p>
+                        <p>Gurgaon</p>
+                        <p className="font-bold">M : 9971969197</p>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Location</p>
-                        <p className="text-[12px] font-bold text-slate-700 leading-snug">{b.address || 'N/A'}</p>
-                      </div>
-                    </div>
-
-                    {/* Instructions */}
-                    <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-100/50">
-                      <h4 className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5 mb-2">
-                        <AlertCircle size={14} className="text-amber-500" /> Important Instructions
-                      </h4>
-                      <ul className="text-[11px] font-medium text-amber-900/80 space-y-2 pl-1">
-                        <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Contact the client before leaving.</li>
-                        <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Arrive exactly at the scheduled time.</li>
-                        <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Update status post-demo.</li>
-                      </ul>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="p-3 bg-slate-50 border-t border-slate-100">
-                    <div className="grid grid-cols-4 gap-2">
-                      <button onClick={() => window.open(`https://wa.me/91${(b.contact || '').replace(/[^0-9]/g, '').slice(-10)}?text=${encodeURIComponent(`Hi ${b.clientName || ''}, I am your assigned tutor from DoAble India.`)}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-white hover:bg-emerald-50 text-emerald-600 py-3 rounded-2xl border border-slate-200 shadow-sm active:scale-95 transition-all">
-                        <MessageCircle size={18} />
-                        <span className="text-[8px] font-black uppercase tracking-widest">Chat</span>
-                      </button>
-                      <button onClick={() => window.open(`tel:${b.contact}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-white hover:bg-blue-50 text-blue-600 py-3 rounded-2xl border border-slate-200 shadow-sm active:scale-95 transition-all">
-                        <Phone size={18} />
-                        <span className="text-[8px] font-black uppercase tracking-widest">Call</span>
-                      </button>
-                      <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(b.address || '')}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-white hover:bg-rose-50 text-rose-600 py-3 rounded-2xl border border-slate-200 shadow-sm active:scale-95 transition-all">
-                        <Navigation size={18} />
-                        <span className="text-[8px] font-black uppercase tracking-widest">Maps</span>
-                      </button>
-                      <button onClick={() => window.open('tel:+919971969197', '_system')} className="flex flex-col items-center justify-center gap-1 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl shadow-md active:scale-95 transition-all">
-                        <Phone size={18} className="text-amber-400" />
-                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">Support</span>
-                      </button>
-                    </div>
+                  <div className="grid grid-cols-4 gap-2 pt-5 mt-5 border-t border-slate-100">
+                    <button onClick={() => window.open(`https://wa.me/91${(b.contact || '').replace(/[^0-9]/g, '').slice(-10)}?text=${encodeURIComponent(`Hi ${b.clientName || ''}, I am your assigned tutor from DoAble India.`)}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 py-3 rounded-2xl border border-emerald-100 shadow-sm active:scale-95 transition-all">
+                      <MessageCircle size={18} />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Chat</span>
+                    </button>
+                    <button onClick={() => window.open(`tel:${b.contact}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-600 py-3 rounded-2xl border border-blue-100 shadow-sm active:scale-95 transition-all">
+                      <Phone size={18} />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Call</span>
+                    </button>
+                    <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(b.address || '')}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 py-3 rounded-2xl border border-rose-100 shadow-sm active:scale-95 transition-all">
+                      <Navigation size={18} />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Maps</span>
+                    </button>
+                    <button onClick={() => window.open('tel:+919971969197', '_system')} className="flex flex-col items-center justify-center gap-1 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl shadow-md active:scale-95 transition-all">
+                      <Phone size={18} className="text-amber-400" />
+                      <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">Support</span>
+                    </button>
                   </div>
                 </motion.div>
              ))
