@@ -63,13 +63,13 @@ function playTapSound() {
 const DetailItem: React.FC<{ emoji: string; label: string; text: string }> = ({ emoji, label, text }) => {
   if (!text) return null;
   return (
-    <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:border-slate-200">
-      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl shrink-0">
+    <div className="bg-white rounded-[16px] p-3 border border-slate-100 shadow-sm flex items-center gap-3 transition-all">
+      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl shrink-0">
         {emoji}
       </div>
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.15em] mb-0.5">{label}</span>
-        <span className="text-[14px] font-bold text-slate-800 leading-tight truncate">{text.replace(/\*/g, '')}</span>
+        <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-0.5">{label}</span>
+        <span className="text-[12px] font-bold text-slate-800 leading-snug whitespace-normal break-words">{text.replace(/\*/g, '')}</span>
       </div>
     </div>
   );
@@ -77,23 +77,27 @@ const DetailItem: React.FC<{ emoji: string; label: string; text: string }> = ({ 
 
 const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, onHide }) => {
   const msg = (alert.message || (alert as any).Message || '').toString();
-  const lines = msg.split('\n');
-
+  
   // ─── ROBUST MAPPING LOGIC ───
-  const orderId = msg.match(/Order ID:\s*([A-Z0-9]+)/i)?.[1] || '';
+  const orderIdMatch = msg.match(/(?:Order ID|ID):\s*([0-9]+)/i);
+  const orderId = orderIdMatch ? orderIdMatch[1] : '';
+  
   const classPart = msg.match(/📚\s*([^-–\n]+)/)?.[1]?.trim() || '';
   const subjectsPart = msg.match(/[–-]\s*([^\n]+)/)?.[1]?.trim() || '';
   const classInfo = subjectsPart ? `${classPart} – ${subjectsPart}` : classPart;
   
-  const genderMatch = msg.match(/👩‍🏫\s*([^\n]+?)\s*Tutor Required/i);
+  const genderMatch = msg.match(/👩|👩‍🏫|👨‍🏫|👤\s*([^\n]+?)\s*Tutor Required/i);
   const genderInfo = genderMatch ? genderMatch[1].trim() : (msg.match(/([^\n]+?)\s*Tutor Required/i)?.[1] || 'Any');
 
   const locationInfo = msg.match(/📍\s*([^\n]+)/)?.[1]?.trim() || '';
   const scheduleInfo = msg.match(/⏰\s*([^\n]+)/)?.[1]?.trim() || '';
-  const feeInfo = msg.match(/💰\s*₹?([^\/ \n]+)/)?.[1]?.trim() || '';
+  
+  const feeMatch = msg.match(/💰\s*₹?([0-9,]+)/);
+  const feeInfo = feeMatch ? feeMatch[1] : '';
+
   const lastDate = msg.match(/Last Date:\s*([^\n]+)/i)?.[1]?.trim() || '';
 
-  const handleWhatsAppClick = (e: React.MouseEvent) => {
+  const handleApplyClick = (e: React.MouseEvent) => {
     e.preventDefault();
     playTapSound();
     openWhatsApp(`Hi, I am interested in Job Order ID: #${orderId || 'N/A'}. Please provide more details.`);
@@ -104,73 +108,71 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
 
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="bg-[#F8FAFC] rounded-[40px] border border-slate-200/60 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)] overflow-hidden relative mx-1"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden relative w-full mb-3"
     >
       {/* Premium Header */}
-      <div className="bg-[#1E293B] p-7 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl rounded-full" />
-        <div className="flex items-center justify-between gap-3 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-3xl shadow-inner border border-white/10">
+      <div className="bg-[#1E293B] p-5 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-2xl rounded-full" />
+        <div className="flex items-start justify-between gap-3 relative z-10">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl shrink-0">
               {msg.includes('🚨') ? '🚨' : '📢'}
             </div>
             <div className="flex flex-col">
-              <h3 className="text-[11px] font-black text-rose-400 uppercase tracking-[0.2em] leading-none mb-1.5">Tuition Job Alert</h3>
-              <div className="text-[22px] font-black text-white tracking-tight leading-none">
-                Order ID: <span className="text-[#FFD166]">{orderId || 'NEW'}</span>
+              <h3 className="text-[14px] font-black text-white uppercase tracking-wider mb-1">Tuition Job Alert</h3>
+              <div className="text-[12px] font-bold text-slate-400">
+                Order ID: <span className="text-[#FFD166]">{orderId || 'PENDING'}</span>
+                {isNew && (
+                  <span className="ml-3 bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-lg shadow-emerald-500/20">
+                    Live
+                  </span>
+                )}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {isNew && (
-              <span className="bg-[#10B981] text-white text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-500/20">
-                Live
-              </span>
-            )}
-            <button onClick={onHide} className="bg-white/10 hover:bg-white/20 transition-all p-2.5 rounded-2xl text-white/60 hover:text-white">
-              <X size={20} />
-            </button>
-          </div>
+          <button onClick={onHide} className="bg-white/10 hover:bg-white/20 p-2 rounded-xl text-white/60">
+            <X size={18} />
+          </button>
         </div>
       </div>
 
-      <div className="p-6 space-y-4">
-        {/* Info Cards */}
-        <div className="space-y-3">
-          <DetailItem emoji="📚" label="Class & Board" text={classInfo} />
+      <div className="p-4 space-y-3">
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 gap-2.5">
+          <DetailItem emoji="📚" label="Class & Subjects" text={classInfo} />
           <DetailItem emoji="👤" label="Gender Pref." text={genderInfo} />
           <DetailItem emoji="📍" label="Location" text={locationInfo} />
           <DetailItem emoji="⏰" label="Schedule" text={scheduleInfo} />
         </div>
 
-        {/* Fee Card */}
-        <div className="p-5 rounded-[32px] bg-white border border-slate-100 shadow-sm flex items-center justify-between group overflow-hidden relative mt-2">
+        {/* Fee Highlight */}
+        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between group overflow-hidden relative mt-1">
            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-2xl text-emerald-600 shrink-0">₹</div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-xl text-emerald-600 shrink-0 font-black">₹</div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.15em] mb-0.5">Monthly Tuition Fee</span>
-                <span className="text-[24px] font-black text-slate-900 tracking-tighter leading-none">₹{feeInfo}/month</span>
+                <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Monthly Tuition Fee</span>
+                <span className="text-[18px] font-black text-slate-900 tracking-tighter leading-none">₹{feeInfo}/month</span>
               </div>
            </div>
-           <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-tight border border-emerald-100/50">Verified</div>
+           <div className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight border border-emerald-100/50">Verified</div>
         </div>
 
-        {/* WhatsApp Button */}
+        {/* Action Button */}
         <button 
-          onClick={handleWhatsAppClick}
-          className="w-full bg-[#25D366] hover:bg-[#22c35e] text-white h-[72px] rounded-[30px] flex items-center justify-center gap-4 transition-all active:scale-[0.98] shadow-xl shadow-green-100 border-b-4 border-green-700/30 mt-2"
+          onClick={handleApplyClick}
+          className="w-full bg-[#25D366] hover:bg-[#22c35e] text-white h-[58px] rounded-[20px] flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-lg shadow-green-100 border-b-4 border-green-700/30 mt-2"
         >
-          <MessageSquare size={24} fill="currentColor" />
+          <MessageSquare size={20} fill="currentColor" />
           <div className="flex flex-col items-start">
-            <span className="text-[15px] font-black uppercase tracking-widest leading-none">WhatsApp Reply Now</span>
-            <span className="text-[10px] font-bold opacity-80 mt-1.5 uppercase tracking-tighter">Fast response from coordinator</span>
+            <span className="text-[15px] font-bold tracking-wide leading-none">Apply Now</span>
+            <span className="text-[9.5px] font-medium opacity-80 mt-1">Fast response from coordinator</span>
           </div>
         </button>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-2 pt-3 border-t border-slate-200/40">
+        <div className="flex items-center justify-between px-1 pt-3 border-t border-slate-200/40">
            <div className="flex items-center gap-3">
              <div className="text-2xl">⏳</div>
              <div className="flex flex-col">
@@ -289,7 +291,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
         // If an alert targets specific localities, user MUST be in one of them
         const hasLocMatch = targetLocs.some(l => {
           const tLoc = l.toLowerCase().trim();
-          return uLocs.some(uLoc => uLoc === tLoc || uLoc.includes(tLoc) || tLoc.includes(uLoc));
+          return uLocs.some(uLoc => uLoc === tLoc || uLoc.includes(tLoc) || uLoc.includes(tLoc));
         });
 
         if (!hasLocMatch) {
@@ -493,7 +495,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
                           <FormattedMessage text={msg} />
                           
                           {/* WhatsApp Style Timestamp */}
-                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/80 uppercase tracking-tighter">
+                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter">
                             <Clock size={10} strokeWidth={3} />
                             {formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                           </div>
