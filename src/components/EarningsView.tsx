@@ -406,7 +406,10 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
 
                   {/* Actions */}
                   <div className="grid grid-cols-4 gap-2 pt-5 mt-5 border-t border-slate-100">
-                    <button onClick={() => window.open(`https://wa.me/91${(b.contact || '').replace(/[^0-9]/g, '').slice(-10)}?text=${encodeURIComponent(`Hi ${b.clientName || ''}, I am your assigned tutor from DoAble India.`)}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 py-3 rounded-2xl border border-emerald-100 shadow-sm active:scale-95 transition-all">
+                    <button 
+                      onClick={() => openWhatsAppTo(b.contact || '', `Hi ${b.clientName || ''}, I am your assigned tutor from DoAble India.`)}
+                      className="flex flex-col items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 py-3 rounded-2xl border border-emerald-100 shadow-sm active:scale-95 transition-all"
+                    >
                       <MessageCircle size={18} />
                       <span className="text-[8px] font-black uppercase tracking-widest">Chat</span>
                     </button>

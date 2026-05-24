@@ -125,11 +125,25 @@ export function cleanValue(val: any): string {
 }
 
 export function openWhatsApp(text: string) {
-  const phone = '9971969197';
-  const url = `https://wa.me/91${phone}?text=${encodeURIComponent(text)}`;
+  openWhatsAppTo('9971969197', text);
+}
+
+export function openWhatsAppTo(phone: string, text: string) {
+  // Clean phone number: remove everything except digits
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  // If number doesn't have country code and is 10 digits (India), add 91
+  const finalPhone = (cleanPhone.length === 10) ? `91${cleanPhone}` : cleanPhone;
   
-  // '_system' tells Capacitor to open the URL in the system browser/app
-  window.open(url, '_system');
+  // Use api.whatsapp.com for better compatibility in some mobile environments
+  const url = `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(text)}`;
+  
+  // Try to open with _system which Capacitor uses to trigger native app intents
+  try {
+    window.open(url, '_system');
+  } catch (e) {
+    // Fallback to standard open if _system fails
+    window.open(url, '_blank');
+  }
 }
 
 // ─── IndexedDB Storage for Large Data ─────────────────────────────

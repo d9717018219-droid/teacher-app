@@ -1952,14 +1952,13 @@ export default function App() {
                </div>
                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 bg-white/80 backdrop-blur-md border-t border-slate-100 flex gap-2 sm:gap-3 pb-[calc(1rem+var(--safe-area-bottom,24px))]">
                   <a href="tel:9971969197" className="flex-1 py-3.5 sm:py-4 rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest text-center border-2 border-primary text-primary active:scale-95 transition-all">📞 Call</a>
-                  <a 
-                    href={`https://wa.me/919971969197?text=${encodeURIComponent(`Hi, I want to apply for Job Order ID: #${selectedJob['Order ID'] || (selectedJob as any).id || 'N/A'}`)}`}
-                    target="_system"
+                  <button 
+                    onClick={() => openWhatsApp(`Hi, I want to apply for Job Order ID: #${selectedJob['Order ID'] || (selectedJob as any).id || 'N/A'}`)}
                     className="flex-[1.8] py-3.5 sm:py-4 rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest text-center text-white shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2" 
                     style={{ background: 'linear-gradient(135deg, #FF1493 0%, #FF69B4 100%)' }}
                   >
                     💬 Apply Now
-                  </a>
+                  </button>
                </div>            </motion.div>
           </div>
         )}
@@ -2154,13 +2153,12 @@ export default function App() {
 
                <div className="absolute bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-slate-100 flex gap-3 pb-[calc(1.5rem+var(--safe-area-bottom,24px))]">
                   <a href="tel:9971969197" className="flex-1 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-center border-2 border-primary text-primary active:scale-95 transition-all">📞 Call</a>
-                  <a 
-                    href={`https://wa.me/919971969197?text=${encodeURIComponent(`Hi, I want to book a free demo with Tutor ID: #${selectedTutor['Tutor ID'] || (selectedTutor as any).id || 'N/A'}`)}`}
-                    target="_system"
+                  <button 
+                    onClick={() => openWhatsApp(`Hi, I want to book a free demo with Tutor ID: #${selectedTutor['Tutor ID'] || (selectedTutor as any).id || 'N/A'}`)}
                     className="flex-[1.5] py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-center bg-primary text-white shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
                     💬 Book a Free Demo
-                  </a>
+                  </button>
                </div>
             </motion.div>
           </div>

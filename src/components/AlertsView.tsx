@@ -139,14 +139,13 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
         </div>
 
         {/* WhatsApp Button */}
-        <a 
-          href={`https://wa.me/919971969197?text=${encodeURIComponent(`Hi, I am interested in Job Order ID: #${orderId}. Please provide more details.`)}`}
-          target="_system"
+        <button 
+          onClick={handleWhatsAppClick}
           className="w-full bg-[#25D366] hover:bg-[#22c35e] text-white h-[58px] rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.97] shadow-lg shadow-green-100 border-b-4 border-green-600/20"
         >
           <MessageSquare size={18} fill="currentColor" />
           <span className="text-[13px] font-black uppercase tracking-widest">WhatsApp Reply</span>
-        </a>
+        </button>
 
         {/* Footer */}
         <div className="flex flex-col gap-3 pt-2">
