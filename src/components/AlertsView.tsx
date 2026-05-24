@@ -86,8 +86,8 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
   const subjectsPart = msg.match(/[–-]\s*([^\n]+)/)?.[1]?.trim() || '';
   const classInfo = subjectsPart ? `${classPart} – ${subjectsPart}` : classPart;
   
-  const genderMatch = msg.match(/👩|👩‍🏫|👨‍🏫|👤\s*([^\n]+?)\s*Tutor Required/i);
-  const genderInfo = genderMatch ? genderMatch[1].trim() : (msg.match(/([^\n]+?)\s*Tutor Required/i)?.[1] || 'Any');
+  const genderMatch = msg.match(/(?:👩|👩‍🏫|👨‍🏫|👤)\s*([^\n]+?)\s*Tutor Required/i);
+  const genderInfo = (genderMatch && genderMatch[1]) ? genderMatch[1].trim() : (msg.match(/([^\n]+?)\s*Tutor Required/i)?.[1]?.trim() || 'Any');
 
   const locationInfo = msg.match(/📍\s*([^\n]+)/)?.[1]?.trim() || '';
   const scheduleInfo = msg.match(/⏰\s*([^\n]+)/)?.[1]?.trim() || '';
