@@ -134,14 +134,15 @@ export function openWhatsAppTo(phone: string, text: string) {
   // If number doesn't have country code and is 10 digits (India), add 91
   const finalPhone = (cleanPhone.length === 10) ? `91${cleanPhone}` : cleanPhone;
   
-  // Use api.whatsapp.com for better compatibility in some mobile environments
-  const url = `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(text)}`;
+  // Use wa.me for standard redirection
+  const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(text)}`;
   
-  // Try to open with _system which Capacitor uses to trigger native app intents
+  // For Capacitor Android, using _system is the standard way to open in system browser/app
+  // If it's not allowed in capacitor.config.ts (which we just fixed), 
+  // the OS should intercept this and open WhatsApp.
   try {
     window.open(url, '_system');
   } catch (e) {
-    // Fallback to standard open if _system fails
     window.open(url, '_blank');
   }
 }

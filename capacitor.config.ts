@@ -5,7 +5,6 @@ const config: CapacitorConfig = {
   appName: 'DoAble India',
   webDir: 'dist',
   server: {
-    allowNavigation: ["*"],
     hostname: 'localhost'
   },
   plugins: {
