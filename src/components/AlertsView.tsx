@@ -63,7 +63,7 @@ function playTapSound() {
 const DetailItem: React.FC<{ emoji: string; label: string; text: string }> = ({ emoji, label, text }) => {
   if (!text) return null;
   return (
-    <div className="bg-white rounded-[16px] p-3 border border-slate-100 shadow-sm flex items-center gap-3 transition-all">
+    <div className="bg-white rounded-[16px] p-3 border border-slate-100 shadow-sm flex items-center gap-3 transition-all hover:border-slate-200">
       <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl shrink-0">
         {emoji}
       </div>
@@ -77,9 +77,11 @@ const DetailItem: React.FC<{ emoji: string; label: string; text: string }> = ({ 
 
 const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, onHide }) => {
   const msg = (alert.message || (alert as any).Message || '').toString();
-  
+  const lines = msg.split('\n');
+
   // ─── ROBUST MAPPING LOGIC ───
-  const orderIdMatch = msg.match(/(?:Order ID|ID):\s*([0-9]+)/i);
+  // More flexible Order ID: just look for digits after Order ID/ID/hash
+  const orderIdMatch = msg.match(/(?:Order ID|ID|#):\s*(\d+)/i);
   const orderId = orderIdMatch ? orderIdMatch[1] : '';
   
   const classPart = msg.match(/📚\s*([^-–\n]+)/)?.[1]?.trim() || '';
@@ -92,7 +94,8 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
   const locationInfo = msg.match(/📍\s*([^\n]+)/)?.[1]?.trim() || '';
   const scheduleInfo = msg.match(/⏰\s*([^\n]+)/)?.[1]?.trim() || '';
   
-  const feeMatch = msg.match(/💰\s*₹?([0-9,]+)/);
+  // More flexible Fee: extract numbers after money bag emoji and currency symbols
+  const feeMatch = msg.match(/💰\s*[^0-9]*([0-9,]+)/);
   const feeInfo = feeMatch ? feeMatch[1] : '';
 
   const lastDate = msg.match(/Last Date:\s*([^\n]+)/i)?.[1]?.trim() || '';
@@ -112,12 +115,12 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden relative w-full mb-3"
     >
-      {/* Premium Header */}
+      {/* Premium Header - Single Row Title */}
       <div className="bg-[#1E293B] p-5 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-2xl rounded-full" />
         <div className="flex items-start justify-between gap-3 relative z-10">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl shrink-0">
+            <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-2xl shrink-0">
               {msg.includes('🚨') ? '🚨' : '📢'}
             </div>
             <div className="flex flex-col">
@@ -125,14 +128,14 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
               <div className="text-[12px] font-bold text-slate-400">
                 Order ID: <span className="text-[#FFD166]">{orderId || 'PENDING'}</span>
                 {isNew && (
-                  <span className="ml-3 bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-lg shadow-emerald-500/20">
+                  <span className="ml-3 bg-emerald-500 text-white text-[8px] font-black px-2.5 py-0.5 rounded uppercase tracking-widest shadow-lg shadow-emerald-500/20">
                     Live
                   </span>
                 )}
               </div>
             </div>
           </div>
-          <button onClick={onHide} className="bg-white/10 hover:bg-white/20 p-2 rounded-xl text-white/60">
+          <button onClick={onHide} className="bg-white/10 hover:bg-white/20 transition-all p-2 rounded-xl text-white/60 hover:text-white">
             <X size={18} />
           </button>
         </div>
@@ -144,7 +147,15 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
           <DetailItem emoji="📚" label="Class & Subjects" text={classInfo} />
           <DetailItem emoji="👤" label="Gender Pref." text={genderInfo} />
           <DetailItem emoji="📍" label="Location" text={locationInfo} />
-          <DetailItem emoji="⏰" label="Schedule" text={scheduleInfo} />
+          
+          {/* Specific styling for Schedule to force single row */}
+          <div className="bg-white rounded-[16px] p-3 border border-slate-100 shadow-sm flex items-center gap-3 transition-all hover:border-slate-200">
+            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl shrink-0">⏰</div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Schedule Details</span>
+              <span className="text-[11px] font-bold text-slate-800 whitespace-nowrap overflow-hidden text-ellipsis">{scheduleInfo}</span>
+            </div>
+          </div>
         </div>
 
         {/* Fee Highlight */}
