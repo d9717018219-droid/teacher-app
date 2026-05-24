@@ -80,8 +80,8 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
   const lines = msg.split('\n');
 
   // ─── ROBUST MAPPING LOGIC ───
-  // More flexible Order ID: just look for digits after Order ID/ID/hash
-  const orderIdMatch = msg.match(/(?:Order ID|ID|#):\s*(\d+)/i);
+  // More flexible Order ID: look for digits after label labels with any non-digit separator
+  const orderIdMatch = msg.match(/(?:Order ID|ID|#)\D*(\d+)/i);
   const orderId = orderIdMatch ? orderIdMatch[1] : '';
   
   const classPart = msg.match(/📚\s*([^-–\n]+)/)?.[1]?.trim() || '';
@@ -94,8 +94,8 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
   const locationInfo = msg.match(/📍\s*([^\n]+)/)?.[1]?.trim() || '';
   const scheduleInfo = msg.match(/⏰\s*([^\n]+)/)?.[1]?.trim() || '';
   
-  // More flexible Fee: extract numbers after money bag emoji and currency symbols
-  const feeMatch = msg.match(/💰\s*[^0-9]*([0-9,]+)/);
+  // More flexible Fee: extract numbers after money bag emoji and any symbols
+  const feeMatch = msg.match(/💰\D*([0-9,]+)/);
   const feeInfo = feeMatch ? feeMatch[1] : '';
 
   const lastDate = msg.match(/Last Date:\s*([^\n]+)/i)?.[1]?.trim() || '';
