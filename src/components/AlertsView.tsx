@@ -77,10 +77,8 @@ const DetailItem: React.FC<{ emoji: string; label: string; text: string }> = ({ 
 
 const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, onHide }) => {
   const msg = (alert.message || (alert as any).Message || '').toString();
-  const lines = msg.split('\n');
-
+  
   // ─── ROBUST MAPPING LOGIC ───
-  // More flexible Order ID: look for digits after label labels with any non-digit separator
   const orderIdMatch = msg.match(/(?:Order ID|ID|#)\D*(\d+)/i);
   const orderId = orderIdMatch ? orderIdMatch[1] : '';
   
@@ -94,16 +92,49 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
   const locationInfo = msg.match(/📍\s*([^\n]+)/)?.[1]?.trim() || '';
   const scheduleInfo = msg.match(/⏰\s*([^\n]+)/)?.[1]?.trim() || '';
   
-  // More flexible Fee: extract numbers after money bag emoji and any symbols
   const feeMatch = msg.match(/💰\D*([0-9,]+)/);
   const feeInfo = feeMatch ? feeMatch[1] : '';
 
-  const lastDate = msg.match(/Last Date:\s*([^\n]+)/i)?.[1]?.trim() || '';
+  const lastDateStr = msg.match(/Last Date:\s*([^\n]+)/i)?.[1]?.trim() || '';
+
+  // ─── EXPIRY LOGIC ───
+  const [isExpired, setIsExpired] = useState(false);
+  useEffect(() => {
+    if (!lastDateStr) return;
+    const parseDeadline = (str: string) => {
+      try {
+        const parts = str.match(/(\d{2})[-/](\d{2})[-/](\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (!parts) return null;
+        let [_, dd, mm, yyyy, h, min, ampm] = parts;
+        let hours = parseInt(h);
+        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+        return new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd), hours, parseInt(min)).getTime();
+      } catch (e) { return null; }
+    };
+    const deadline = parseDeadline(lastDateStr);
+    if (!deadline) return;
+    const checkExpiry = () => {
+      if (Date.now() > deadline) setIsExpired(true);
+    };
+    checkExpiry();
+    const timer = setInterval(checkExpiry, 30000);
+    return () => clearInterval(timer);
+  }, [lastDateStr]);
 
   const handleApplyClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (isExpired) return;
     playTapSound();
     openWhatsApp(`Hi, I am interested in Job Order ID: #${orderId || 'N/A'}. Please provide more details.`);
+  };
+
+  const openInMaps = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!locationInfo) return;
+    playTapSound();
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationInfo)}`;
+    window.open(url, '_system');
   };
 
   const timestampDate = alert.timestamp?.toDate ? alert.timestamp.toDate() : new Date();
@@ -113,22 +144,30 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden relative w-full mb-3"
+      className={cn(
+        "bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden relative w-full mb-3 transition-all",
+        isExpired && "opacity-80 grayscale-[0.3]"
+      )}
     >
-      {/* Premium Header - Single Row Title */}
-      <div className="bg-[#1E293B] p-5 text-white relative overflow-hidden">
+      {/* Premium Header */}
+      <div className={cn(
+        "p-5 text-white relative overflow-hidden transition-colors",
+        isExpired ? "bg-slate-500" : "bg-[#1E293B]"
+      )}>
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-2xl rounded-full" />
         <div className="flex items-start justify-between gap-3 relative z-10">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-2xl shrink-0">
-              {msg.includes('🚨') ? '🚨' : '📢'}
+              {isExpired ? '⌛' : msg.includes('🚨') ? '🚨' : '📢'}
             </div>
             <div className="flex flex-col">
-              <h3 className="text-[14px] font-black text-white uppercase tracking-wider mb-1">Tuition Job Alert</h3>
+              <h3 className="text-[14px] font-black text-white uppercase tracking-wider mb-1">
+                {isExpired ? 'Application Closed' : 'Tuition Job Alert'}
+              </h3>
               <div className="text-[12px] font-bold text-slate-400">
                 Order ID: <span className="text-[#FFD166]">{orderId || 'PENDING'}</span>
-                {isNew && (
-                  <span className="ml-3 bg-emerald-500 text-white text-[8px] font-black px-2.5 py-0.5 rounded uppercase tracking-widest shadow-lg shadow-emerald-500/20">
+                {isNew && !isExpired && (
+                  <span className="ml-3 bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-lg shadow-emerald-500/20">
                     Live
                   </span>
                 )}
@@ -146,11 +185,24 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
         <div className="grid grid-cols-1 gap-2.5">
           <DetailItem emoji="📚" label="Class & Subjects" text={classInfo} />
           <DetailItem emoji="👤" label="Gender Pref." text={genderInfo} />
-          <DetailItem emoji="📍" label="Location" text={locationInfo} />
           
-          {/* Specific styling for Schedule to force single row */}
+          {/* Clickable Location */}
+          <button 
+            onClick={openInMaps}
+            className="bg-white rounded-[16px] p-3 border border-slate-100 shadow-sm flex items-center gap-3 transition-all hover:border-blue-200 active:scale-[0.98] group text-left w-full"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl shrink-0 group-hover:bg-blue-100 transition-colors">📍</div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-0.5 flex items-center gap-1.5">
+                Location <span className="text-blue-500 text-[7px] bg-blue-50 px-1 rounded">Open Map</span>
+              </span>
+              <span className="text-[12px] font-bold text-slate-800 leading-snug break-words underline decoration-blue-500/20 decoration-2 underline-offset-2">{locationInfo}</span>
+            </div>
+          </button>
+
+          {/* Schedule forcefully single row */}
           <div className="bg-white rounded-[16px] p-3 border border-slate-100 shadow-sm flex items-center gap-3 transition-all hover:border-slate-200">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl shrink-0">⏰</div>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-xl shrink-0">⏰</div>
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Schedule Details</span>
               <span className="text-[11px] font-bold text-slate-800 whitespace-nowrap overflow-hidden text-ellipsis">{scheduleInfo}</span>
@@ -159,41 +211,58 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
         </div>
 
         {/* Fee Highlight */}
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between group overflow-hidden relative mt-1">
+        <div className="p-4 rounded-2xl bg-emerald-50/30 border border-emerald-100 flex items-center justify-between group overflow-hidden relative mt-1">
            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-xl text-emerald-600 shrink-0 font-black">₹</div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-xl text-white shrink-0 font-black shadow-lg shadow-emerald-500/20">₹</div>
               <div className="flex flex-col">
-                <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Monthly Tuition Fee</span>
+                <span className="text-[9px] font-black uppercase text-emerald-600/60 tracking-wider mb-0.5">Monthly Tuition Fee</span>
                 <span className="text-[18px] font-black text-slate-900 tracking-tighter leading-none">₹{feeInfo}/month</span>
               </div>
            </div>
-           <div className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight border border-emerald-100/50">Verified</div>
+           <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight shadow-md">Verified</div>
         </div>
 
         {/* Action Button */}
         <button 
           onClick={handleApplyClick}
-          className="w-full bg-[#25D366] hover:bg-[#22c35e] text-white h-[58px] rounded-[20px] flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-lg shadow-green-100 border-b-4 border-green-700/30 mt-2"
+          disabled={isExpired}
+          className={cn(
+            "w-full h-[64px] rounded-[24px] flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-lg border-b-4",
+            isExpired 
+              ? "bg-slate-200 border-slate-300 text-slate-500 cursor-not-allowed shadow-none" 
+              : "bg-[#25D366] hover:bg-[#22c35e] text-white shadow-green-100 border-green-700/30"
+          )}
         >
           <MessageSquare size={20} fill="currentColor" />
           <div className="flex flex-col items-start">
-            <span className="text-[15px] font-bold tracking-wide leading-none">Apply Now</span>
-            <span className="text-[9.5px] font-medium opacity-80 mt-1">Fast response from coordinator</span>
+            <span className="text-[15px] font-bold tracking-wide leading-none">{isExpired ? 'Expired' : 'Apply Now'}</span>
+            <span className="text-[9.5px] font-medium opacity-80 mt-1">{isExpired ? 'This job is no longer accepting replies' : 'Fast reply before expiry via WhatsApp'}</span>
           </div>
         </button>
 
-        {/* Footer */}
+        {/* Footer with Tags */}
         <div className="flex items-center justify-between px-1 pt-3 border-t border-slate-200/40">
-           <div className="flex items-center gap-3">
-             <div className="text-2xl">⏳</div>
-             <div className="flex flex-col">
-               <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Deadline</span>
-               <span className="text-[11px] font-black text-rose-600 uppercase">{lastDate || 'Asap'}</span>
+           <div className="flex items-center gap-2">
+             <div className="flex flex-col gap-1">
+               <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Deadline</span>
+               <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tight",
+                    isExpired ? "bg-slate-100 text-slate-400" : "bg-rose-500 text-white shadow-md shadow-rose-500/20"
+                  )}>
+                    {lastDateStr || 'ASAP'}
+                  </span>
+                  {isExpired && (
+                    <span className="bg-rose-100 text-rose-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tight border border-rose-200">
+                      EXPIRED
+                    </span>
+                  )}
+               </div>
              </div>
            </div>
            
            <div className="flex flex-col items-end">
-             <span className="text-[9px] font-black uppercase text-slate-300 tracking-wider">Signals Detected</span>
+             <span className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Posted</span>
              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400/80 uppercase">
                 <Clock size={12} strokeWidth={3} /> {formatWhatsAppStyle(timestampDate)}
              </div>
@@ -209,15 +278,11 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
  */
 const FormattedMessage: React.FC<{ text: string }> = ({ text }) => {
   if (!text) return null;
-  
-  // Split by * but keep the delimiters to know what was inside
   const parts = text.split(/(\*[^*]+\*)/g);
-  
   return (
     <div className="text-[15px] font-bold text-slate-800 leading-snug whitespace-pre-wrap">
       {parts.map((part, i) => {
         if (part.startsWith('*') && part.endsWith('*')) {
-          // Remove the stars and render as extra bold
           return <span key={i} className="font-[900] text-slate-900">{part.slice(1, -1)}</span>;
         }
         return part;
@@ -289,43 +354,24 @@ const AlertsView: React.FC<AlertsViewProps> = ({
 
     return items.filter(a => {
       const aData = a as any;
-      // 1. City Filter - ABSOLUTE MATCH
       const targetCity = (a.city || aData.City || 'All').toString().toLowerCase().trim();
-      if (targetCity !== 'all' && userCityLower !== targetCity) {
-        console.log(`[Targeting] Rejecting Alert ${a.id}: City mismatch. User: "${userCityLower}", Target: "${targetCity}"`);
-        return false;
-      }
+      if (targetCity !== 'all' && userCityLower !== targetCity) return false;
 
-      // 1.5 Localities Filter - STRICT MATCH
       const targetLocs = (a.localities || aData.Localities || []);
       if (Array.isArray(targetLocs) && targetLocs.length > 0) {
-        // If an alert targets specific localities, user MUST be in one of them
         const hasLocMatch = targetLocs.some(l => {
           const tLoc = l.toLowerCase().trim();
           return uLocs.some(uLoc => uLoc === tLoc || uLoc.includes(tLoc) || uLoc.includes(tLoc));
         });
-
-        if (!hasLocMatch) {
-          console.log(`[Targeting] Rejecting Alert ${a.id}: Locality mismatch. User Areas: [${uLocs.join(', ')}], Target Areas: [${targetLocs.join(', ')}]`);
-          return false;
-        }
+        if (!hasLocMatch) return false;
       }
 
-      // 2. User Type Filter
       const targetUserRole = (a.targetUserType || aData.targetUserType || 'all').toString().toLowerCase().trim();
-      if (targetUserRole !== 'all' && userTypeLower && userTypeLower !== targetUserRole) {
-        console.log(`[Targeting] Rejecting Alert ${a.id}: Role mismatch. User: "${userTypeLower}", Target: "${targetUserRole}"`);
-        return false;
-      }
+      if (targetUserRole !== 'all' && userTypeLower && userTypeLower !== targetUserRole) return false;
 
-      // 3. Gender Filter
       const targetGender = (a.gender || aData.Gender || 'Any').toString().toLowerCase().trim();
-      if (targetGender !== 'any' && userGenderLower && userGenderLower !== targetGender) {
-        console.log(`[Targeting] Rejecting Alert ${a.id}: Gender mismatch. User: "${userGenderLower}", Target: "${targetGender}"`);
-        return false;
-      }
+      if (targetGender !== 'any' && userGenderLower && userGenderLower !== targetGender) return false;
 
-      // 4. Class Filter
       const targetClassStr = (a.targetClass || aData.targetClass || 'All').toString().toLowerCase().trim();
       if (targetClassStr !== 'all' && userClasses && userClasses.length > 0) {
         const matchesClass = userClasses.some(c => {
@@ -333,12 +379,8 @@ const AlertsView: React.FC<AlertsViewProps> = ({
           const tCls = targetClassStr.toLowerCase().trim().replace('class ', '');
           return tCls.includes(uCls) || uCls.includes(tCls);
         });
-        if (!matchesClass) {
-          console.log(`[Targeting] Rejecting Alert ${a.id}: Class mismatch. User Classes: [${userClasses.join(', ')}], Target: "${targetClassStr}"`);
-          return false;
-        }
+        if (!matchesClass) return false;
       }
-
       return true;
     });
   };
@@ -356,7 +398,6 @@ const AlertsView: React.FC<AlertsViewProps> = ({
       }
     };
     checkPermission();
-
     const handleTokenUpdate = (e: any) => setFcmToken(e.detail);
     const handleError = (e: any) => setFcmError(e.detail);
     window.addEventListener('fcmTokenUpdated', handleTokenUpdate);
@@ -388,93 +429,40 @@ const AlertsView: React.FC<AlertsViewProps> = ({
   return (
     <div className="space-y-4 pb-24 mt-8">
       <audio ref={domAudioRef} onEnded={() => setIsPlaying(null)} className="hidden" preload="auto" crossOrigin="anonymous" />
-      
-      {/* Modern Filter Bar */}
       <div className="px-6 mb-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="bg-slate-900 border-slate-900 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 w-fit shadow-lg">
             <Bell size={12} /> Live Alerts ({filteredAlerts.length})
           </div>
-          
           <div className="flex items-center gap-3">
             {onRefresh && (
-              <button 
-                onClick={() => { playTapSound(); onRefresh(); }}
-                className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-md"
-              >
-                Refresh
-              </button>
+              <button onClick={() => { playTapSound(); onRefresh(); }} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-md">Refresh</button>
             )}
-            {loading && (
-              <div className="flex items-center gap-2 text-[8px] font-black text-slate-400 uppercase tracking-widest animate-pulse">
-                <Settings size={10} className="animate-spin" /> Syncing...
-              </div>
-            )}
+            {loading && <div className="flex items-center gap-2 text-[8px] font-black text-slate-400 uppercase tracking-widest animate-pulse"><Settings size={10} className="animate-spin" /> Syncing...</div>}
           </div>
         </div>
-
-        {/* Date Filter Chips */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar -mx-6 px-6">
-          {[
-            { id: 'all', label: 'All Alerts' },
-            { id: 'today', label: 'Today' },
-            { id: 'yesterday', label: 'Yesterday' },
-            { id: 'week', label: 'This Week' }
-          ].map((f) => (
-            <button
-              key={f.id}
-              onClick={() => { playTapSound(); setDateFilter(f.id as any); }}
-              className={cn(
-                "px-3 py-1.5 rounded-xl text-[8.5px] font-black uppercase tracking-tight whitespace-nowrap transition-all border-2",
-                dateFilter === f.id 
-                  ? "bg-primary border-primary text-white shadow-lg scale-105" 
-                  : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
-              )}
-            >
-              {f.label}
-            </button>
+          {[{ id: 'all', label: 'All Alerts' }, { id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'week', label: 'This Week' }].map((f) => (
+            <button key={f.id} onClick={() => { playTapSound(); setDateFilter(f.id as any); }} className={cn("px-3 py-1.5 rounded-xl text-[8.5px] font-black uppercase tracking-tight whitespace-nowrap transition-all border-2", dateFilter === f.id ? "bg-primary border-primary text-white shadow-lg scale-105" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200")}>{f.label}</button>
           ))}
         </div>
       </div>
-
       <div className="px-6 space-y-4">
         {error && (
           <div className="p-4 bg-rose-50 border border-rose-100 rounded-[24px] text-rose-500">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle size={14} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Network Error</span>
-            </div>
+            <div className="flex items-center gap-2 mb-1"><AlertTriangle size={14} /><span className="text-[10px] font-black uppercase tracking-widest">Network Error</span></div>
             <p className="text-[11px] font-bold leading-relaxed opacity-80">{error}</p>
           </div>
         )}
-
-        {/* Removed: Project Config Diagnostic block */}
-        
         {alerts.length > 0 && filteredAlerts.length === 0 && (
           <div className="p-6 text-center space-y-4 bg-slate-50 rounded-[40px] border border-dashed border-slate-200">
              <div className="text-3xl">🔍</div>
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">
-               No alerts found for this {dateFilter === 'all' ? 'area' : 'period'}.<br/>
-               {showAllDebug ? 'Try changing filters.' : 'Try setting "Global Feed" or changing date.'}
-             </p>
-             <button 
-               onClick={() => { setDateFilter('all'); setShowAllDebug(true); }}
-               className="bg-white border-2 border-slate-100 px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 active:scale-95 transition-all"
-             >
-               Reset Filters
-             </button>
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">No alerts found for this {dateFilter === 'all' ? 'area' : 'period'}.<br/>{showAllDebug ? 'Try changing filters.' : 'Try setting "Global Feed" or changing date.'}</p>
+             <button onClick={() => { setDateFilter('all'); setShowAllDebug(true); }} className="bg-white border-2 border-slate-100 px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 active:scale-95 transition-all">Reset Filters</button>
           </div>
         )}
-
         <AnimatePresence mode="wait">
-            <motion.div 
-              key="feed"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-4"
-            >
+            <motion.div key="feed" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }} className="space-y-4">
               {filteredAlerts.length === 0 ? (
                 <div className="py-20 text-center space-y-4 bg-slate-50 rounded-[40px] border border-dashed border-slate-200">
                   <div className="text-4xl">📡</div>
@@ -485,31 +473,15 @@ const AlertsView: React.FC<AlertsViewProps> = ({
                   const msg = (alert.message || (alert as any).Message || '').toString();
                   const isJobAlert = msg.includes('📢') || msg.includes('🚨') || msg.toLowerCase().includes('tuition job alert');
                   const timestampDate = alert.timestamp?.toDate ? alert.timestamp.toDate() : new Date(alert.timestamp || Date.now());
-                  
-                  if (isJobAlert) {
-                    return <JobAlertCard key={alert.id} alert={alert} onHide={() => hideAlert(alert.id)} />;
-                  }
-
+                  if (isJobAlert) return <JobAlertCard key={alert.id} alert={alert} onHide={() => hideAlert(alert.id)} />;
                   return (
                     <div key={alert.id} className={cn("p-6 rounded-[32px] border-2 shadow-sm relative transition-all hover:scale-[1.01]", getBg(alert.type))}>
-                      {/* Diagnostic Overlay (Visible to All during Debug) */}
-                      <div className="mb-4 p-2 bg-slate-900 rounded-xl text-[8px] font-mono text-slate-300 grid grid-cols-2 gap-2">
-                        <div><span className="text-amber-400">Target City:</span> {alert.city || 'All'}</div>
-                        <div><span className="text-amber-400">Target Role:</span> {alert.targetUserType || 'All'}</div>
-                        <div className="col-span-2"><span className="text-amber-400">Target Locs:</span> {JSON.stringify(alert.localities || [])}</div>
-                      </div>
-
                       <div className="flex gap-4">
                         <div className="shrink-0 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">{getIcon(alert.type)}</div>
                         <div className="flex-1">
                           <div className="font-black text-[10px] uppercase mb-1 tracking-wider text-slate-500">{alert.sender || 'System Broadcast'}</div>
                           <FormattedMessage text={msg} />
-                          
-                          {/* WhatsApp Style Timestamp */}
-                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter">
-                            <Clock size={10} strokeWidth={3} />
-                            {formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                          </div>
+                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter"><Clock size={10} strokeWidth={3} />{formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
                         </div>
                         <button onClick={() => hideAlert(alert.id)} className="text-slate-400 hover:text-slate-600 transition-colors shrink-0"><X size={18} /></button>
                       </div>
