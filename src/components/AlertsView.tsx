@@ -60,36 +60,43 @@ function playTapSound() {
   } catch {}
 }
 
-const DetailItem: React.FC<{ emoji: string; text: string }> = ({ emoji, text }) => {
+const DetailItem: React.FC<{ emoji: string; label: string; text: string }> = ({ emoji, label, text }) => {
   if (!text) return null;
   return (
-    <div className="flex gap-4 items-start group">
-      <span className="text-xl shrink-0 leading-none group-hover:scale-110 transition-transform">{emoji}</span>
-      <span className="text-[14px] font-bold text-slate-700 leading-snug">{text}</span>
+    <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:border-slate-200">
+      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl shrink-0">
+        {emoji}
+      </div>
+      <div className="flex flex-col min-w-0 flex-1">
+        <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.15em] mb-0.5">{label}</span>
+        <span className="text-[14px] font-bold text-slate-800 leading-tight truncate">{text.replace(/\*/g, '')}</span>
+      </div>
     </div>
   );
 };
 
 const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, onHide }) => {
   const msg = (alert.message || (alert as any).Message || '').toString();
+  const lines = msg.split('\n');
+
+  // ─── ROBUST MAPPING LOGIC ───
+  const orderId = msg.match(/Order ID:\s*([A-Z0-9]+)/i)?.[1] || '';
+  const classPart = msg.match(/📚\s*([^-–\n]+)/)?.[1]?.trim() || '';
+  const subjectsPart = msg.match(/[–-]\s*([^\n]+)/)?.[1]?.trim() || '';
+  const classInfo = subjectsPart ? `${classPart} – ${subjectsPart}` : classPart;
   
-  // Extracting data using regex
-  const orderId = msg.match(/Order ID:\s*(\d+)/i)?.[1] || msg.match(/ID:\s*(\d+)/i)?.[1] || '';
-  const classInfo = msg.match(/📚\s*([^\n]*)/)?.[1] || msg.match(/Class:\s*([^\n]*)/i)?.[1] || '';
-  const genderInfo = msg.match(/👩\s*([^\n]*)/)?.[1] || msg.match(/Gender:\s*([^\n]*)/i)?.[1] || '';
-  const locationInfo = msg.match(/📍\s*([^\n]*)/)?.[1] || msg.match(/Location:\s*([^\n]*)/i)?.[1] || '';
-  const timeInfo = msg.match(/⏰\s*([^\n]*)/)?.[1] || msg.match(/Time:\s*([^\n]*)/i)?.[1] || '';
-  const feeInfo = msg.match(/💰\s*([^\n]*)/)?.[1] || msg.match(/Fee:\s*([^\n]*)/i)?.[1] || '';
-  const lastDate = msg.match(/⏳\s*Last Date:\s*([^\n]*)/i)?.[1] || '';
-  
-  const whatsappNumber = '9971969197';
-  const encodedText = encodeURIComponent(`Hi, I am interested in Job Order ID: #${orderId}. Please provide more details.`);
-  const whatsappLink = `https://wa.me/91${whatsappNumber}?text=${encodedText}`;
+  const genderMatch = msg.match(/👩‍🏫\s*([^\n]+?)\s*Tutor Required/i);
+  const genderInfo = genderMatch ? genderMatch[1].trim() : (msg.match(/([^\n]+?)\s*Tutor Required/i)?.[1] || 'Any');
+
+  const locationInfo = msg.match(/📍\s*([^\n]+)/)?.[1]?.trim() || '';
+  const scheduleInfo = msg.match(/⏰\s*([^\n]+)/)?.[1]?.trim() || '';
+  const feeInfo = msg.match(/💰\s*₹?([^\/ \n]+)/)?.[1]?.trim() || '';
+  const lastDate = msg.match(/Last Date:\s*([^\n]+)/i)?.[1]?.trim() || '';
 
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.preventDefault();
     playTapSound();
-    openWhatsApp(`Hi, I am interested in Job Order ID: #${orderId}. Please provide more details.`);
+    openWhatsApp(`Hi, I am interested in Job Order ID: #${orderId || 'N/A'}. Please provide more details.`);
   };
 
   const timestampDate = alert.timestamp?.toDate ? alert.timestamp.toDate() : new Date();
@@ -97,68 +104,87 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
 
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-white rounded-[32px] border border-slate-100 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden relative"
+      className="bg-[#F8FAFC] rounded-[40px] border border-slate-200/60 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)] overflow-hidden relative mx-1"
     >
-      {/* Diagnostic Overlay */}
-      <div className="mx-7 mt-7 p-2 bg-slate-900 rounded-xl text-[8px] font-mono text-slate-300 grid grid-cols-2 gap-2">
-        <div><span className="text-amber-400">Target City:</span> {alert.city || 'All'}</div>
-        <div><span className="text-amber-400">Target Role:</span> {alert.targetUserType || 'All'}</div>
-        <div className="col-span-2"><span className="text-amber-400">Target Locs:</span> {JSON.stringify(alert.localities || [])}</div>
-      </div>
-
-      <div className="p-7 space-y-6 pt-4">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-xl">📢</div>
-            <h3 className="text-[12px] font-black text-rose-500 uppercase tracking-widest leading-tight">
-              Tuition Job Alert <span className="mx-1 opacity-30">|</span> Order ID: {orderId}
-            </h3>
+      {/* Premium Header */}
+      <div className="bg-[#1E293B] p-7 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl rounded-full" />
+        <div className="flex items-center justify-between gap-3 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-3xl shadow-inner border border-white/10">
+              {msg.includes('🚨') ? '🚨' : '📢'}
+            </div>
+            <div className="flex flex-col">
+              <h3 className="text-[11px] font-black text-rose-400 uppercase tracking-[0.2em] leading-none mb-1.5">Tuition Job Alert</h3>
+              <div className="text-[22px] font-black text-white tracking-tight leading-none">
+                Order ID: <span className="text-[#FFD166]">{orderId || 'NEW'}</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {isNew && (
-              <span className="bg-slate-100 text-slate-500 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
-                New
+              <span className="bg-[#10B981] text-white text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-500/20">
+                Live
               </span>
             )}
-            <button onClick={onHide} className="text-slate-300 hover:text-slate-500 transition-colors p-1">
-              <X size={16} />
+            <button onClick={onHide} className="bg-white/10 hover:bg-white/20 transition-all p-2.5 rounded-2xl text-white/60 hover:text-white">
+              <X size={20} />
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Info Grid */}
-        <div className="space-y-4 pt-1">
-          <DetailItem emoji="📚" text={classInfo} />
-          <DetailItem emoji="👩" text={genderInfo} />
-          <DetailItem emoji="📍" text={locationInfo} />
-          <DetailItem emoji="⏰" text={timeInfo} />
-          <DetailItem emoji="💰" text={feeInfo} />
+      <div className="p-6 space-y-4">
+        {/* Info Cards */}
+        <div className="space-y-3">
+          <DetailItem emoji="📚" label="Class & Board" text={classInfo} />
+          <DetailItem emoji="👤" label="Gender Pref." text={genderInfo} />
+          <DetailItem emoji="📍" label="Location" text={locationInfo} />
+          <DetailItem emoji="⏰" label="Schedule" text={scheduleInfo} />
+        </div>
+
+        {/* Fee Card */}
+        <div className="p-5 rounded-[32px] bg-white border border-slate-100 shadow-sm flex items-center justify-between group overflow-hidden relative mt-2">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-2xl text-emerald-600 shrink-0">₹</div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.15em] mb-0.5">Monthly Tuition Fee</span>
+                <span className="text-[24px] font-black text-slate-900 tracking-tighter leading-none">₹{feeInfo}/month</span>
+              </div>
+           </div>
+           <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-tight border border-emerald-100/50">Verified</div>
         </div>
 
         {/* WhatsApp Button */}
         <button 
           onClick={handleWhatsAppClick}
-          className="w-full bg-[#25D366] hover:bg-[#22c35e] text-white h-[58px] rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.97] shadow-lg shadow-green-100 border-b-4 border-green-600/20"
+          className="w-full bg-[#25D366] hover:bg-[#22c35e] text-white h-[72px] rounded-[30px] flex items-center justify-center gap-4 transition-all active:scale-[0.98] shadow-xl shadow-green-100 border-b-4 border-green-700/30 mt-2"
         >
-          <MessageSquare size={18} fill="currentColor" />
-          <span className="text-[13px] font-black uppercase tracking-widest">WhatsApp Reply</span>
+          <MessageSquare size={24} fill="currentColor" />
+          <div className="flex flex-col items-start">
+            <span className="text-[15px] font-black uppercase tracking-widest leading-none">WhatsApp Reply Now</span>
+            <span className="text-[10px] font-bold opacity-80 mt-1.5 uppercase tracking-tighter">Fast response from coordinator</span>
+          </div>
         </button>
 
         {/* Footer */}
-        <div className="flex flex-col gap-3 pt-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-rose-500/80">
-              <span className="text-sm">⏳</span>
-              <span className="text-[9px] font-black uppercase tracking-widest">Last Date: {lastDate}</span>
-            </div>
-            <div className="text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter flex items-center gap-1.5">
-              <Clock size={10} strokeWidth={3} />
-              {formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-            </div>
-          </div>
+        <div className="flex items-center justify-between px-2 pt-3 border-t border-slate-200/40">
+           <div className="flex items-center gap-3">
+             <div className="text-2xl">⏳</div>
+             <div className="flex flex-col">
+               <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Deadline</span>
+               <span className="text-[11px] font-black text-rose-600 uppercase">{lastDate || 'Asap'}</span>
+             </div>
+           </div>
+           
+           <div className="flex flex-col items-end">
+             <span className="text-[9px] font-black uppercase text-slate-300 tracking-wider">Signals Detected</span>
+             <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400/80 uppercase">
+                <Clock size={12} strokeWidth={3} /> {formatWhatsAppStyle(timestampDate)}
+             </div>
+           </div>
         </div>
       </div>
     </motion.div>
@@ -444,7 +470,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
               ) : 
                 filteredAlerts.filter(a => !hiddenAlertIds.includes(a.id)).map((alert) => {
                   const msg = (alert.message || (alert as any).Message || '').toString();
-                  const isJobAlert = msg.includes('📢') || msg.toLowerCase().includes('tuition job alert');
+                  const isJobAlert = msg.includes('📢') || msg.includes('🚨') || msg.toLowerCase().includes('tuition job alert');
                   const timestampDate = alert.timestamp?.toDate ? alert.timestamp.toDate() : new Date(alert.timestamp || Date.now());
                   
                   if (isJobAlert) {
@@ -467,7 +493,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
                           <FormattedMessage text={msg} />
                           
                           {/* WhatsApp Style Timestamp */}
-                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter">
+                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/80 uppercase tracking-tighter">
                             <Clock size={10} strokeWidth={3} />
                             {formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                           </div>
