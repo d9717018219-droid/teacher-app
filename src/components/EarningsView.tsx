@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { JobLead } from '../types';
-import { cn, formatCurrency, toTitleCase, openWhatsApp } from '../utils';
+import { cn, formatCurrency, toTitleCase, openWhatsApp, openWhatsAppTo } from '../utils';
 
 interface EarningsViewProps {
   leads: JobLead[];

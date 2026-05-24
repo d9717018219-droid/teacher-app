@@ -42,8 +42,8 @@ export const useNotifications = (
           } catch (e) {}
         } else {
            // Web-Push
-           const permissionGranted = await requestNotificationPermission();
-           if (permissionGranted) {
+           await requestNotificationPermission();
+           if (Notification.permission === 'granted') {
               initForegroundMessaging();
               const fcmToken = await getWebFCMToken();
               if (fcmToken) {

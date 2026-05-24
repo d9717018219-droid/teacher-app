@@ -40,6 +40,8 @@ export interface TutorProfile {
   'Verified': string;
   'Status': string;
   'About'?: string;
+  'Email'?: string;
+  'email'?: string;
 }
 
 export interface ApiResponse<T> {
