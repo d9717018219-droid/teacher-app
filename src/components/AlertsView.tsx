@@ -431,7 +431,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
       <audio ref={domAudioRef} onEnded={() => setIsPlaying(null)} className="hidden" preload="auto" crossOrigin="anonymous" />
       <div className="px-6 mb-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="bg-slate-900 border-slate-900 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 w-fit shadow-lg">
+          <div className="bg-gradient-to-r from-[#FF8C00] to-[#EC4899] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 w-fit shadow-lg">
             <Bell size={12} /> Live Alerts ({filteredAlerts.length})
           </div>
           <div className="flex items-center gap-3">

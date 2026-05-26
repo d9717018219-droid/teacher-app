@@ -20,14 +20,14 @@
 
 /* Force Light Mode - Disable Dark Mode Preferences */
 :root {
-  background-color: #FFFFFF !important;
+  background: linear-gradient(135deg, #FFF7ED 0%, #FFF1F2 100%) !important;
   color: #1E293B !important;
   color-scheme: light !important;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 body {
-  background-color: #FFFFFF !important;
+  background: linear-gradient(135deg, #FFF7ED 0%, #FFF1F2 100%) !important;
   color: #1E293B !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -278,7 +278,7 @@ input, textarea, select {
 #support-chat-mount .chat-inputs textarea {
   border-radius: 14px !important;
   border: 1px solid #e2e8f0 !important;
-  background: #f8fafc !important;
+  background: transparent !important;
   padding: 10px 14px !important;
   font-size: 16px !important; /* Fixed at 16px for iOS */
 }

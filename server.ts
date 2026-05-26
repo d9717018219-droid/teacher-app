@@ -16,12 +16,13 @@ async function startServer() {
     try {
       console.log('Fetching leads from external API...');
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30s
+      const timeoutId = setTimeout(() => controller.abort(), 30000); 
       
       const response = await fetch('https://doableindia.com/api_data.php', { 
         signal: controller.signal,
         headers: {
           'Accept': 'application/json',
+          'X-API-KEY': 'DoAble_Super_Secret_Token_2026',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
       });
@@ -47,12 +48,13 @@ async function startServer() {
     try {
       console.log('Fetching tutors from external API...');
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30s
+      const timeoutId = setTimeout(() => controller.abort(), 30000); 
 
-      const response = await fetch('https://doableindia.com/api_data_copy.php', { 
+      const response = await fetch('https://doableindia.com/api_copy_data.php', { 
         signal: controller.signal,
         headers: {
           'Accept': 'application/json',
+          'X-API-KEY': 'DoAble_Super_Secret_Token_2026',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
       });
@@ -79,7 +81,10 @@ async function startServer() {
       console.log('Forwarding signup to Hostinger...');
       const response = await fetch('https://doableindia.com/app_auth.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-KEY': 'DoAble_Super_Secret_Token_2026'
+        },
         body: JSON.stringify({ action: 'signup', ...req.body })
       });
       const data = await response.json();
@@ -94,38 +99,11 @@ async function startServer() {
       console.log('Forwarding signin to Hostinger...');
       const response = await fetch('https://doableindia.com/app_auth.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-KEY': 'DoAble_Super_Secret_Token_2026'
+        },
         body: JSON.stringify({ action: 'signin', ...req.body })
-      });
-      const data = await response.json();
-      res.status(response.status).json(data);
-    } catch (error: any) {
-      res.status(500).json({ status: 'error', message: error.message });
-    }
-  });
-
-  app.post('/api/auth/forgot-password', express.json(), async (req, res) => {
-    try {
-      console.log('Forwarding forgot-password to Hostinger...');
-      const response = await fetch('https://doableindia.com/app_auth.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'forgot_password', ...req.body })
-      });
-      const data = await response.json();
-      res.status(response.status).json(data);
-    } catch (error: any) {
-      res.status(500).json({ status: 'error', message: error.message });
-    }
-  });
-
-  app.post('/api/auth/reset-password', express.json(), async (req, res) => {
-    try {
-      console.log('Forwarding reset-password to Hostinger...');
-      const response = await fetch('https://doableindia.com/app_auth.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset_password', ...req.body })
       });
       const data = await response.json();
       res.status(response.status).json(data);
@@ -139,7 +117,10 @@ async function startServer() {
       console.log('Forwarding profile update to Hostinger...');
       const response = await fetch('https://doableindia.com/api_copy.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-KEY': 'DoAble_Super_Secret_Token_2026'
+        },
         body: JSON.stringify(req.body)
       });
       const data = await response.json();

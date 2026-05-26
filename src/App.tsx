@@ -1341,7 +1341,7 @@ export default function App() {
   const currentClearFilters = isJobs ? clearJobsFilters : clearTutorsFilters;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans select-none overflow-x-hidden relative" ref={mainScrollRef}>
+    <div className="min-h-screen bg-transparent flex flex-col font-sans select-none overflow-x-hidden relative" ref={mainScrollRef}>
       <audio ref={audioRef} preload="auto" />
 
       {/* Onboarding & Auth Flow Overlay */}
@@ -1488,7 +1488,7 @@ export default function App() {
           --safe-area-bottom: env(safe-area-inset-bottom, 0px);
         }
         .no-line { border: none !important; box-shadow: none !important; outline: none !important; }
-        .sticky-fix { background-color: #F8FAFC !important; }
+        .sticky-fix { background-color: rgba(255, 255, 255, 0.7) !important; backdrop-filter: blur(8px); }
         
         /* Mobile specific safe area adjustments */
         @media (max-width: 768px) {
@@ -1697,11 +1697,10 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#2E1065] via-[#4C1D95] to-[#DB2777] px-5 pb-3 flex items-center justify-between shadow-[0_10px_40px_rgba(46,16,101,0.3)] border-b border-white/10 relative overflow-hidden pt-[calc(0.6rem+var(--safe-area-top,20px))]">
-        <div className="absolute top-0 left-0 w-full h-full bg-black/5" />
-        <div className="absolute -top-24 -left-20 w-48 h-48 bg-pink-500/10 blur-3xl rounded-full" />
+      <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#FF8C00] via-[#F97316] to-[#EC4899] px-5 pb-3 flex items-center justify-between shadow-[0_10px_40px_rgba(249,115,22,0.3)] border-b border-white/10 relative overflow-hidden pt-[calc(0.6rem+var(--safe-area-top,20px))]">
+        <div className="absolute -top-24 -left-20 w-48 h-48 bg-white/10 blur-3xl rounded-full" />
         <div className="flex flex-col relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
-          <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none [text-shadow:_0_2px_15px_rgba(0,0,0,0.4)]">DoAble India</span>
+          <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none">DoAble India</span>
           <span className="text-[7.5px] font-black text-white/80 uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5">
             Premium Home Tuition Network <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse" /> {debugClicks > 3 && ' [DEBUG ON]'}
           </span>
@@ -1840,7 +1839,7 @@ export default function App() {
         {selectedJob && (
           <div className="fixed inset-0 z-[15000] flex items-end sm:items-center justify-center">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedJob(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="relative bg-[#F8FAFC] w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[96vh] overflow-hidden">
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="relative bg-transparent w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[96vh] overflow-hidden">
                <div className="p-8 text-center text-white relative shrink-0 pt-[calc(2rem+var(--safe-area-top,24px))]" style={{ background: getCityTheme(selectedJob.City).grad }}>
                   <button onClick={() => setSelectedJob(null)} className="absolute top-8 left-6 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-all"><X size={20} /></button>
                   <div className="text-[22px] font-[900] text-white mb-1 tracking-tight">
@@ -1971,7 +1970,7 @@ export default function App() {
               animate={{ y: 0 }} 
               exit={{ y: "100%" }} 
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="relative bg-[#F8FAFC] w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[96vh] overflow-hidden"
+              className="relative bg-transparent w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[96vh] overflow-hidden"
             >
                <div className="p-8 text-center text-white relative shrink-0 pt-[calc(2rem+var(--safe-area-top,24px))]" style={{ background: 'linear-gradient(135deg, #4ECDC4 0%, #2563EB 100%)' }}>
                   <button onClick={() => setSelectedTutor(null)} className="absolute top-8 left-6 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-all"><X size={20} /></button>
@@ -2168,7 +2167,7 @@ export default function App() {
       {showProfileSetup && (
         <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4">
           <div onClick={() => setShowProfileSetup(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-          <div className="relative bg-[#F8FAFC] w-full max-w-[360px] rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[92vh]">
+          <div className="relative bg-transparent w-full max-w-[360px] rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[92vh]">
              <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
                 <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900">
                   {activeUser ? `${userType === 'teacher' ? 'Tutor' : 'Parent'} Profile` : 'Profile Setup'}

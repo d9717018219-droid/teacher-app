@@ -167,7 +167,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
       {/* 2. Dynamic Carousel Banner */}
       <section className="px-5 relative">
-        <div className="relative h-[165px] w-full rounded-[28px] overflow-hidden shadow-xl bg-slate-900">
+        <div className="relative h-[165px] w-full rounded-[28px] overflow-hidden shadow-xl bg-gradient-to-r from-[#FF8C00] to-[#EC4899]">
           <AnimatePresence mode="popLayout">
             <motion.div
               key={currentBanner}

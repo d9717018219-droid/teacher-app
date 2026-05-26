@@ -52,7 +52,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
         <p className="text-slate-400 text-[9px] font-bold tracking-tight uppercase">Teaching Opportunities</p>
       </div>
       
-      <div className="flex flex-col gap-2.5 sticky top-[64px] z-50 bg-[#F8FAFC]/95 backdrop-blur-md py-2 -mx-5 px-5 no-line sticky-fix border-b border-slate-100/50">
+      <div className="flex flex-col gap-2.5 sticky top-[64px] z-50 bg-white/70 backdrop-blur-md py-2 -mx-5 px-5 no-line sticky-fix border-b border-slate-100/50">
          <div className="flex items-center gap-2 w-full">
             <div className="flex-1 flex items-center gap-1.5 px-0.5 overflow-x-auto no-scrollbar pb-1">
               {(cityFilter !== 'all' || filterLocalities.length > 0 || filterClasses.length > 0 || filterGender !== 'All') && (
@@ -116,7 +116,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                <h3 className="text-lg font-[900] text-slate-900 uppercase tracking-tighter">No jobs found</h3>
                <p className="text-xs text-slate-500 font-bold max-w-[200px] mx-auto">Try changing your location or filters to see more results.</p>
              </div>
-             <button onClick={clearFilters} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">
+             <button onClick={clearFilters} className="bg-gradient-to-r from-[#FF8C00] to-[#EC4899] text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg">
                Reset All
              </button>
            </div>

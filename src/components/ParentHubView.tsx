@@ -41,7 +41,7 @@ export const ParentHubView: React.FC<ParentHubViewProps> = ({
       </motion.div>
 
       {/* ─── HERO ACTION CARD ─── */}
-      <motion.div layout className="bg-slate-900 rounded-[36px] p-8 relative overflow-hidden shadow-[0_30px_60px_-12px_rgba(87,33,73,0.3)] group">
+      <motion.div layout className="bg-gradient-to-r from-[#FF8C00] to-[#EC4899] rounded-[36px] p-8 relative overflow-hidden shadow-[0_30px_60px_-12px_rgba(249,115,22,0.3)] group">
         <div className="absolute top-[-20%] right-[-10%] w-[200px] h-[200px] bg-[#572149]/30 blur-[60px] rounded-full group-hover:scale-125 transition-transform duration-1000" />
         <div className="absolute bottom-[-10%] left-[-5%] w-[150px] h-[150px] bg-blue-500/20 blur-[50px] rounded-full group-hover:scale-125 transition-transform duration-1000" />
         

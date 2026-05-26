@@ -247,7 +247,7 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLead
       </motion.div>
 
       {/* ─── DYNAMIC GLOW CARD ─── */}
-      <motion.div layout className="bg-slate-900 rounded-[36px] p-8 relative overflow-hidden shadow-[0_20px_50px_rgba(15,23,42,0.3)] group">
+      <motion.div layout className="bg-gradient-to-r from-[#FF8C00] to-[#EC4899] rounded-[36px] p-8 relative overflow-hidden shadow-[0_20px_50px_rgba(249,115,22,0.3)] group">
         <div className="absolute top-[-20%] right-[-10%] w-[180px] h-[180px] bg-[#7A2157]/20 blur-[60px] rounded-full group-hover:scale-125 transition-transform duration-1000" />
         <div className="absolute bottom-[-10%] left-[-5%] w-[140px] h-[140px] bg-blue-500/20 blur-[50px] rounded-full group-hover:scale-125 transition-transform duration-1000" />
         
