@@ -84,9 +84,9 @@ const SupportView: React.FC<SupportViewProps> = ({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-[32px] border border-slate-100 shadow-2xl overflow-hidden flex-1 flex flex-col relative min-h-[500px]"
+        className="bg-white rounded-[32px] border border-slate-100 shadow-2xl overflow-hidden flex-1 flex flex-col relative h-[65vh]"
       >
-        <div className="sticky top-0 z-10 px-5 py-3 bg-[#347475] flex items-center justify-between shrink-0">
+        <div className="sticky top-0 z-[200] px-5 py-3 bg-[#347475] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center text-white">
               <Sparkles size={14} strokeWidth={2.5} />
@@ -107,49 +107,53 @@ const SupportView: React.FC<SupportViewProps> = ({
         <div 
           id="support-chat-mount" 
           ref={mountNodeRef}
-          className="flex-1 w-full bg-white relative overflow-hidden" 
+          className="flex-1 w-full bg-white relative overflow-hidden h-full" 
         />
         
-        {/* Aggressive CSS Fix for n8n chat input positioning */}
+        {/* Universal CSS Fix for n8n chat input visibility */}
         <style>{`
-          #support-chat-mount {
+          /* Force the container to take full height of the parent */
+          #support-chat-mount, 
+          #support-chat-mount > div {
             height: 100% !important;
             display: flex !important;
             flex-direction: column !important;
           }
-          
-          /* Target n8n specific internal elements */
-          div[class*="chat-container"], 
-          .n8n-chat-container {
+
+          /* Force messages to scroll and input to stay at bottom */
+          .n8n-chat-container, 
+          [class*="chat-container"] {
             height: 100% !important;
             display: flex !important;
             flex-direction: column !important;
             position: relative !important;
           }
 
-          div[class*="messages-container"], 
-          .n8n-chat-messages-container {
-            flex: 1 !important;
+          .n8n-chat-messages-container, 
+          [class*="messages-container"] {
+            flex: 1 1 auto !important;
             overflow-y: auto !important;
-            padding-bottom: 80px !important;
+            padding-bottom: 70px !important; /* Space for input */
           }
 
-          div[class*="input-container"], 
-          .n8n-chat-input-container {
+          .n8n-chat-input-container, 
+          [class*="input-container"] {
             position: absolute !important;
             bottom: 0 !important;
             left: 0 !important;
             right: 0 !important;
             background: white !important;
-            padding: 12px !important;
-            border-top: 1px solid #f1f5f9 !important;
-            z-index: 1000 !important;
+            border-top: 2px solid #f1f5f9 !important;
+            padding: 10px !important;
+            z-index: 9999 !important;
           }
 
-          /* Ensure the chat widget itself fills the mount */
-          #support-chat-mount > div {
-            height: 100% !important;
-            width: 100% !important;
+          /* Ensure input box itself is visible */
+          .n8n-chat-input, 
+          [class*="chat-input"] {
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px !important;
           }
         `}</style>
       </motion.div>
