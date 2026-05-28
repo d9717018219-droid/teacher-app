@@ -48,6 +48,8 @@ interface HomeViewProps {
   onTutorClick: (tutor: TutorProfile) => void;
   shortlistedIds: string[];
   onShortlistToggle: (id: string, e: React.MouseEvent) => void;
+  profileCompletion: number;
+  setShowProfileSetup: (show: boolean) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -68,7 +70,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onJobClick,
   onTutorClick,
   shortlistedIds,
-  onShortlistToggle
+  onShortlistToggle,
+  profileCompletion,
+  setShowProfileSetup
 }) => {
   const [currentBanner, setCurrentBanner] = React.useState(0);
   const banners = [
@@ -164,6 +168,74 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </button>
         </div>
       </section>
+
+      {/* Profile Completion Widget */}
+      {profileCompletion < 100 && (
+        <section className="px-5">
+          <button 
+            onClick={() => { playTapSound(); setShowProfileSetup(true); }}
+            className="w-full bg-white border border-slate-100 rounded-[28px] p-4 flex items-center gap-4 shadow-sm active:scale-[0.98] transition-all group overflow-hidden relative"
+          >
+            {/* Background Decorative Sparkles */}
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform">
+               <Sparkles size={60} />
+            </div>
+
+            {/* Circular Progress */}
+            <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
+              <svg className="w-full h-full -rotate-90">
+                <circle
+                  cx="28"
+                  cy="28"
+                  r="24"
+                  fill="transparent"
+                  stroke="#F1F5F9"
+                  strokeWidth="6"
+                />
+                <motion.circle
+                  cx="28"
+                  cy="28"
+                  r="24"
+                  fill="transparent"
+                  stroke="url(#progress-grad)"
+                  strokeWidth="6"
+                  strokeDasharray="150.8"
+                  initial={{ strokeDashoffset: 150.8 }}
+                  animate={{ strokeDashoffset: 150.8 - (150.8 * profileCompletion) / 100 }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  strokeLinecap="round"
+                />
+                <defs>
+                  <linearGradient id="progress-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FF8C00" />
+                    <stop offset="100%" stopColor="#EC4899" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[12px] font-black text-slate-800">{profileCompletion}%</span>
+              </div>
+            </div>
+
+            <div className="flex-1 text-left">
+              <h4 className="text-[13px] font-black text-slate-800 tracking-tight flex items-center gap-1.5">
+                Complete Your Profile <Sparkles size={12} className="text-amber-500 fill-amber-500" />
+              </h4>
+              <p className="text-[10px] font-medium text-slate-400 leading-tight mt-0.5">
+                Unlock elite tutor connections and high-paying jobs by completing your details.
+              </p>
+              <div className="flex items-center gap-1.5 mt-2">
+                 <div className="px-2 py-0.5 bg-primary/10 rounded-full text-[8px] font-black text-primary uppercase tracking-widest">
+                   {100 - profileCompletion}% Remaining
+                 </div>
+                 <div className="text-[9px] font-bold text-slate-400 flex items-center gap-0.5">
+                   Finish Now <ChevronRight size={10} strokeWidth={3} />
+                 </div>
+              </div>
+            </div>
+          </button>
+        </section>
+      )}
 
       {/* 2. Dynamic Carousel Banner */}
       <section className="px-5 relative">

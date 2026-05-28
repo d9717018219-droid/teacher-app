@@ -22,7 +22,7 @@ import { ParentHubView } from './components/ParentHubView';
 
 import { requestNotificationPermission } from './firebase';
 import { useNotifications } from './hooks/useNotifications';
-import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp, cleanValue, saveToLargeStorage, getFromLargeStorage } from './utils';
+import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp, cleanValue, saveToLargeStorage, getFromLargeStorage, calculateProfileCompletion } from './utils';
 import { 
   CITIES_LIST, 
   CLASSES_LIST,
@@ -552,6 +552,36 @@ export default function App() {
   const [activeToast, setActiveToast] = useState<{ title: string, body: string } | null>(null);
   const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
   const [showProfileSetup, setShowProfileSetup] = useState(false);
+  
+  // Auto-open profile setup for new users or incomplete profiles
+  useEffect(() => {
+    if (activeUser && !showOnboarding && !showProfileSetup) {
+      const userData = {
+        name: userName,
+        email: activeUser?.email,
+        city: userCity,
+        gender: userGender,
+        phone: userPhone,
+        dob: userDob,
+        qualification: userQualifications,
+        experience: userExperience,
+        about: aboutMe,
+        classes: userClasses,
+        subjects: userSubjects,
+        photo: profilePhoto,
+        address: userAddress,
+        mode: userMode,
+        board: userBoard
+      };
+      const completion = calculateProfileCompletion(userData, userType);
+      
+      // If profile is very incomplete (e.g. < 40%), show setup popup automatically
+      if (completion < 40) {
+        setShowProfileSetup(true);
+      }
+    }
+  }, [activeUser, showOnboarding, userType]);
+
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('userType'));
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
@@ -841,7 +871,7 @@ export default function App() {
         setUserType(userType || 'teacher');
         localStorage.setItem('userType', userType || 'teacher');
         playTapSound();
-        setShowProfileSetup(false);
+        setShowProfileSetup(true); // Open profile setup for new users
         setShowOnboarding(false);
       } else {
         setAuthError(data.message || 'Failed to sign up.');
@@ -1386,6 +1416,27 @@ export default function App() {
     const email = activeUser?.email?.toLowerCase().trim();
     return email === 'd9717018219@gmail.com' || email === 'doableindia@gmail.com';
   }, [activeUser]);
+
+  const profileCompletion = useMemo(() => {
+    const userData = {
+      name: userName,
+      email: activeUser?.email,
+      city: userCity,
+      gender: userGender,
+      phone: userPhone,
+      dob: userDob,
+      qualification: userQualifications,
+      experience: userExperience,
+      about: aboutMe,
+      classes: userClasses,
+      subjects: userSubjects,
+      photo: profilePhoto,
+      address: userAddress,
+      mode: userMode,
+      board: userBoard
+    };
+    return calculateProfileCompletion(userData, userType);
+  }, [userName, activeUser, userCity, userGender, userPhone, userDob, userQualifications, userExperience, aboutMe, userClasses, userSubjects, profilePhoto, userAddress, userMode, userBoard, userType]);
 
   const toggleShortlist = useCallback((id: string, e?: React.MouseEvent) => {
     if (e) { e.stopPropagation(); e.preventDefault(); }
@@ -1993,7 +2044,28 @@ export default function App() {
 
       <main className="container mx-auto p-0 sm:p-[10px] max-w-[1200px] pb-32">
        {activeTab === 'home' && (
-          <HomeView userName={userName} userType={userType} userCity={userCity} activeLeadsCount={finalJobs.length} activeTutorsCount={finalTutors.length} featuredJobs={finalJobs.slice(0, 3)} featuredTutors={finalTutors.slice(0, 3)} playTapSound={playTapSound} setFormType={setFormType} setShowFormModal={setShowFormModal} onSignUpClick={() => { setAuthMode('signup'); setShowOnboarding(true); }} setActiveTab={setActiveTab} setShowFilterDrawer={setShowFilterDrawer} getDynamicGreeting={getDynamicGreeting} onJobClick={setSelectedJob} onTutorClick={setSelectedTutor} shortlistedIds={shortlistedIds} onShortlistToggle={toggleShortlist} />
+          <HomeView 
+            userName={userName} 
+            userType={userType} 
+            userCity={userCity} 
+            activeLeadsCount={finalJobs.length} 
+            activeTutorsCount={finalTutors.length} 
+            featuredJobs={finalJobs.slice(0, 3)} 
+            featuredTutors={finalTutors.slice(0, 3)} 
+            playTapSound={playTapSound} 
+            setFormType={setFormType} 
+            setShowFormModal={setShowFormModal} 
+            onSignUpClick={() => { setAuthMode('signup'); setShowOnboarding(true); }} 
+            setActiveTab={setActiveTab} 
+            setShowFilterDrawer={setShowFilterDrawer} 
+            getDynamicGreeting={getDynamicGreeting} 
+            onJobClick={setSelectedJob} 
+            onTutorClick={setSelectedTutor} 
+            shortlistedIds={shortlistedIds} 
+            onShortlistToggle={toggleShortlist}
+            profileCompletion={profileCompletion}
+            setShowProfileSetup={setShowProfileSetup}
+          />
         )}
        {activeTab === 'jobs' && (
           <JobsView 
@@ -2646,6 +2718,42 @@ export default function App() {
                                   </select>
                                 </div>
                               </div>
+
+                              {/* Parent Only Fields: Board & Mode */}
+                              {userType === 'parent' && (
+                                <>
+                                  <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Board</label>
+                                      <select value={userBoard} onChange={(e) => { setUserBoard(e.target.value); localStorage.setItem('userBoard', e.target.value); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
+                                        <option value="CBSE">CBSE</option>
+                                        <option value="ICSE">ICSE</option>
+                                        <option value="IB">IB</option>
+                                        <option value="IGCSE">IGCSE</option>
+                                        <option value="State Board">State Board</option>
+                                        <option value="Other">Other</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Tuition Mode</label>
+                                      <select value={userMode} onChange={(e) => { setUserMode(e.target.value); localStorage.setItem('userMode', e.target.value); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
+                                        <option value="Home Tuition">Home Tuition</option>
+                                        <option value="Online">Online</option>
+                                        <option value="Group Tuition">Group Tuition</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative col-span-2">
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Detail Address</label>
+                                      <div className="text-[11px] font-bold text-slate-700 truncate">{userAddress || "Not set"}</div>
+                                    </div>
+                                    <button onClick={() => { const val = prompt("Enter your full address:", userAddress || ""); if (val !== null) { setUserAddress(val); localStorage.setItem('userAddress', val); }}} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
+                                  </div>
+                                </>
+                              )}
                           </div>
 
                           {/* 2. ABOUT ME SECTION (Only for Teachers) */}

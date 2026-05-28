@@ -116,6 +116,30 @@ export function getTutorId(tutor: any): string {
   return (tutor.tutor_id || tutor['Tutor ID'] || tutor.tutorId || tutor.id || tutor.ID || 'N/A').toString();
 }
 
+export function calculateProfileCompletion(userData: any, userType: 'parent' | 'teacher' | null): number {
+  if (!userType) return 0;
+  
+  let totalFields = 0;
+  let filledFields = 0;
+
+  const commonFields = ['name', 'email', 'city', 'gender'];
+  const teacherFields = ['phone', 'dob', 'qualification', 'experience', 'about', 'classes', 'subjects', 'photo'];
+  const parentFields = ['classes', 'subjects', 'address', 'mode', 'board'];
+
+  const fieldsToCheck = [...commonFields, ...(userType === 'teacher' ? teacherFields : parentFields)];
+  
+  totalFields = fieldsToCheck.length;
+
+  fieldsToCheck.forEach(field => {
+    const val = userData[field];
+    if (val && (Array.isArray(val) ? val.length > 0 : val.toString().trim() !== '')) {
+      filledFields++;
+    }
+  });
+
+  return Math.round((filledFields / totalFields) * 100);
+}
+
 /**
  * Robust WhatsApp redirection for mobile apps
  */
