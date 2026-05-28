@@ -2142,8 +2142,14 @@ export default function App() {
         <nav className="fixed bottom-0 left-0 right-0 z-[8000] bg-white/90 backdrop-blur-xl border-t border-slate-100 px-3 pt-2 pb-[calc(1.2rem+var(--safe-area-bottom,20px))] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between gap-1 max-w-[600px] mx-auto">
             <NavButton active={activeTab === 'home'} onClick={() => { playTapSound(); setActiveTab('home'); window.scrollTo(0,0); }} icon={<HomeIcon className="w-[18px] h-[18px]" />} label="Home" activeColor="text-white" activeBg="bg-[#CC2570]" inactiveColor="text-[#CC2570]" inactiveBg="bg-[#CC2570]/5" />
-            <NavButton active={activeTab === 'jobs'} onClick={() => { playTapSound(); setActiveTab('jobs'); window.scrollTo(0,0); }} icon={<FileText className="w-[18px] h-[18px]" />} label="Jobs" activeColor="text-white" activeBg="bg-indigo-600" inactiveColor="text-indigo-600" inactiveBg="bg-indigo-50" />
-            <NavButton active={activeTab === 'tutors'} onClick={() => { playTapSound(); setActiveTab('tutors'); window.scrollTo(0,0); }} icon={<GraduationCap className="w-[18px] h-[18px]" />} label="Tutors" activeColor="text-white" activeBg="bg-emerald-500" inactiveColor="text-emerald-600" inactiveBg="bg-emerald-50" />
+            
+            {(userType === 'teacher' || !userType) && (
+              <NavButton active={activeTab === 'jobs'} onClick={() => { playTapSound(); setActiveTab('jobs'); window.scrollTo(0,0); }} icon={<FileText className="w-[18px] h-[18px]" />} label="Jobs" activeColor="text-white" activeBg="bg-indigo-600" inactiveColor="text-indigo-600" inactiveBg="bg-indigo-50" />
+            )}
+
+            {(userType === 'parent' || !userType) && (
+              <NavButton active={activeTab === 'tutors'} onClick={() => { playTapSound(); setActiveTab('tutors'); window.scrollTo(0,0); }} icon={<GraduationCap className="w-[18px] h-[18px]" />} label="Tutors" activeColor="text-white" activeBg="bg-emerald-500" inactiveColor="text-emerald-600" inactiveBg="bg-emerald-50" />
+            )}
             
             {userType === 'teacher' && (
               <NavButton active={activeTab === 'earnings'} onClick={() => { playTapSound(); setActiveTab('earnings'); window.scrollTo(0,0); }} icon={<TrendingUp className="w-[18px] h-[18px]" />} label="Earnings" activeColor="text-white" activeBg="bg-[#7A2157]" inactiveColor="text-[#7A2157]" inactiveBg="bg-[#7A2157]/5" />
