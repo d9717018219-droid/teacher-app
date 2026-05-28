@@ -2032,9 +2032,29 @@ export default function App() {
         </div>
         <div className="flex items-center gap-3 relative z-10">
              <div className="flex items-center gap-1.5 bg-white/5 backdrop-blur-xl p-0.5 rounded-2xl border border-white/10">
-                <button onClick={() => { playTapSound(); if (!activeUser) { setAuthMode('signin'); setShowOnboarding(true); } else { setShowProfileSetup(true); } }} className="p-1.5 text-white hover:text-white transition-all active:scale-90 flex items-center gap-2">
-                  <LucideUser size={18} strokeWidth={2.5} color="#FFFFFF" />
-                  <span className="text-[9px] font-black uppercase tracking-wider pr-1">Profile</span>
+                <button 
+                  onClick={() => { playTapSound(); if (!activeUser) { setAuthMode('signin'); setShowOnboarding(true); } else { setShowProfileSetup(true); } }} 
+                  className="p-1.5 text-white hover:text-white transition-all active:scale-90 flex items-center gap-2 relative"
+                >
+                  <div className="relative w-7 h-7 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90 absolute inset-0">
+                      <circle cx="14" cy="14" r="12" fill="transparent" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
+                      <motion.circle
+                        cx="14" cy="14" r="12" fill="transparent" stroke="#FBBF24" strokeWidth="2.5"
+                        strokeDasharray="75.4"
+                        initial={{ strokeDashoffset: 75.4 }}
+                        animate={{ strokeDashoffset: 75.4 - (75.4 * profileCompletion) / 100 }}
+                        transition={{ duration: 1.5, ease: "easeOut" }}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <LucideUser size={14} strokeWidth={3} color="#FFFFFF" className="relative z-10" />
+                  </div>
+                  {profileCompletion < 100 && (
+                    <span className="text-[9px] font-black text-white bg-amber-500/80 px-1.5 py-0.5 rounded-full shadow-sm">
+                      {profileCompletion}%
+                    </span>
+                  )}
                 </button>
               </div>
         </div>
@@ -2139,29 +2159,29 @@ export default function App() {
       {!selectedJob && !selectedTutor && !showAdvancedFilterDrawer && !showFilterDrawer && !showProfileSetup && !showFormModal && (
         <nav className="fixed bottom-0 left-0 right-0 z-[8000] bg-white/90 backdrop-blur-xl border-t border-slate-100 px-3 pt-2 pb-[calc(1.2rem+var(--safe-area-bottom,20px))] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between gap-1 max-w-[600px] mx-auto">
-            <NavButton active={activeTab === 'home'} onClick={() => { playTapSound(); setActiveTab('home'); window.scrollTo(0,0); }} icon={<HomeIcon className="w-[18px] h-[18px]" />} label="🏠 Home" activeColor="text-white" activeBg="bg-[#CC2570]" inactiveColor="text-[#CC2570]" inactiveBg="bg-[#CC2570]/5" />
+            <NavButton active={activeTab === 'home'} onClick={() => { playTapSound(); setActiveTab('home'); window.scrollTo(0,0); }} icon={<HomeIcon className="w-[18px] h-[18px]" />} label="Home" activeColor="text-white" activeBg="bg-[#CC2570]" inactiveColor="text-[#CC2570]" inactiveBg="bg-[#CC2570]/5" />
             
             {(userType === 'teacher' || !userType) && (
-              <NavButton active={activeTab === 'jobs'} onClick={() => { playTapSound(); setActiveTab('jobs'); window.scrollTo(0,0); }} icon={<FileText className="w-[18px] h-[18px]" />} label="💼 Jobs" activeColor="text-white" activeBg="bg-indigo-600" inactiveColor="text-indigo-600" inactiveBg="bg-indigo-50" />
+              <NavButton active={activeTab === 'jobs'} onClick={() => { playTapSound(); setActiveTab('jobs'); window.scrollTo(0,0); }} icon={<FileText className="w-[18px] h-[18px]" />} label="Jobs" activeColor="text-white" activeBg="bg-indigo-600" inactiveColor="text-indigo-600" inactiveBg="bg-indigo-50" />
             )}
 
             {(userType === 'parent' || !userType) && (
-              <NavButton active={activeTab === 'tutors'} onClick={() => { playTapSound(); setActiveTab('tutors'); window.scrollTo(0,0); }} icon={<GraduationCap className="w-[18px] h-[18px]" />} label="🎓 Tutors" activeColor="text-white" activeBg="bg-emerald-500" inactiveColor="text-emerald-600" inactiveBg="bg-emerald-50" />
+              <NavButton active={activeTab === 'tutors'} onClick={() => { playTapSound(); setActiveTab('tutors'); window.scrollTo(0,0); }} icon={<GraduationCap className="w-[18px] h-[18px]" />} label="Tutors" activeColor="text-white" activeBg="bg-emerald-500" inactiveColor="text-emerald-600" inactiveBg="bg-emerald-50" />
             )}
             
             {userType === 'teacher' && (
-              <NavButton active={activeTab === 'earnings'} onClick={() => { playTapSound(); setActiveTab('earnings'); window.scrollTo(0,0); }} icon={<TrendingUp className="w-[18px] h-[18px]" />} label="💰 Earnings" activeColor="text-white" activeBg="bg-[#7A2157]" inactiveColor="text-[#7A2157]" inactiveBg="bg-[#7A2157]/5" />
+              <NavButton active={activeTab === 'earnings'} onClick={() => { playTapSound(); setActiveTab('earnings'); window.scrollTo(0,0); }} icon={<TrendingUp className="w-[18px] h-[18px]" />} label="Earnings" activeColor="text-white" activeBg="bg-[#7A2157]" inactiveColor="text-[#7A2157]" inactiveBg="bg-[#7A2157]/5" />
             )}
             
             {userType === 'parent' && (
-              <NavButton active={activeTab === 'concierge'} onClick={() => { playTapSound(); setActiveTab('concierge'); window.scrollTo(0,0); }} icon={<Sparkles className="w-[18px] h-[18px]" />} label="✨ Concierge" activeColor="text-white" activeBg="bg-[#572149]" inactiveColor="text-[#572149]" inactiveBg="bg-[#572149]/5" />
+              <NavButton active={activeTab === 'concierge'} onClick={() => { playTapSound(); setActiveTab('concierge'); window.scrollTo(0,0); }} icon={<Sparkles className="w-[18px] h-[18px]" />} label="Concierge" activeColor="text-white" activeBg="bg-[#572149]" inactiveColor="text-[#572149]" inactiveBg="bg-[#572149]/5" />
             )}
 
             <NavButton 
               active={activeTab === 'alerts'} 
               onClick={() => { playTapSound(); setActiveTab('alerts'); setAlertsInitialTab('feed'); setUnseenAlertsCount(0); window.scrollTo(0,0); }} 
               icon={<Bell className="w-[18px] h-[18px]" />} 
-              label="🔔 Alerts" 
+              label="Alerts" 
               activeColor="text-white" 
               activeBg="bg-orange-500" 
               inactiveColor="text-orange-600" 
@@ -2169,7 +2189,7 @@ export default function App() {
               badge={unseenAlertsCount}
             />
 
-            <NavButton active={activeTab === 'support'} onClick={() => { playTapSound(); setActiveTab('support'); window.scrollTo(0,0); }} icon={<MessageSquare className="w-[18px] h-[18px]" />} label="💬 Support" activeColor="text-white" activeBg="bg-[#347475]" inactiveColor="text-[#347475]" inactiveBg="bg-[#347475]/5" />
+            <NavButton active={activeTab === 'support'} onClick={() => { playTapSound(); setActiveTab('support'); window.scrollTo(0,0); }} icon={<MessageSquare className="w-[18px] h-[18px]" />} label="Support" activeColor="text-white" activeBg="bg-[#347475]" inactiveColor="text-[#347475]" inactiveBg="bg-[#347475]/5" />
           </div>
         </nav>
       )}
