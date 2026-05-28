@@ -110,23 +110,46 @@ const SupportView: React.FC<SupportViewProps> = ({
           className="flex-1 w-full bg-white relative overflow-hidden" 
         />
         
-        {/* CSS Fix to ensure n8n chat input is always visible and correctly positioned */}
+        {/* Aggressive CSS Fix for n8n chat input positioning */}
         <style>{`
-          #support-chat-mount .n8n-chat-container {
+          #support-chat-mount {
             height: 100% !important;
-            position: absolute !important;
-            inset: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
           }
-          #support-chat-mount .n8n-chat-input-container {
-            position: sticky !important;
-            bottom: 0 !important;
-            background: white !important;
-            z-index: 100 !important;
-            padding-bottom: 10px !important;
-            border-top: 1px solid #f1f5f9 !important;
+          
+          /* Target n8n specific internal elements */
+          div[class*="chat-container"], 
+          .n8n-chat-container {
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            position: relative !important;
           }
-          #support-chat-mount .n8n-chat-messages-container {
+
+          div[class*="messages-container"], 
+          .n8n-chat-messages-container {
+            flex: 1 !important;
+            overflow-y: auto !important;
             padding-bottom: 80px !important;
+          }
+
+          div[class*="input-container"], 
+          .n8n-chat-input-container {
+            position: absolute !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            background: white !important;
+            padding: 12px !important;
+            border-top: 1px solid #f1f5f9 !important;
+            z-index: 1000 !important;
+          }
+
+          /* Ensure the chat widget itself fills the mount */
+          #support-chat-mount > div {
+            height: 100% !important;
+            width: 100% !important;
           }
         `}</style>
       </motion.div>
