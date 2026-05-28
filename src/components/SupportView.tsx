@@ -84,7 +84,7 @@ const SupportView: React.FC<SupportViewProps> = ({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-[32px] border border-slate-100 shadow-2xl overflow-hidden flex-1 flex flex-col relative h-[500px]"
+        className="bg-white rounded-[32px] border border-slate-100 shadow-2xl overflow-hidden flex-1 flex flex-col relative min-h-[500px]"
       >
         <div className="sticky top-0 z-10 px-5 py-3 bg-[#347475] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -109,6 +109,26 @@ const SupportView: React.FC<SupportViewProps> = ({
           ref={mountNodeRef}
           className="flex-1 w-full bg-white relative overflow-hidden" 
         />
+        
+        {/* CSS Fix to ensure n8n chat input is always visible and correctly positioned */}
+        <style>{`
+          #support-chat-mount .n8n-chat-container {
+            height: 100% !important;
+            position: absolute !important;
+            inset: 0 !important;
+          }
+          #support-chat-mount .n8n-chat-input-container {
+            position: sticky !important;
+            bottom: 0 !important;
+            background: white !important;
+            z-index: 100 !important;
+            padding-bottom: 10px !important;
+            border-top: 1px solid #f1f5f9 !important;
+          }
+          #support-chat-mount .n8n-chat-messages-container {
+            padding-bottom: 80px !important;
+          }
+        `}</style>
       </motion.div>
 
       <div className="text-center opacity-10 shrink-0 pb-20">
