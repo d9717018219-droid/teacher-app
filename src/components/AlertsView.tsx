@@ -79,23 +79,31 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
   const msg = (alert.message || (alert as any).Message || '').toString();
   
   // ─── ROBUST MAPPING LOGIC ───
+  // Order ID: Handles "Order ID: 123", "#123", "ID 123", etc.
   const orderIdMatch = msg.match(/(?:Order ID|ID|#)\D*(\d+)/i);
   const orderId = orderIdMatch ? orderIdMatch[1] : '';
   
-  const classPart = msg.match(/📚\s*([^-–\n]+)/)?.[1]?.trim() || '';
-  const subjectsPart = msg.match(/[–-]\s*([^\n]+)/)?.[1]?.trim() || '';
+  // Class & Subjects: Handles "📚 10th - Math", "📚 Class 10: Math", etc.
+  const classPart = msg.match(/(?:📚|Class:?)\s*([^-–:\n]+)/i)?.[1]?.trim() || '';
+  const subjectsPart = msg.match(/[–:\n-]\s*([^\n]+)/)?.[1]?.trim() || '';
   const classInfo = subjectsPart ? `${classPart} – ${subjectsPart}` : classPart;
   
-  const genderMatch = msg.match(/(?:👩|👩‍🏫|👨‍🏫|👤)\s*([^\n]+?)\s*Tutor Required/i);
+  // Gender: Handles emojis and "Tutor Required"
+  const genderMatch = msg.match(/(?:👩|👩‍🏫|👨‍🏫|👤|Gender:?)\s*([^\n]+?)\s*(?:Tutor Required|Teacher Required|$)/i);
   const genderInfo = (genderMatch && genderMatch[1]) ? genderMatch[1].trim() : (msg.match(/([^\n]+?)\s*Tutor Required/i)?.[1]?.trim() || 'Any');
 
-  const locationInfo = msg.match(/📍\s*([^\n]+)/)?.[1]?.trim() || '';
-  const scheduleInfo = msg.match(/⏰\s*([^\n]+)/)?.[1]?.trim() || '';
+  // Location: Handles "📍 Area", "Location: Area"
+  const locationInfo = msg.match(/(?:📍|Location:?)\s*([^\n]+)/i)?.[1]?.trim() || '';
   
-  const feeMatch = msg.match(/💰\D*([0-9,]+)/);
+  // Schedule: Handles "⏰ Time", "Schedule: Time"
+  const scheduleInfo = msg.match(/(?:⏰|Schedule:?|Time:?)\s*([^\n]+)/i)?.[1]?.trim() || '';
+  
+  // Fee: Handles "💰 25000", "Fee: 25,000"
+  const feeMatch = msg.match(/(?:💰|Fee:?)\D*([0-9,]+)/i);
   const feeInfo = feeMatch ? feeMatch[1] : '';
 
-  const lastDateStr = msg.match(/Last Date:\s*([^\n]+)/i)?.[1]?.trim() || '';
+  // Expiry Date
+  const lastDateStr = msg.match(/(?:Last Date|Expiry|Deadline):?\s*([^\n]+)/i)?.[1]?.trim() || '';
 
   // ─── EXPIRY LOGIC ───
   const [isExpired, setIsExpired] = useState(false);

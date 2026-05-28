@@ -67,19 +67,32 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
   onShortlistToggle 
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
-  const subjects = cleanValue(job.subjects || 'General').split(/[;,]/)[0].trim();
-  const classBoard = cleanValue(job['Class / Board'] || ((job.Class || '') + (job.Board ? ' (' + job.Board + ')' : '')) || 'General');
+  
+  const getValue = (keys: string[], fallback: string = '–') => {
+    if (!job) return fallback;
+    for (const key of keys) {
+      const val = (job as any)[key];
+      if (val !== undefined && val !== null && val !== '') return val;
+    }
+    return fallback;
+  };
+
+  const subjects = cleanValue(getValue(['subjects', 'Subjects', 'Preferred Subject(s)'], 'General')).split(/[;,]/)[0].trim();
+  const classBoard = cleanValue(getValue(['Class / Board', 'classBoard', 'Class'], ((job.Class || '') + (job.Board ? ' (' + job.Board + ')' : '')) || 'General'));
   const { bg, icon } = getSubjectStyles(subjects, classBoard);
   
-  const jobId = job['Order ID'] || (job as any).id || 'N/A';
-  const locationRaw = job.Locations || job.City || 'India';
+  const jobId = getValue(['Order ID', 'order_id', 'id', 'ID'], 'N/A').toString();
+  const locationRaw = getValue(['Locations', 'locations', 'City', 'city'], 'India');
   const locality = locationRaw.toString().split(/[;,]/).map(l => l.trim().split('-')[0].trim())[0];
-  const location = `${locality} - ${job.City}`;
-  const postedDate = formatPostedDate(job['Updated Time'] || job['Record Added']);
-  const isNew = true; // For demo matching image
-  const requiredGender = job.Gender || 'Any';
+  const city = getValue(['City', 'city'], 'India').toString();
+  const location = `${locality} - ${city}`;
+  
+  const postedDate = formatPostedDate(getValue(['Updated Time', 'Record Added', 'updated_at', 'record_added'], ''));
+  const isNew = true; 
+  const requiredGender = getValue(['Gender', 'gender', 'requiredGender'], 'Any').toString();
+  const fee = getValue(['Fee', 'fee', 'monthly_fee'], '0').toString();
 
-  const rawName = job.Name || subjects + ' Teacher';
+  const rawName = getValue(['Name', 'name', 'fullName'], subjects + ' Teacher').toString();
   const name = rawName.replace(/\s*[Jj]i\s*$/, '').replace(/\s*[Jj]i\s+/g, ' ');
 
   return (
@@ -97,7 +110,7 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
         {/* Middle Content */}
         <div className="flex-1 space-y-0.5 min-w-0">
           <div className="flex items-center justify-between">
-            <span className="text-[#10B981] text-[10.5px] font-bold tracking-tight">Order ID: {job['Order ID']}</span>
+            <span className="text-[#10B981] text-[10.5px] font-bold tracking-tight">Order ID: {jobId}</span>
             {isNew && (
               <span className="bg-[#DCFCE7] text-[#166534] px-2 py-0.5 rounded-full text-[9.5px] font-bold tracking-wider">NEW</span>
             )}
@@ -116,7 +129,7 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
           <div className="flex items-center gap-2 pt-1">
             <div className="bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
                <span className="text-[#0F172A] text-[10px] font-black tracking-tighter whitespace-nowrap">
-                 ₹{formatCurrency(job.Fee || '0')}/month
+                 ₹{formatCurrency(fee)}/month
                </span>
             </div>
             <div className="bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">

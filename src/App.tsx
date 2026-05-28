@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle, Mail, Lock, Camera, Phone, Plus } from 'lucide-react';
+import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle, Mail, Lock, Camera, Phone, Plus, Trash2, BadgeCheck } from 'lucide-react';
 import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc, getDocsFromServer, enableNetwork } from 'firebase/firestore';
 import { db, auth, auth as firebaseAuth } from './firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
@@ -121,7 +121,7 @@ export default function App() {
       const next = selected.includes(value) ? selected.filter(v => v !== value) : [...selected, value];
       setShowSelectionDrawer({ ...showSelectionDrawer, selected: next });
       
-      if (type === 'qualification') { setUserQualifications(next); localStorage.setItem('userQualifications', JSON.stringify(next)); }
+      if (type === 'qualification' || type === 'qualifications') { setUserQualifications(next); localStorage.setItem('userQualifications', JSON.stringify(next)); }
       if (type === 'subjects') { setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }
       if (type === 'localities') { setUserLocalities(next); localStorage.setItem('userLocalities', JSON.stringify(next)); }
       if (type === 'days') { setUserDays(next.join(', ')); localStorage.setItem('userDays', next.join(', ')); }
@@ -162,59 +162,98 @@ export default function App() {
     playTapSound();
     auth.signOut();
     setCustomUser(null);
+    
+    // Clear All User Data
     localStorage.removeItem('customUser');
     localStorage.removeItem('userType');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userGender');
+    localStorage.removeItem('userCity');
+    localStorage.removeItem('userPhone');
+    localStorage.removeItem('aboutMe');
+    localStorage.removeItem('userDob');
+    localStorage.removeItem('userAge');
+    localStorage.removeItem('userQualifications');
+    localStorage.removeItem('userExperience');
+    localStorage.removeItem('isSchoolTeacher');
+    localStorage.removeItem('hasVehicle');
+    localStorage.removeItem('userSubjects');
+    localStorage.removeItem('userLocalities');
+    localStorage.removeItem('userClasses');
+    localStorage.removeItem('tutorId');
+    localStorage.removeItem('tutorStatus');
+    localStorage.removeItem('isVerified');
+
     setUserType(null);
+    setUserName(null);
+    setUserGender('All');
+    setUserCity('All');
+    setUserPhone('');
+    setAboutMe('');
+    setUserDob('');
+    setUserAge('');
+    setUserQualifications([]);
+    setUserExperience('');
+    setIsSchoolTeacher('No');
+    setHasVehicle('No');
+    setUserSubjects([]);
+    setUserLocalities([]);
+    setUserClasses([]);
+    setTutorId(null);
+    setIsTutorFetched(false);
+
     setShowOnboarding(true);
     setAuthMode('signin');
   };
 
   const handleDeleteProfile = async () => {
-    if (deleteProfileText !== 'DELETE') {
-      alert("Please type DELETE to confirm.");
-      return;
-    }
-    if (!window.confirm("Are you absolutely sure? This will delete your profile completely.")) return;
+    if (!window.confirm("Are you absolutely sure? This will delete your profile completely. This action cannot be undone.")) return;
 
     setIsDeletingProfile(true);
     try {
       const isNative = Capacitor.isNativePlatform();
-      const apiUrl = isNative ? 'https://doableindia.com/api_copy.php' : '/api-crm/api_copy.php';
+      const apiUrl = isNative ? 'https://doableindia.com/app-sys/api_copy.php' : '/api-crm/api_copy.php';
 
       const tutorId = localStorage.getItem('tutorId');
       
       const payload: any = {
         action: 'delete',
-        Email: activeUser?.email
+        email: activeUser?.email
       };
       if (tutorId) {
-         payload['Tutor ID'] = tutorId;
-         payload['Order_ID'] = tutorId;
+         payload['tutor_id'] = tutorId;
       }
 
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        mode: 'cors',
-        body: JSON.stringify(payload)
-      });
-      
-      if (!res.ok) throw new Error("Failed to communicate with the server.");
+      if (isNative) {
+        await CapacitorHttp.post({
+          url: apiUrl,
+          headers: {
+            'Content-Type': 'application/json'
+          },          data: payload
+        });
+      } else {
+        await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },          body: JSON.stringify(payload)
+        });
+      }
       
       // Attempt to delete Firebase Auth user if it's a current FirebaseUser
       if (currentUser) {
         try {
           await deleteUser(currentUser);
         } catch (e: any) {
-          console.warn("Could not delete Firebase auth directly, they might need to re-authenticate: ", e.message);
+          console.warn("Could not delete Firebase auth directly: ", e.message);
         }
       }
 
-      alert("Profile deleted successfully.");
+      setActiveToast({ title: 'Profile Deleted 🗑️', body: 'Your profile has been removed successfully.' });
       handleLogout();
     } catch (error: any) {
       console.error(error);
-      alert("Failed to delete profile: " + error.message);
+      setActiveToast({ title: 'Delete Failed ❌', body: error.message });
     } finally {
       setIsDeletingProfile(false);
     }
@@ -222,91 +261,132 @@ export default function App() {
 
   const handleUpdateProfile = async () => {
     if (!activeUser?.email) return;
+    setIsUpdatingProfile(true);
 
     try {
       const isNative = Capacitor.isNativePlatform();
       
       if (userType === 'teacher') {
-        const url = isNative ? 'https://doableindia.com/api_copy.php' : '/api/profile/update';
-        // Map frontend state to CRM_Leads column names
-        const profileData = {
-          action: 'upsert',
-          Order_ID: localStorage.getItem('tutorId') || 'NEW_USER', 
-          Email: activeUser.email,
-          Name: userName,
-          Gender: userGender,
-          Age: userAge,
-          DOB: userDob,
-          Phone: userPhone,
-          Qualification: JSON.stringify(userQualifications),
-          Experience: userExperience,
+        const url = 'https://doableindia.com/app-sys/api_copy.php';
+        // Map frontend state to EXACT 24 database columns provided by user
+        let tutorId = localStorage.getItem('tutorId') || '';
+        if (tutorId === 'NEW_USER' || tutorId === 'NEW') tutorId = ''; // Clean legacy bad data
 
-          School_Experience: isSchoolTeacher,
-          Vehicle: hasVehicle,
+        const profileData: any = {
+          action: 'upsert',
+          tutor_id: tutorId,
+          name: userName || 'Tutor',
+          email: activeUser.email,
+          phone: userPhone,
+          gender: userGender,
+          age: userAge,
+          dob: userDob,
+          qualification: userQualifications.join(', '),
+          experience: userExperience,
+          school_teacher: isSchoolTeacher === 'Yes' ? 'Yes' : 'No',
+          days: userDays,
+          time: userTime,
+          class_group: userClasses.join(', '),
+          subjects: userSubjects.join(', '),
           city: userCity,
-          Class: JSON.stringify(userClasses),
-          Subject_Field: JSON.stringify(userSubjects),
-          Preferred_Location: JSON.stringify(userLocalities),
-          Photo: profilePhoto,
-          About: aboutMe,
-          Status: 'Active',
-          Record_Added: new Date().toISOString().slice(0, 19).replace('T', ' '),
-          Verified: 'No'
+          location: userLocalities.join(', '),
+          have_vehicle: hasVehicle === 'Yes' ? 'Yes' : 'No',
+          communication: userCommunication,
+          fee: userFee,
+          about: aboutMe,
+          status: localStorage.getItem('tutorStatus') || 'Active',
+          verified: localStorage.getItem('isVerified') || 'No',
+          created_time: new Date().toISOString().split('T')[0]
         };
 
-        console.log(`Syncing teacher profile to ${url}...`, profileData);
+        console.log(`Syncing profile to ${url} with clean schema (omitting photo for stability)...`, profileData);
         let data;
         if (isNative) {
-          const response = await CapacitorHttp.post({
-            url: url,
-            headers: { 'Content-Type': 'application/json' },
-            data: profileData
-          });
-          data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+          try {
+            const response = await CapacitorHttp.post({
+              url: url,
+              headers: { 
+                'Content-Type': 'application/json'
+              },
+              data: profileData
+            });
+            console.log('📡 Profile sync native response:', response.status, response.data);
+            
+            if (response.status >= 400) {
+               throw new Error(`Server Error (${response.status})`);
+            }
+            
+            if (!response.data) {
+               throw new Error('Empty response from server');
+            }
+            
+            data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+          } catch (nativeErr: any) {
+             console.error('Native Request Failed:', nativeErr);
+             throw new Error(nativeErr.message || 'Network request failed');
+          }
         } else {
+          const params = new URLSearchParams();
+          Object.entries(profileData).forEach(([key, val]) => {
+            params.append(key, String(val));
+          });
+
           const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(profileData)
+            headers: { 
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params.toString()
           });
-          data = await response.json();
-        }
-        console.log('Teacher profile sync response:', data);
-        
-        // Refresh local data to reflect changes
-        if (data && data.status === 'success') {
-          if (data.tutor_id) {
-            localStorage.setItem('tutorId', data.tutor_id);
-            setTutorId(data.tutor_id);
+          
+          if (!response.ok) {
+             const text = await response.text();
+             console.error("SERVER RAW ERROR (Tutor Sync):", text);
+             throw new Error(`HTTP Error (${response.status})`);
           }
-          await loadData();
-          setActiveToast({ title: 'Success', body: 'Profile updated successfully!' });
-          setTimeout(() => setActiveToast(null), 3000);
+          
+          const text = await response.text();
+          data = text ? JSON.parse(text) : {};
+          console.log('🌐 Profile sync web response:', data);
+        }
+        console.log('Profile sync response:', data);
+        
+        if (data && (data.status === 'success' || data.message?.includes('success'))) {
+          const newId = data.tutor_id || data.id;
+          if (newId) {
+            localStorage.setItem('tutorId', newId.toString());
+            setTutorId(newId.toString());
+          }
+          loadData();
+          setActiveToast({ title: 'Success ✅', body: 'Profile updated successfully!' });
+          setShowProfileSetup(false);
+          setTimeout(() => setActiveToast(null), 4000);
         } else {
-          setActiveToast({ title: 'Update Failed', body: data?.message || 'Server error occurred' });
+          setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
           setTimeout(() => setActiveToast(null), 5000);
         }
       } 
       else if (userType === 'parent') {
-        const url = isNative ? 'https://doableindia.com/parent_api.php' : '/api/profile/parent/update';
-        // Map frontend state to CRM_Contacts column names based on the parent PHP script
-        const parentData = {
-          Order_ID: activeUser.email, // Using email as Order_ID for parents
-          Name: userName,
-          Class: JSON.stringify(userClasses),
-          subjects: JSON.stringify(userSubjects),
-          City: userCity,
-          Gender: userGender,
-          Address: userAddress,
-          Board: userBoard,
-          Mode: userMode,
-          Preferred_Time: userTime,
+        const url = 'https://doableindia.com/app-sys/api.php';
+        // Map frontend state to lowercase database column names
+        const parentData: any = {
+          action: 'upsert',
+          order_id: activeUser.email, 
+          name: userName,
+          class: userClasses.join(', '),
+          subjects: userSubjects.join(', '),
+          city: userCity,
+          gender: userGender,
+          address: userAddress,
+          board: userBoard,
+          mode: userMode,
+          preferred_time: userTime,
           days: userDays,
           duration: userDuration,
-          Fee: userFee,
-          Notes: aboutMe,
-          Created_Time1: new Date().toISOString().slice(0, 19).replace('T', ' '),
-          Locations: JSON.stringify(userLocalities)
+          fee: userFee,
+          notes: aboutMe,
+          created_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          locations: userLocalities.join(', ')
         };
 
         console.log(`Syncing parent profile to ${url}...`, parentData);
@@ -314,31 +394,53 @@ export default function App() {
         if (isNative) {
           const response = await CapacitorHttp.post({
             url: url,
-            headers: { 'Content-Type': 'application/json' },
-            data: parentData
+            headers: {
+              'Content-Type': 'application/json'
+            },            data: parentData
           });
+          console.log('📡 Parent profile sync native response:', response.status, response.data);
           data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         } else {
+          const params = new URLSearchParams();
+          Object.entries(parentData).forEach(([key, val]) => {
+            params.append(key, String(val));
+          });
+
           const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(parentData)
+            headers: { 
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params.toString()
           });
-          data = await response.json();
+          
+          if (!response.ok) {
+             const text = await response.text();
+             console.error("SERVER RAW ERROR (Parent Sync):", text);
+             throw new Error(`HTTP Error (${response.status})`);
+          }
+          
+          const text = await response.text();
+          data = text ? JSON.parse(text) : {};
+          console.log('🌐 Parent profile sync web response:', data);
         }
         console.log('Parent profile sync response:', data);
         
-        if (data && data.status === 'success') {
-          await loadData();
-          setActiveToast({ title: 'Success', body: 'Profile updated successfully!' });
-          setTimeout(() => setActiveToast(null), 3000);
+        if (data && (data.status === 'success' || data.message?.includes('success'))) {
+          loadData(); // Run in background
+          setActiveToast({ title: 'Success ✅', body: 'Your profile has been updated!' });
+          setShowProfileSetup(false);
+          setTimeout(() => setActiveToast(null), 4000);
         } else {
-          setActiveToast({ title: 'Update Failed', body: data?.message || 'Server error occurred' });
+          setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
           setTimeout(() => setActiveToast(null), 5000);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error syncing profile:', error);
+      setActiveToast({ title: 'Connection Error', body: error.message || 'Please check your internet connection.' });
+    } finally {
+      setIsUpdatingProfile(false);
     }
   };
 
@@ -383,6 +485,7 @@ export default function App() {
   // Parent Specific States
   const [userBoard, setUserBoard] = useState<string>(localStorage.getItem('userBoard') || 'CBSE');
   const [userMode, setUserMode] = useState<string>(localStorage.getItem('userMode') || 'Home Tuition');
+  const [userCommunication, setUserCommunication] = useState<string>(localStorage.getItem('userCommunication') || '');
   const [userAddress, setUserAddress] = useState<string>(localStorage.getItem('userAddress') || '');
   const [userDays, setUserDays] = useState<string>(localStorage.getItem('userDays') || '');
   const [userTime, setUserTime] = useState<string>(localStorage.getItem('userTime') || '');
@@ -449,8 +552,9 @@ export default function App() {
   const [activeToast, setActiveToast] = useState<{ title: string, body: string } | null>(null);
   const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
   const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('userType'));
-  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
   const [showPassword, setShowPassword] = useState(false);
   const [tutorStatus, setTutorStatus] = useState<'registered' | 'new' | null>(null);
   
@@ -488,8 +592,17 @@ export default function App() {
         const experience = (tutor.Experience || (tutor as any).experience || '').toString();
         const schoolExp = (tutor['School Exp.'] || tutor.School_Experience || 'No').toString();
         const vehicle = (tutor['Have own Vehicle'] || tutor.Vehicle || 'No').toString();
-        const subjects = JSON.parse((tutor['Preferred Subject(s)'] || tutor.Subject_Field || '[]').toString());
-        const localities = JSON.parse((tutor['Preferred Location(s)'] || tutor.Preferred_Location || '[]').toString());
+        let subjects: string[] = [];
+        try {
+          const rawS = (tutor['Preferred Subject(s)'] || tutor.Subject_Field || '[]').toString();
+          subjects = rawS.startsWith('[') ? JSON.parse(rawS) : (rawS ? rawS.split(',').map((s: any) => s.trim()).filter(Boolean) : []);
+        } catch { subjects = []; }
+
+        let localities: string[] = [];
+        try {
+          const rawL = (tutor['Preferred Location(s)'] || tutor.Preferred_Location || '[]').toString();
+          localities = rawL.startsWith('[') ? JSON.parse(rawL) : (rawL ? rawL.split(',').map((l: any) => l.trim()).filter(Boolean) : []);
+        } catch { localities = []; }
 
         setUserName(toTitleCase(name));
         setUserGender(toTitleCase(gender));
@@ -508,6 +621,11 @@ export default function App() {
           localStorage.setItem('tutorId', tutorId);
           setTutorId(tutorId);
         }
+
+        // Set User Type as Teacher automatically
+        setUserType('teacher');
+        localStorage.setItem('userType', 'teacher');
+        setShowOnboarding(false);
         
         // Match Class Groups - Enforce single selection
         const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
@@ -599,18 +717,47 @@ export default function App() {
     setAuthError(null);
     try {
       const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app_auth.php' : '/api/auth/signin';
+      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/signin';
       
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'signin', // Required for direct PHP calls
+      let data;
+      if (isNative) {
+        const payload = { 
+          action: 'signin',
           email, 
-          password 
-        })
-      });
-      const data = await response.json();
+          password,
+          userType: userType || 'teacher'
+        };
+
+        const response = await CapacitorHttp.post({
+          url: url,
+          headers: {
+            'Content-Type': 'application/json'
+          },          data: payload
+        });
+        
+        console.log('📡 Auth Response:', url, response.status, JSON.stringify(response.data));
+
+        if (response.status >= 500) {
+           setAuthError(`Server Error (${response.status}).`);
+           setIsAuthLoading(false);
+           return;
+        }
+
+        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      } else {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },          body: JSON.stringify({ 
+            action: 'signin', 
+            email, 
+            password,
+            userType: userType || 'teacher'
+          })
+        });
+        data = await response.json();
+      }
       
       if (data.status === 'success') {
         const userData = { email: data.user.email, userType: data.user.userType, uid: data.user.id };
@@ -645,19 +792,47 @@ export default function App() {
     setAuthError(null);
     try {
       const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app_auth.php' : '/api/auth/signup';
+      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/signup';
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'signup', // Required for direct PHP calls
+      let data;
+      if (isNative) {
+        const payload = { 
+          action: 'signup',
           email, 
           password, 
           userType: userType || 'teacher' 
-        })
-      });
-      const data = await response.json();
+        };
+
+        const response = await CapacitorHttp.post({
+          url: url,
+          headers: {
+            'Content-Type': 'application/json'
+          },          data: payload
+        });
+        
+        console.log('📡 Auth Response:', url, response.status, JSON.stringify(response.data));
+
+        if (response.status >= 500) {
+           setAuthError(`Server Error (${response.status}).`);
+           setIsAuthLoading(false);
+           return;
+        }
+
+        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      } else {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },          body: JSON.stringify({ 
+            action: 'signup', 
+            email, 
+            password, 
+            userType: userType || 'teacher' 
+          })
+        });
+        data = await response.json();
+      }
 
       if (data.status === 'success') {
         const userData = { email: email, userType: userType || 'teacher', uid: data.userId };
@@ -688,17 +863,32 @@ export default function App() {
     setAuthError(null);
     try {
       const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app_auth.php' : '/api/auth/forgot-password';
+      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/forgot-password';
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'forgot_password', // Required for direct PHP calls
-          email 
-        })
-      });
-      const data = await response.json();
+      let data;
+      if (isNative) {
+        const response = await CapacitorHttp.post({
+          url: url,
+          headers: {
+            'Content-Type': 'application/json'
+          },          data: { 
+            action: 'forgot_password',
+            email 
+          }
+        });
+        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      } else {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },          body: JSON.stringify({ 
+            action: 'forgot_password', 
+            email 
+          })
+        });
+        data = await response.json();
+      }
       if (data.status === 'success') {
         setAuthMode('reset');
         setAuthError(null);
@@ -729,19 +919,37 @@ export default function App() {
     setAuthError(null);
     try {
       const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app_auth.php' : '/api/auth/reset-password';
+      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/reset-password';
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'reset_password', // Required for direct PHP calls
-          email, 
-          pin: resetPin, 
-          password: newPassword 
-        })
-      });
-      const data = await response.json();
+      let data;
+      if (isNative) {
+        const response = await CapacitorHttp.post({
+          url: url,
+          headers: {
+            'Content-Type': 'application/json'
+          },          data: { 
+            action: 'reset_password',
+            email, 
+            pin: resetPin, 
+            password: newPassword 
+          }
+        });
+        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      } else {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },          body: JSON.stringify({ 
+            action: 'reset_password', 
+            email, 
+            pin: resetPin, 
+            password: newPassword 
+          })
+        });
+        data = await response.json();
+      }
+
       if (data.status === 'success') {
         alert('Password updated successfully. Please Sign In.');
         setAuthMode('signin');
@@ -947,6 +1155,48 @@ export default function App() {
   const [selectedJob, setSelectedJob] = useState<JobLead | null>(null);
   const [selectedTutor, setSelectedTutor] = useState<TutorProfile | null>(null);
 
+  const normalizeTutor = (t: any) => {
+    const safeParse = (str: any) => {
+      if (Array.isArray(str)) return str;
+      if (!str) return [];
+      try {
+        // Try JSON parse first
+        const parsed = JSON.parse(str);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch (e) {
+        // Fallback: Split by comma and trim
+        return str.toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+    };
+
+    return {
+      tutor_id: t.tutor_id || t['Tutor ID'] || t.id || '',
+      name: t.name || t.Name || '',
+      email: t.email || t.Email || '',
+      internal_phone: t.phone || t.Phone || '', 
+      gender: t.gender || t.Gender || '',
+      age: t.age || t.Age || '',
+      dob: t.dob || t.DOB || '',
+      qualification: safeParse(t.qualification || t['Qualification(s)'] || t.Qualification),
+      experience: t.experience || t.Experience || '',
+      school_teacher: t.school_teacher || t['School Exp.'] || 'No',
+      days: t.days || '',
+      time: t.time || t.Time || '',
+      class_group: safeParse(t.class_group || t['Preferred Class Group'] || t.Class),
+      subjects: safeParse(t.subjects || t['Preferred Subject(s)'] || t['Subject(s)']),
+      city: t.city || t.City || t['Preferred City'] || '',
+      location: safeParse(t.location || t['Preferred Location(s)'] || t.Location),
+      have_vehicle: t.have_vehicle || t['Have own Vehicle'] || 'No',
+      communication: t.communication || t.Communication || '',
+      fee: t.fee || t.Fee || t['Fee/Month'] || '',
+      about: t.about || t.About || '',
+      status: t.status || t.Status || 'Active',
+      photo: t.photo || t.Photo || '',
+      verified: t.verified || t.Verified || 'No',
+      created_time: t.created_time || t['Record Added'] || ''
+    };
+  };
+
   const loadData = async () => {
     try {
       // Cleanup old bulky localStorage cache if it exists
@@ -960,7 +1210,7 @@ export default function App() {
       const cachedTutors = await getFromLargeStorage('cachedTutors');
       
       if (cachedLeads) setLeads(JSON.parse(cachedLeads));
-      if (cachedTutors) setTutors(cachedTutors);
+      if (cachedTutors) setTutors(cachedTutors.map(normalizeTutor));
 
       if (leads.length === 0 && tutors.length === 0 && !cachedLeads) {
         setLoading(true);
@@ -968,18 +1218,21 @@ export default function App() {
       
       const isNative = Capacitor.isNativePlatform();
 
-      const LEADS_URL = isNative 
-        ? 'https://doableindia.com/api_data.php' 
-        : '/api/leads';
-      const TUTORS_URL = isNative 
-        ? 'https://doableindia.com/api_data_copy.php' 
-        : '/api/tutors';
+      const LEADS_URL = Capacitor.isNativePlatform() ? 'https://doableindia.com/app-sys/api_data.php' : '/api/leads';
+      const TUTORS_URL = Capacitor.isNativePlatform() ? 'https://doableindia.com/app-sys/api_copy_data.php' : '/api/tutors';
 
       if (isNative) {
         // Use native fetch to bypass CORS
         const [leadsRes, tutorsRes] = await Promise.all([
-          CapacitorHttp.get({ url: LEADS_URL }),
-          CapacitorHttp.get({ url: TUTORS_URL })
+          CapacitorHttp.get({ 
+            url: LEADS_URL
+          }),
+          CapacitorHttp.get({ 
+            url: TUTORS_URL,
+            headers: { 
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+          })
         ]);
         
         if (leadsRes.data) {
@@ -995,25 +1248,40 @@ export default function App() {
 
         if (tutorsRes.data) {
            const data = typeof tutorsRes.data === 'string' ? JSON.parse(tutorsRes.data) : tutorsRes.data;
-           if (Array.isArray(data.data)) {
-             setTutors(data.data);
-             await saveToLargeStorage('cachedTutors', data.data);
-           } else if (Array.isArray(data)) {
-             setTutors(data);
-             await saveToLargeStorage('cachedTutors', data);
-           }
+           const rawTutors = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+           const normalized = rawTutors.map(normalizeTutor);
+           setTutors(normalized);
+           await saveToLargeStorage('cachedTutors', normalized);
         }
       } else {
-        const [leadsRes, tutorsRes] = await Promise.all([fetch(LEADS_URL), fetch(TUTORS_URL)]);
-        const [leadsJson, tutorsJson] = await Promise.all([leadsRes.json(), tutorsRes.json()]);
+        const [leadsRes, tutorsRes] = await Promise.all([
+          fetch(LEADS_URL),
+          fetch(TUTORS_URL)
+        ]);
+        
+        const leadsText = await leadsRes.text();
+        const tutorsText = await tutorsRes.text();
+
+        if (!leadsRes.ok) {
+           console.error("SERVER RAW ERROR (Leads Fetch):", leadsText);
+           console.warn(`Leads HTTP Error (${leadsRes.status})`);
+        }
+        if (!tutorsRes.ok) {
+           console.error("SERVER RAW ERROR (Tutors Fetch):", tutorsText);
+           console.warn(`Tutors HTTP Error (${tutorsRes.status})`);
+        }
+        
+        const leadsJson = leadsText ? JSON.parse(leadsText) : { status: 'error', data: [] };
+        const tutorsJson = tutorsText ? JSON.parse(tutorsText) : { status: 'error', data: [] };
         
         if (leadsJson.status === 'success') {
           setLeads(leadsJson.data);
           localStorage.setItem('cachedLeads', JSON.stringify(leadsJson.data));
         }
         if (tutorsJson.status === 'success') {
-          setTutors(tutorsJson.data);
-          await saveToLargeStorage('cachedTutors', tutorsJson.data);
+          const normalized = tutorsJson.data.map(normalizeTutor);
+          setTutors(normalized);
+          await saveToLargeStorage('cachedTutors', normalized);
         }
       }
     } catch (err) {
@@ -1083,6 +1351,8 @@ export default function App() {
         const credential = GoogleAuthProvider.credential(user.authentication.idToken);
         const result = await signInWithCredential(auth, credential);
         console.log('🎉 Firebase: Login Success!', result.user.email);
+        if (userType) localStorage.setItem('userType', userType);
+        setShowOnboarding(false);
         setActiveToast({ title: 'Welcome!', body: `Signed in as: ${result.user.email}` });
         setTimeout(() => setActiveToast(null), 4000);
       } else {
@@ -1090,6 +1360,8 @@ export default function App() {
         const provider = new GoogleAuthProvider();
         const result = await signInWithPopup(auth, provider);
         console.log('🎉 Firebase: Web Login Success!', result.user.email);
+        if (userType) localStorage.setItem('userType', userType);
+        setShowOnboarding(false);
       }
     } catch (err: any) {
       console.error('❌ Sign-in Error:', err);
@@ -1244,27 +1516,29 @@ export default function App() {
     return tutors.filter(t => {
       // 🚨 CRITICAL: Visibility Check
       // Only show 'Active' tutors. Hide 'Hidden' or 'Blocked' profiles.
-      const status = (t.Status || '').toString().toLowerCase();
+      const status = (t.status || '').toString().toLowerCase();
       if (status === 'hidden' || status === 'blocked') return false;
 
-      const cityVal = (t['Preferred City'] || (t as any).preferredCity || (t as any).City || (t as any).city || 'India').toString().toLowerCase();
+      const cityVal = (t.city || 'India').toString().toLowerCase();
       if (!isCityMatch(cityVal, tutorCityFilter)) return false;
 
       // Localities Filter
       if (tutorFilterLocalities.length > 0) {
-        const tutorLocs = (t['Preferred Location(s)'] || '').toLowerCase();
+        const tutorLocs = JSON.stringify(t.location || []).toLowerCase();
         if (!tutorFilterLocalities.some(loc => tutorLocs.includes(loc.toLowerCase()))) return false;
       }
 
       // Classes Filter
       if (tutorFilterClasses.length > 0) {
-        const tutorClass = (t['Preferred Class Group'] || '').toLowerCase();
+        const tutorClassArr = t.class_group || [];
+        const tutorClassStr = JSON.stringify(tutorClassArr).toLowerCase();
+        
         const matchesClass = tutorFilterClasses.some(cls => {
-          // Direct match
-          if (tutorClass.includes(cls.toLowerCase())) return true;
+          // Direct match in array
+          if (tutorClassStr.includes(cls.toLowerCase())) return true;
           // Group mapping match
           const mappedClasses = CLASS_GROUP_MAPPING[cls];
-          if (mappedClasses && mappedClasses.some(m => tutorClass.includes(m.toLowerCase()))) return true;
+          if (mappedClasses && mappedClasses.some(m => tutorClassStr.includes(m.toLowerCase()))) return true;
           return false;
         });
         if (!matchesClass) return false;
@@ -1272,7 +1546,7 @@ export default function App() {
 
       // Gender Filter
       if (tutorFilterGender !== 'All') {
-        const tutorGender = (t.Gender || '').toLowerCase();
+        const tutorGender = (t.gender || '').toLowerCase();
         const filterGender = tutorFilterGender.toLowerCase();
         
         // Exact match or 'any' (unlikely for tutors but for safety)
@@ -1287,27 +1561,27 @@ export default function App() {
 
       if (tutorSearchQuery) {
         const sl = tutorSearchQuery.toLowerCase();
-        const tName = (t['Full Name'] || (t as any).fullName || (t.Name || '')).toLowerCase();
-        const tID = (t['Tutor ID'] || (t as any).tutorId || '').toString().toLowerCase();
-        const skills = (t.Skills || '').toLowerCase();
+        const tName = (t.name || '').toLowerCase();
+        const tID = (t.tutor_id || '').toString().toLowerCase();
+        const skills = JSON.stringify(t.subjects || []).toLowerCase();
         if (!(tName.includes(sl) || tID.includes(sl) || skills.includes(sl))) return false;
       }
       return true;
     }).sort((a, b) => {
       if (tutorSortBy === 'verified') {
-        const vA = a.Verified === 'Yes' ? 1 : 0;
-        const vB = b.Verified === 'Yes' ? 1 : 0;
+        const vA = a.verified === 'Yes' ? 1 : 0;
+        const vB = b.verified === 'Yes' ? 1 : 0;
         if (vA !== vB) return vB - vA;
       }
 
       if (tutorSortBy === 'fee_high' || tutorSortBy === 'fee_low') {
-        const fA = parseInt(a['Fee/Month']?.replace(/[^0-9]/g, '') || '0');
-        const fB = parseInt(b['Fee/Month']?.replace(/[^0-9]/g, '') || '0');
+        const fA = parseInt(a.fee?.toString().replace(/[^0-9]/g, '') || '0');
+        const fB = parseInt(b.fee?.toString().replace(/[^0-9]/g, '') || '0');
         return tutorSortBy === 'fee_high' ? fB - fA : fA - fB;
       }
 
-      const idA = parseInt((a['Tutor ID'] || a.tutorId || '0').toString().replace(/[^0-9]/g, ''));
-      const idB = parseInt((b['Tutor ID'] || b.tutorId || '0').toString().replace(/[^0-9]/g, ''));
+      const idA = parseInt((a.tutor_id || '0').toString().replace(/[^0-9]/g, ''));
+      const idB = parseInt((b.tutor_id || '0').toString().replace(/[^0-9]/g, ''));
       if (idB !== idA) return idB - idA;
 
       const parseTutorDate = (d: any) => {
@@ -1320,8 +1594,8 @@ export default function App() {
         return new Date(d).getTime() || 0;
       };
 
-      const dateA = parseTutorDate(a['Record Added']);
-      const dateB = parseTutorDate(b['Record Added']);
+      const dateA = parseTutorDate(a.created_time);
+      const dateB = parseTutorDate(b.created_time);
       return dateB - dateA;
     });
   }, [tutors, tutorCityFilter, tutorSearchQuery, isCityMatch, tutorFilterLocalities, tutorFilterClasses, tutorFilterGender, tutorSortBy]);
@@ -1358,7 +1632,7 @@ export default function App() {
                   </div>
                   <div className="grid grid-cols-1 gap-4">
                     <button 
-                      onClick={() => { playTapSound(); setUserType('parent'); }}
+                      onClick={() => { playTapSound(); setUserType('parent'); localStorage.setItem('userType', 'parent'); }}
                       className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
                     >
                       <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
@@ -1370,7 +1644,7 @@ export default function App() {
                       </div>
                     </button>
                     <button 
-                      onClick={() => { playTapSound(); setUserType('teacher'); }}
+                      onClick={() => { playTapSound(); setUserType('teacher'); localStorage.setItem('userType', 'teacher'); }}
                       className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
                     >
                       <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
@@ -1975,16 +2249,16 @@ export default function App() {
                <div className="p-8 text-center text-white relative shrink-0 pt-[calc(2rem+var(--safe-area-top,24px))]" style={{ background: 'linear-gradient(135deg, #4ECDC4 0%, #2563EB 100%)' }}>
                   <button onClick={() => setSelectedTutor(null)} className="absolute top-8 left-6 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-all"><X size={20} /></button>
                   <div className="text-[22px] font-[900] text-white mb-1 tracking-tight">
-                    ✨ {toTitleCase(selectedTutor.Name || 'Premium Tutor')}
+                    ✨ {toTitleCase(selectedTutor.name || 'Premium Tutor')}
                   </div>
                   <div className="flex items-center justify-center gap-3 mt-1">
-                    <div className="text-[11px] font-[600] opacity-80 uppercase tracking-widest">🆔 Tutor ID: {selectedTutor['Tutor ID']}</div>
+                    <div className="text-[11px] font-[600] opacity-80 uppercase tracking-widest">🆔 Tutor ID: {selectedTutor.tutor_id}</div>
                   </div>
 
                   {/* Status & Verification Badges */}
                   <div className="flex items-center justify-center gap-6 mt-4">
                     <div className="flex items-center gap-1.5">
-                      {selectedTutor.Verified === 'Yes' ? (
+                      {selectedTutor.verified === 'Yes' ? (
                         <>
                           <div className="relative">
                             <CheckCircle size={20} className="text-white fill-blue-500" />
@@ -2003,17 +2277,17 @@ export default function App() {
                       )}
                     </div>
 
-                    {selectedTutor.Status && (
+                    {selectedTutor.status && (
                       <div className="flex items-center gap-2">
                         <div className={cn(
                           "px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm transition-all",
-                          selectedTutor.Status === 'Active' ? "bg-[#FFD700]" : 
-                          selectedTutor.Status === 'Not Available' ? "bg-slate-400" : "bg-rose-500"
+                          selectedTutor.status === 'Active' ? "bg-[#FFD700]" : 
+                          selectedTutor.status === 'Not Available' ? "bg-slate-400" : "bg-rose-500"
                         )}>
                            <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                              {selectedTutor.Status === 'Active' ? (
+                              {selectedTutor.status === 'Active' ? (
                                 <Check size={10} className="text-[#FFD700]" strokeWidth={4} />
-                              ) : selectedTutor.Status === 'Not Available' ? (
+                              ) : selectedTutor.status === 'Not Available' ? (
                                 <Clock size={10} className="text-slate-400" strokeWidth={3} />
                               ) : (
                                 <X size={10} className="text-rose-500" strokeWidth={4} />
@@ -2021,9 +2295,9 @@ export default function App() {
                            </div>
                            <span className={cn(
                              "text-[11px] font-black uppercase tracking-tighter",
-                             selectedTutor.Status === 'Active' ? "text-[#856404]" : "text-white"
+                             selectedTutor.status === 'Active' ? "text-[#856404]" : "text-white"
                            )}>
-                             {selectedTutor.Status === 'Not Available' ? 'Busy' : selectedTutor.Status}
+                             {selectedTutor.status === 'Not Available' ? 'Busy' : selectedTutor.status}
                            </span>
                         </div>
                         <span className="text-[15px] font-[800] text-white tracking-tight">Status</span>
@@ -2035,10 +2309,10 @@ export default function App() {
                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-[calc(8rem+var(--safe-area-bottom,20px))]">
                   {/* Quick Stats Grid */}
                   <div className="grid grid-cols-2 gap-2.5">
-                    <DetailStat emoji="🎓" label="Qualification" value={(selectedTutor['Qualification(s)'] || 'Graduate').toString().replace(/[\[\]"]/g, '').split(',')[0]} color="bg-purple-600" />
-                    <DetailStat emoji="📚" label="Experience" value={selectedTutor.Experience || '1-3 Years'} color="bg-emerald-600" />
-                    <DetailStat emoji="🏫" label="Class Group" value={(selectedTutor['Preferred Class Group'] || 'All Classes').toString().replace(/[\[\]"]/g, '')} color="bg-blue-600" />
-                    <DetailStat emoji="👩‍🏫" label="School Teacher" value={selectedTutor['School Exp.'] || 'No'} color="bg-orange-500" />
+                    <DetailStat emoji="🎓" label="Qualification" value={(selectedTutor.qualification || []).join(', ') || 'Graduate'} color="bg-purple-600" />
+                    <DetailStat emoji="📚" label="Experience" value={selectedTutor.experience || '1-3 Years'} color="bg-emerald-600" />
+                    <DetailStat emoji="🏫" label="Class Group" value={(selectedTutor.class_group || []).join(', ') || 'All Classes'} color="bg-blue-600" />
+                    <DetailStat emoji="👩‍🏫" label="School Teacher" value={selectedTutor.school_teacher || 'No'} color="bg-orange-500" />
                   </div>
 
                   {/* Expert Subjects Section (Full Width) */}
@@ -2048,7 +2322,7 @@ export default function App() {
                        <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Expert Subjects</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                       {(selectedTutor['Preferred Subject(s)'] || 'General').toString().replace(/[\[\]"]/g, '').split(/[;,]/).map((s, i) => (
+                       {(selectedTutor.subjects || []).map((s: string, i: number) => (
                          <span key={i} className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700">📖 {s.trim()}</span>
                        ))}
                     </div>
@@ -2058,11 +2332,11 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-2.5">
                     <div className="p-4 bg-white rounded-3xl border border-slate-100 shadow-sm">
                       <div className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Age / Gender</div>
-                      <div className="text-[13px] font-black text-slate-900">🎂 {selectedTutor.Age || '25+'} / {selectedTutor.Gender || 'Any'}</div>
+                      <div className="text-[13px] font-black text-slate-900">🎂 {selectedTutor.age || '25+'} / {selectedTutor.gender || 'Any'}</div>
                     </div>
                     <div className="p-4 bg-white rounded-3xl border border-slate-100 shadow-sm">
                       <div className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Own Vehicle</div>
-                      <div className="text-[13px] font-black text-slate-900">🚗 {selectedTutor['Have own Vehicle'] || 'No'}</div>
+                      <div className="text-[13px] font-black text-slate-900">🚗 {selectedTutor.have_vehicle || 'No'}</div>
                     </div>
                   </div>
 
@@ -2074,7 +2348,7 @@ export default function App() {
                     </div>
                     <p className="text-[13px] text-slate-700 font-medium leading-relaxed">
                        {(() => {
-                         const about = selectedTutor.About || "Dedicated educator committed to student success.";
+                         const about = selectedTutor.about || "Dedicated educator committed to student success.";
                          const lastDot = about.lastIndexOf('.');
                          return lastDot !== -1 ? about.substring(0, lastDot + 1) : about;
                        })()}
@@ -2259,11 +2533,22 @@ export default function App() {
                               </label>
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest truncate">{userName || activeUser?.displayName || 'Welcome'}</h4>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest truncate">{userName || activeUser?.displayName || 'Welcome'}</h4>
+                                {localStorage.getItem('isVerified') === 'Yes' && <BadgeCheck size={14} className="text-blue-500 fill-blue-50" />}
+                              </div>
                               <p className="text-[9px] font-bold text-slate-400 truncate mb-1">{activeUser?.email}</p>
                               {userType === 'teacher' && (
-                                 <div className="flex flex-col gap-0.5">
-                                   <p className="text-[10px] font-black text-primary uppercase tracking-widest">🆔 ID: {localStorage.getItem('tutorId') || 'NEW'}</p>
+                                 <div className="flex flex-col gap-1 mt-1">
+                                   <div className="flex items-center gap-2">
+                                      <p className="text-[10px] font-black text-primary uppercase tracking-widest">🆔 ID: {localStorage.getItem('tutorId') || 'NEW'}</p>
+                                      <span className={cn(
+                                        "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter shadow-sm",
+                                        localStorage.getItem('tutorStatus') === 'Active' ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
+                                      )}>
+                                        {localStorage.getItem('tutorStatus') || 'Active'}
+                                      </span>
+                                   </div>
                                    {activeUser?.metadata?.creationTime && (
                                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
                                        Since: {new Date(activeUser.metadata.creationTime).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
@@ -2330,6 +2615,27 @@ export default function App() {
                                   </select>
                                 </div>
                               </div>
+
+                              {/* Qualification */}
+                              {userType === 'teacher' && (
+                                <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Qualification</label>
+                                    <div className="text-[11px] font-bold text-slate-700 truncate">{(userQualifications || []).length > 0 ? userQualifications[0] : "Not set"}</div>
+                                  </div>
+                                  <button onClick={() => setShowSelectionDrawer({ type: 'qualification', title: 'Qualification', options: QUALIFICATIONS_LIST, selected: userQualifications || [], isMulti: true })} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>                                </div>
+                              )}
+
+                              {/* Fee */}
+                              {userType === 'teacher' && (
+                                <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
+                                  <div className="space-y-0.5">
+                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Expected Fee</label>
+                                    <div className="text-[11px] font-bold text-slate-700 truncate">{userFee ? `₹${userFee}/mo` : "Not set"}</div>
+                                  </div>
+                                  <button onClick={() => { const val = prompt("Enter expected monthly fee:", userFee); if (val !== null) { setUserFee(val); localStorage.setItem('userFee', val); }}} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
+                                </div>
+                              )}
                               
                               {/* City */}
                               <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative col-span-2">
@@ -2405,6 +2711,16 @@ export default function App() {
                                     <select value={hasVehicle} onChange={(e) => { setHasVehicle(e.target.value); localStorage.setItem('hasVehicle', e.target.value); }} className="w-full bg-transparent text-[10px] font-bold text-slate-700 mt-1 outline-none"><option value="Yes">Yes</option><option value="No">No</option></select>
                                   </div>
                                 </div>
+                                {/* Communication */}
+                                <div className="col-span-2 border-t border-slate-50 pt-2">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Communication Skills</label>
+                                  <select value={userCommunication} onChange={(e) => { setUserCommunication(e.target.value); localStorage.setItem('userCommunication', e.target.value); }} className="w-full bg-transparent text-[10px] font-bold text-slate-700 mt-1 outline-none">
+                                    <option value="">Select Level</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Average">Average</option>
+                                  </select>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -2420,7 +2736,7 @@ export default function App() {
                               <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
                                 <div className="space-y-0.5">
                                   <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">{userType === 'parent' ? "Student's Class" : "Class Group"}</label>
-                                  <div className="text-sm font-bold text-slate-700">{userClasses.length > 0 ? userClasses[0] : "Not selected"}</div>
+                                  <div className="text-sm font-bold text-slate-700">{(userClasses || []).length > 0 ? userClasses[0] : "Not selected"}</div>
                                 </div>
                                 <button 
                                   onClick={() => setShowSelectionDrawer({
@@ -2443,9 +2759,9 @@ export default function App() {
                                     <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Expert Subjects</label>
                                     <div 
                                       className="font-bold text-slate-700 leading-tight"
-                                      style={{ fontSize: getDynamicFontSize(userSubjects.join(', ')) }}
+                                      style={{ fontSize: getDynamicFontSize((userSubjects || []).join(', ')) }}
                                     >
-                                      {userSubjects.length > 0 ? userSubjects.join(', ') : "Select Subjects"}
+                                      {((userSubjects || [])).length > 0 ? (userSubjects || []).join(', ') : "Select Subjects"}
                                     </div>
                                   </div>
                                   <button 
@@ -2502,11 +2818,10 @@ export default function App() {
                                       <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Specific Localities</label>
                                       <div 
                                         className="font-bold text-slate-700 leading-tight"
-                                        style={{ fontSize: getDynamicFontSize(userLocalities.join(', ')) }}
+                                        style={{ fontSize: getDynamicFontSize((userLocalities || []).join(', ')) }}
                                       >
-                                        {userLocalities.length > 0 ? userLocalities.join(', ') : "Select Localities"}
-                                      </div>
-                                    </div>
+                                        {((userLocalities || [])).length > 0 ? (userLocalities || []).join(', ') : "Select Localities"}
+                                      </div>                                    </div>
                                     <button 
                                       onClick={() => setShowSelectionDrawer({
                                         type: 'localities',
@@ -2527,10 +2842,23 @@ export default function App() {
 
                           <div className="pt-4 border-t border-slate-50">
                              <button 
-                               onClick={() => { playTapSound(); handleUpdateProfile(); setShowProfileSetup(false); }}
-                               className="w-full py-4 rounded-2xl bg-primary text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
+                               onClick={() => { playTapSound(); handleUpdateProfile(); }}
+                               disabled={isUpdatingProfile}
+                               className={cn(
+                                 "w-full py-4 rounded-2xl text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2",
+                                 isUpdatingProfile ? "bg-slate-400 cursor-not-allowed" : "bg-primary"
+                               )}
                              >
-                                <Save size={16} className="mr-2 inline-block" /> Save & Close
+                                {isUpdatingProfile ? (
+                                  <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Saving...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Save size={16} /> Save & Close
+                                  </>
+                                )}
                              </button>
                              <p className="text-center text-[8px] font-bold text-slate-300 uppercase tracking-[0.2em] mt-6">Last sync: {new Date().toLocaleDateString()}</p>
                           </div>
@@ -2578,26 +2906,20 @@ export default function App() {
                          <div className="pt-4 border-t border-slate-100/50">
                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><AlertCircle size={12} /> Danger Zone</p>
                            <p className="text-[9px] font-medium text-slate-500 leading-snug mb-3">
-                             Deleting your profile is permanent and cannot be undone. Type <strong className="text-slate-800">DELETE</strong> to confirm.
+                             Deleting your profile is permanent and will remove your data from our database.
                            </p>
-                           <div className="flex items-center gap-2">
-                             <input 
-                               type="text" 
-                               placeholder="Type DELETE" 
-                               value={deleteProfileText}
-                               onChange={(e) => setDeleteProfileText(e.target.value)}
-                               className="flex-1 bg-rose-50/50 border border-rose-100 rounded-xl px-3 py-3 text-[10px] font-black outline-none focus:border-rose-300 text-rose-700 placeholder:text-rose-300"
-                             />
-                             <button 
-                               onClick={handleDeleteProfile} 
-                               disabled={deleteProfileText !== 'DELETE' || isDeletingProfile}
-                               className="shrink-0 bg-rose-500 text-white px-4 py-3 rounded-xl font-black uppercase tracking-widest text-[9px] active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
-                             >
-                               {isDeletingProfile ? <Loader2 size={12} className="animate-spin" /> : "Delete Profile"}
-                             </button>
-                           </div>
-                         </div>
-                       </div>
+                           <button
+                             onClick={handleDeleteProfile}
+                             disabled={isDeletingProfile}
+                             className="w-full bg-rose-500 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                           >
+                             {isDeletingProfile ? <Loader2 size={16} className="animate-spin" /> : (
+                               <>
+                                 <Trash2 size={16} /> Delete My Profile
+                               </>
+                             )}
+                           </button>
+                         </div>                       </div>
                      ) : null}
                    </div>
 
@@ -2705,3 +3027,4 @@ function NavButton({ active, onClick, icon, label, activeColor, activeBg, inacti
     </button>
   );
 }
+

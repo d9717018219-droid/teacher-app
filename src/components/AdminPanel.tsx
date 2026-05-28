@@ -31,17 +31,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
 
   // Tutor Management State
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingTutor, setEditingTutor] = useState<TutorProfile | null>(null);
+  const [editingTutor, setEditingTutor] = useState<any | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const filteredTutors = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
     return tutors.filter(t => {
-      const name = (t['Full Name'] || t.Name || '').toString().toLowerCase();
-      const id = (t['Tutor ID'] || t.tutorId || '').toString().toLowerCase();
-      const email = (t.Email || t.email || '').toString().toLowerCase();
-      const phone = (t.Phone || t.phone || '').toString().toLowerCase();
+      const name = (t.name || '').toLowerCase();
+      const id = (t.tutor_id || '').toLowerCase();
+      const email = (t.email || '').toLowerCase();
+      const phone = (t.internal_phone || '').toLowerCase();
       return name.includes(q) || id.includes(q) || email.includes(q) || phone.includes(q);
     }).slice(0, 50);
   }, [tutors, searchQuery]);
@@ -50,14 +50,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
     playTapSound();
     setIsUpdating(true);
     try {
-      const response = await fetch('https://doableindia.com/api_copy.php', {
+      const response = await fetch('https://doableindia.com/api_data.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'upsert',
           ...updatedData,
-          Status: 'Active',
-          Record_Added: new Date().toISOString().slice(0, 19).replace('T', ' ')
+          status: 'Active',
+          record_added: new Date().toISOString().slice(0, 19).replace('T', ' ')
         })
       });
       const result = await response.json();
@@ -75,22 +75,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
     }
   };
 
-  const handleDeleteTutor = async (tutor: TutorProfile) => {
+  const handleDeleteTutor = async (tutor: any) => {
     playTapSound();
-    const name = tutor['Full Name'] || tutor.Name || 'this tutor';
+    const name = tutor.name || 'this tutor';
     if (!window.confirm(`Are you sure you want to DELETE ${name}? This action might be permanent.`)) return;
     
     setIsUpdating(true);
     try {
-      // Note: Using 'update' with a 'Deleted' status as a safe way if direct delete isn't supported
-      const response = await fetch('https://doableindia.com/api_copy.php', {
+      const response = await fetch('https://doableindia.com/api_data.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'upsert',
-          Email: tutor.Email || tutor.email,
-          Status: 'Inactive', // Marking as inactive/deleted
-          'Internal Remark': 'DELETED_BY_ADMIN'
+          email: tutor.email,
+          status: 'Inactive', 
+          about: 'DELETED_BY_ADMIN'
         })
       });
       const result = await response.json();
@@ -360,18 +359,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
           <div className="space-y-3">
             {filteredTutors.length > 0 ? (
               filteredTutors.map(t => (
-                <div key={t.id || t.Email} className="bg-white rounded-[28px] p-4 border border-slate-100 shadow-sm space-y-3 relative overflow-hidden group">
+                <div key={t.tutor_id || t.email} className="bg-white rounded-[28px] p-4 border border-slate-100 shadow-sm space-y-3 relative overflow-hidden group">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                         <User size={24} />
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-[14px] font-black text-slate-900 truncate">{toTitleCase(t['Full Name'] || t.Name || 'Premium Tutor')}</h4>
+                        <h4 className="text-[14px] font-black text-slate-900 truncate">{toTitleCase(t.name || 'Premium Tutor')}</h4>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-black text-primary uppercase tracking-tighter">ID: {t['Tutor ID'] || 'N/A'}</span>
+                          <span className="text-[10px] font-black text-primary uppercase tracking-tighter">ID: {t.tutor_id || 'N/A'}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-200" />
-                          <span className="text-[10px] font-bold text-slate-400">{t.Gender || 'Any'}</span>
+                          <span className="text-[10px] font-bold text-slate-400">{t.gender || 'Any'}</span>
                         </div>
                       </div>
                     </div>
@@ -394,11 +393,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-50">
                     <div className="flex items-center gap-2">
                       <Phone size={12} className="text-slate-300" />
-                      <span className="text-[11px] font-bold text-slate-600">{t.Phone || 'No Phone'}</span>
+                      <span className="text-[11px] font-bold text-slate-600">{t.internal_phone || 'No Phone'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Mail size={12} className="text-slate-300" />
-                      <span className="text-[11px] font-bold text-slate-600 truncate">{t.Email || t.email || 'No Email'}</span>
+                      <span className="text-[11px] font-bold text-slate-600 truncate">{t.email || 'No Email'}</span>
                     </div>
                   </div>
                 </div>
@@ -430,10 +429,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <TutorEditField label="Full Name" value={editingTutor['Full Name'] || editingTutor.Name || ''} onChange={(val) => setEditingTutor({...editingTutor, Name: val, 'Full Name': val})} icon={<User size={14}/>} />
-              <TutorEditField label="Phone Number" value={editingTutor.Phone || editingTutor.phone || ''} onChange={(val) => setEditingTutor({...editingTutor, Phone: val})} icon={<Phone size={14}/>} />
-              <TutorEditField label="Email Address" value={editingTutor.Email || editingTutor.email || ''} onChange={(val) => setEditingTutor({...editingTutor, Email: val})} icon={<Mail size={14}/>} />
-              <TutorEditField label="Tutor ID" value={editingTutor['Tutor ID'] || editingTutor.tutorId || ''} onChange={(val) => setEditingTutor({...editingTutor, 'Tutor ID': val})} icon={<Hash size={14}/>} />
+              <TutorEditField label="Full Name" value={editingTutor.name || ''} onChange={(val) => setEditingTutor({...editingTutor, name: val})} icon={<User size={14}/>} />
+              <TutorEditField label="Phone Number" value={editingTutor.internal_phone || ''} onChange={(val) => setEditingTutor({...editingTutor, internal_phone: val})} icon={<Phone size={14}/>} />
+              <TutorEditField label="Email Address" value={editingTutor.email || ''} onChange={(val) => setEditingTutor({...editingTutor, email: val})} icon={<Mail size={14}/>} />
+              <TutorEditField label="Tutor ID" value={editingTutor.tutor_id || ''} onChange={(val) => setEditingTutor({...editingTutor, tutor_id: val})} icon={<Hash size={14}/>} />
               
               <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
                 <p className="text-[10px] font-bold text-amber-600 flex items-center gap-2">

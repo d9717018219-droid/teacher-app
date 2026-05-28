@@ -62,29 +62,23 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
 }) => {
   if (!tutor) return null;
 
-  const getValue = (keys: string[], fallback: string = '–') => {
-    for (const key of keys) {
-      const val = (tutor as any)[key];
-      if (val !== undefined && val !== null && val !== '') return val;
-    }
-    return fallback;
-  };
-
-  const name = getValue(['Name', 'name', 'fullName', 'Full Name'], 'Premium Tutor').toString();
-  const tutorId = getValue(['Tutor ID', 'tutorId', 'id', 'ID'], 'N/A').toString();
-  const city = getValue(['Preferred City', 'preferredCity', 'City', 'city'], 'India').toString();
-  const area = getValue(['Preferred Locality', 'preferredArea', 'Locality', 'Area'], '').toString().split(/[;,]/)[0].trim();
+  const tutorId = tutor.tutor_id || 'N/A';
+  const name = tutor.name || 'Premium Tutor';
+  const city = tutor.city || 'India';
+  const locationArr = tutor.location || [];
+  const area = locationArr.length > 0 ? locationArr[0] : '';
   const location = area ? `${area} - ${city}` : city;
-  const fee = getValue(['Fee/Month', 'feeMonth', 'Fee', 'fee'], 'Flexible').toString();
-  const exp = getValue(['Experience', 'experience', 'Teaching Experience'], '1-3 Years').toString();
-  const qual = cleanValue(getValue(['Qualification(s)', 'qualifications', 'Qualification'], 'Graduate'));
-  const subjects = cleanValue(getValue(['Preferred Subject(s)', 'preferredSubjects', 'subjects'], 'General'));
-  const gender = getValue(['Gender', 'gender'], '').toString();
-  const classGroup = cleanValue(getValue(['Preferred Class Group', 'preferredClassGroup', 'classGroup'], ''));
-  const verified = getValue(['Verified', 'verified'], 'No').toString().toLowerCase().trim() === 'yes';
-  const lastUpdated = formatPostedDate(getValue(['Record Added', 'Updated Time', 'updatedTime'], ''));
-
-  const { bg, icon } = getSubjectStyles(subjects);
+  const exp = tutor.experience || '1-3 Years';
+  const qualArr = tutor.qualification || [];
+  const qual = qualArr.length > 0 ? qualArr[0] : 'Graduate';
+  const subjectsArr = tutor.subjects || [];
+  const subjectsStr = subjectsArr.join(', ') || 'General';
+  const gender = tutor.gender || '';
+  const classGroupArr = tutor.class_group || [];
+  const classGroupStr = classGroupArr.join(', ') || '';
+  const verified = tutor.verified === 'Yes';
+  
+  const { bg, icon } = getSubjectStyles(subjectsStr);
 
   return (
     <div 
@@ -132,11 +126,11 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
                 <User size={9} strokeWidth={3} className="text-slate-400" /> {gender}
               </span>
             )}
-            {classGroup && (
+            {classGroupStr && (
               <span className={cn(
                 "text-[9px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950 whitespace-nowrap",
                 (() => {
-                  const g = classGroup.toLowerCase();
+                  const g = classGroupStr.toLowerCase();
                   if (g.includes('11') || g.includes('12') || g.includes('higher') || g.includes('senior')) return "bg-violet-50 border-violet-100/50";
                   if (g.includes('9') || g.includes('10') || g.includes('secondary')) return "bg-amber-50 border-amber-100/50";
                   if (g.includes('6') || g.includes('7') || g.includes('8') || g.includes('middle')) return "bg-emerald-50 border-emerald-100/50";
@@ -144,7 +138,7 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
                   return "bg-slate-50 border-slate-100/50";
                 })()
               )}>
-                <BookOpen size={9} strokeWidth={3} className="text-slate-400" /> {classGroup}
+                <BookOpen size={9} strokeWidth={3} className="text-slate-400" /> {classGroupStr}
               </span>
             )}
           </div>
@@ -157,9 +151,9 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
         <div className="flex justify-between items-center opacity-70">
           <div className="flex items-center gap-1">
             <CheckCircle2 size={9} className="text-primary" />
-            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tight">School Exp.: {getValue(['School Exp.', 'schoolExp'], 'No')}</span>
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tight">School Exp.: {tutor.school_teacher || 'No'}</span>
           </div>
-          <span className="text-[#94A3B8] text-[8px] font-black uppercase tracking-tight">Own Vehicle: {getValue(['Have own Vehicle', 'haveOwnVehicle'], 'No')}</span>
+          <span className="text-[#94A3B8] text-[8px] font-black uppercase tracking-tight">Own Vehicle: {tutor.have_vehicle || 'No'}</span>
         </div>
 
         <div className="flex items-center gap-2">

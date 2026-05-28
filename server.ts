@@ -18,12 +18,11 @@ async function startServer() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); 
       
-      const response = await fetch('https://doableindia.com/api_data.php', { 
+      const response = await fetch('https://doableindia.com/app-sys/api_data.php', { 
         signal: controller.signal,
         headers: {
-          'Accept': 'application/json',
-          'X-API-KEY': 'DoAble_Super_Secret_Token_2026',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Accept': 'application/json'
         }
       });
       clearTimeout(timeoutId);
@@ -46,19 +45,14 @@ async function startServer() {
 
   app.get('/api/tutors', async (req, res) => {
     try {
-      console.log('Fetching tutors from external API...');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); 
-
-      const response = await fetch('https://doableindia.com/api_copy_data.php', { 
-        signal: controller.signal,
+      console.log('Fetching tutors from Hostinger (api_copy_data.php)...');
+      const response = await fetch('https://doableindia.com/app-sys/api_copy_data.php', { 
+        method: 'GET',
         headers: {
-          'Accept': 'application/json',
-          'X-API-KEY': 'DoAble_Super_Secret_Token_2026',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Accept': 'application/json'
         }
       });
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`External API responded with status ${response.status}`);
@@ -79,11 +73,10 @@ async function startServer() {
   app.post('/api/auth/signup', express.json(), async (req, res) => {
     try {
       console.log('Forwarding signup to Hostinger...');
-      const response = await fetch('https://doableindia.com/app_auth.php', {
+      const response = await fetch('https://doableindia.com/app-sys/app_auth.php', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'X-API-KEY': 'DoAble_Super_Secret_Token_2026'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ action: 'signup', ...req.body })
       });
@@ -97,11 +90,10 @@ async function startServer() {
   app.post('/api/auth/signin', express.json(), async (req, res) => {
     try {
       console.log('Forwarding signin to Hostinger...');
-      const response = await fetch('https://doableindia.com/app_auth.php', {
+      const response = await fetch('https://doableindia.com/app-sys/app_auth.php', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'X-API-KEY': 'DoAble_Super_Secret_Token_2026'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ action: 'signin', ...req.body })
       });
@@ -114,29 +106,50 @@ async function startServer() {
 
   app.post('/api/profile/update', express.json(), async (req, res) => {
     try {
-      console.log('Forwarding profile update to Hostinger...');
-      const response = await fetch('https://doableindia.com/api_copy.php', {
+      const payload: any = { action: 'upsert', ...req.body };
+      console.log('Forwarding profile update to Hostinger (api_copy.php)...');
+      
+      const response = await fetch('https://doableindia.com/app-sys/api_copy.php', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-API-KEY': 'DoAble_Super_Secret_Token_2026'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Accept': 'application/json'
         },
-        body: JSON.stringify(req.body)
+        body: JSON.stringify(payload)
       });
-      const data = await response.json();
+      
+      const responseText = await response.text();
+      console.log('Raw response from Hostinger:', responseText.slice(0, 500));
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse Hostinger response as JSON');
+        res.status(500).json({ status: 'error', message: 'Invalid response from server', raw: responseText.slice(0, 200) });
+        return;
+      }
+      
+      console.log('Response from Hostinger (parsed):', JSON.stringify(data).slice(0, 200) + '...');
       res.status(response.status).json(data);
     } catch (error: any) {
+      console.error('Proxy Error:', error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   });
 
   app.post('/api/profile/parent/update', express.json(), async (req, res) => {
     try {
-      console.log('Forwarding parent profile update to Hostinger...');
-      const response = await fetch('https://doableindia.com/parent_api.php', {
+      console.log('Forwarding parent profile update to Hostinger (api_copy.php)...');
+      const response = await fetch('https://doableindia.com/app-sys/api_copy.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req.body)
+        headers: { 
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ action: 'upsert', ...req.body })
       });
       const data = await response.json();
       res.status(response.status).json(data);

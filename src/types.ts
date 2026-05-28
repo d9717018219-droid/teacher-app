@@ -20,28 +20,35 @@ export interface JobLead {
 }
 
 export interface TutorProfile {
-  'Name': string;
-  'Tutor ID': string;
-  'Preferred City': string;
-  'Fee/Month': string;
-  'Gender': string;
-  'Age': string;
-  'Qualification(s)': string;
-  'Experience': string;
-  'School Exp.': string;
-  'Preferred Subject(s)': string;
-  'Preferred Class Group': string;
-  'Mode of Teaching': string;
-  'Preferred Time': string;
-  'Preferred Location(s)': string;
-  'Address': string;
-  'Have own Vehicle': string;
-  'Record Added': string;
-  'Verified': string;
-  'Status': string;
-  'About'?: string;
-  'Email'?: string;
-  'email'?: string;
+  tutor_id: string;
+  name: string;
+  email: string;
+  internal_phone: string;
+  gender: string;
+  age: string;
+  dob: string;
+  qualification: string[];
+  experience: string;
+  school_teacher: string;
+  days: string;
+  time: string;
+  class_group: string[];
+  subjects: string[];
+  city: string;
+  location: string[];
+  have_vehicle: string;
+  communication: string;
+  fee: string;
+  about: string;
+  status: string;
+  photo: string;
+  verified: string;
+  created_time: string;
+  
+  // Legacy fields (optional)
+  id?: string;
+  Verified?: string;
+  Status?: string;
 }
 
 export interface ApiResponse<T> {

@@ -113,7 +113,7 @@ export function getJobId(job: any): string {
 
 export function getTutorId(tutor: any): string {
   if (!tutor) return 'N/A';
-  return (tutor['Tutor ID'] || tutor.tutorId || tutor.id || tutor.ID || 'N/A').toString();
+  return (tutor.tutor_id || tutor['Tutor ID'] || tutor.tutorId || tutor.id || tutor.ID || 'N/A').toString();
 }
 
 /**
