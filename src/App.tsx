@@ -553,6 +553,9 @@ export default function App() {
   const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('userType'));
+
   // Auto-open profile setup for new users or incomplete profiles
   useEffect(() => {
     if (activeUser && !showOnboarding && !showProfileSetup) {
@@ -581,9 +584,6 @@ export default function App() {
       }
     }
   }, [activeUser, showOnboarding, userType]);
-
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('userType'));
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
   const [showPassword, setShowPassword] = useState(false);
   const [tutorStatus, setTutorStatus] = useState<'registered' | 'new' | null>(null);
