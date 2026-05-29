@@ -377,6 +377,8 @@ export default function App() {
           class: userClasses.join(', '),
           subjects: userSubjects.join(', '),
           city: userCity,
+          location: userLocalities.join(', '),
+          residency: userResidency,
           gender: userGender,
           address: userAddress,
           board: userBoard,
@@ -492,6 +494,8 @@ export default function App() {
   const [userTime, setUserTime] = useState<string>(localStorage.getItem('userTime') || '');
   const [userDuration, setUserDuration] = useState<string>(localStorage.getItem('userDuration') || '');
   const [userFee, setUserFee] = useState<string>(localStorage.getItem('userFee') || '');
+  const [userResidency, setUserResidency] = useState<string>(localStorage.getItem('userResidency') || '');
+  const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Calculate age from DOB
   useEffect(() => {
@@ -2585,489 +2589,373 @@ export default function App() {
       {showProfileSetup && (
         <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4">
           <div onClick={() => setShowProfileSetup(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-          <div className="relative bg-transparent w-full max-w-[360px] rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[92vh]">
-             <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
-                <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900">
-                  {activeUser ? `${userType === 'teacher' ? 'Tutor' : 'Parent'} Profile` : 'Profile Setup'}
-                </h3>
-                <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition-all"><X size={16} /></button>
+          <div className="relative bg-white w-full max-w-[400px] rounded-[40px] shadow-2xl overflow-hidden flex flex-col h-[85vh] border border-white/20">
+             {/* Progress Bar */}
+             <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-50">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(currentStep / 5) * 100}%` }}
+                  className="h-full bg-primary"
+                />
              </div>
-             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                <div className="space-y-6">
-                  {!activeUser && (
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-[1000] uppercase text-slate-900 ml-1 tracking-[0.2em]">I'm here as...</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { id: 'parent', label: 'Parent', icon: '👨‍👩‍👧‍👦', desc: 'Looking for a Tutor' },
-                          { id: 'teacher', label: 'Teacher', icon: '👩‍🏫', desc: 'Looking for Jobs' }
-                        ].map(type => (
-                          <button 
-                            key={type.id} 
-                            onClick={() => { 
-                              playTapSound(); 
-                              const newType = type.id as UserType;
-                              setUserType(newType); 
-                              localStorage.setItem('userType', type.id);
-                              setActiveTab('home');
-                              setTutorStatus(null);
-                              setIsTutorFetched(false);
 
-                              // Clear Details for fresh start in new role
-                              setUserName(null);
-                              setUserGender('All');
-                              setUserCity('All');
-                              setUserClasses([]);
-                              
-                              localStorage.removeItem('userName');
-                              localStorage.removeItem('userGender');
-                              localStorage.setItem('userCity', 'All');
-                              localStorage.removeItem('userClasses');
-                            }} 
-                            className={cn(
-                              "py-5 rounded-[24px] border-2 flex flex-col items-center gap-1 transition-all relative overflow-hidden", 
-                              userType === type.id ? "border-primary bg-primary/5 text-primary shadow-inner" : "border-slate-100 text-slate-400 bg-white"
-                            )}
-                          >
-                            <span className="text-2xl mb-1">{type.icon}</span>
-                            <span className="text-[10px] font-black uppercase tracking-tight">{type.label}</span>
-                            <span className="text-[8px] font-bold opacity-60">{type.desc}</span>
-                            {userType === type.id && (
-                              <motion.div layoutId="role-check" className="absolute top-2 right-2 w-4 h-4 bg-primary text-white rounded-full flex items-center justify-center">
-                                <Check size={10} strokeWidth={4} />
-                              </motion.div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <AnimatePresence mode="wait">
-                    <motion.div 
-                      key={userType || 'initial'} 
-                      initial={{ opacity: 0, y: 10 }} 
-                      animate={{ opacity: 1, y: 0 }} 
-                      exit={{ opacity: 0, y: -10 }}
-                      className="space-y-5"
-                    >
-                      {userType === 'teacher' && (
-                        <div className="space-y-4">
-                           {/* Individual auth buttons removed in favor of unified Onboarding flow */}
-                        </div>
-                      )}
-
-                      {(userType === 'parent' || (userType === 'teacher' && activeUser)) && (
-                        <div className="space-y-4">
-                          {/* Top Profile Header (Pic) Compact */}
-                          <div className="flex items-center gap-4 p-4 bg-white rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
-                            <div className="relative shrink-0">
-                              {profilePhoto ? (
-                                <img src={profilePhoto} alt="User" className="w-16 h-16 rounded-full border-2 border-slate-100 object-cover" />
-                              ) : activeUser?.photoURL ? (
-                                <img src={activeUser.photoURL} alt="User" className="w-16 h-16 rounded-full border-2 border-slate-100 object-cover" />
-                              ) : (
-                                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-slate-100">
-                                  <LucideUser size={32} />
-                                </div>
-                              )}
-                              <label className="absolute -bottom-1 -right-1 w-7 h-7 bg-primary text-white rounded-full flex items-center justify-center shadow-lg border-2 border-white cursor-pointer active:scale-90 transition-all z-10">
-                                <Camera size={14} strokeWidth={3} />
-                                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                              </label>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest truncate">{userName || activeUser?.displayName || 'Welcome'}</h4>
-                                {localStorage.getItem('isVerified') === 'Yes' && <BadgeCheck size={14} className="text-blue-500 fill-blue-50" />}
-                              </div>
-                              <p className="text-[9px] font-bold text-slate-400 truncate mb-1">{activeUser?.email}</p>
-                              {userType === 'teacher' && (
-                                 <div className="flex flex-col gap-1 mt-1">
-                                   <div className="flex items-center gap-2">
-                                      <p className="text-[10px] font-black text-primary uppercase tracking-widest">🆔 ID: {localStorage.getItem('tutorId') || 'NEW'}</p>
-                                      <span className={cn(
-                                        "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter shadow-sm",
-                                        localStorage.getItem('tutorStatus') === 'Active' ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
-                                      )}>
-                                        {localStorage.getItem('tutorStatus') || 'Active'}
-                                      </span>
-                                   </div>
-                                   {activeUser?.metadata?.creationTime && (
-                                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                                       Since: {new Date(activeUser.metadata.creationTime).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                                     </p>
-                                   )}
-                                 </div>
-                               )}
-                            </div>
-                          </div>
-
-                          {/* Grid for Inputs (2 Columns to save vertical space) */}
-                          <div className="grid grid-cols-2 gap-3">
-                              {/* Name */}
-                              <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
-                                <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">{userType === 'parent' ? "What is your Name?" : "Your Name"}</label>
-                                  <div className="text-[11px] font-bold text-slate-700 truncate">{userName || "Not set"}</div>
-                                </div>
-                                <button onClick={() => { const val = prompt("Enter name:", userName || ""); if (val !== null) { setUserName(val); localStorage.setItem('userName', val); }}} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
-                              </div>
-
-                              {/* Phone */}
-                              <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
-                                <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">{userType === 'parent' ? "Primary Phone No." : "Phone Number"}</label>
-                                  <div className="text-[11px] font-bold text-slate-700 truncate">{userPhone || "Not set"}</div>
-                                </div>
-                                <button onClick={() => { 
-                                  const cleanPhone = userPhone ? userPhone.replace('+91 ', '').replace('+91', '') : '';
-                                  const val = prompt("Enter phone number:", cleanPhone);
-                                  if (val !== null) { 
-                                    const digits = val.replace(/\D/g, '').slice(-10);
-                                    if (digits.length === 10) {
-                                      const formatted = "+91 " + digits;
-                                      setUserPhone(formatted); 
-                                      localStorage.setItem('userPhone', formatted);
-                                    } else {
-                                      alert("Please enter exactly 10 digits.");
-                                    }
-                                  }
-                                }} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
-                              </div>
-
-                              {/* DOB (Teacher Only) */}
-                              {userType === 'teacher' && (
-                                <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative overflow-hidden">
-                                  <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Age (DOB)</label>
-                                    <div className="text-[11px] font-bold text-slate-700 truncate">{userAge ? `${userAge} yrs` : 'Not set'}</div>
-                                  </div>
-                                  <input type="date" value={userDob} onChange={(e) => { const date = e.target.value; setUserDob(date); localStorage.setItem('userDob', date); if (date) { const birthDate = new Date(date); const today = new Date(); let age = today.getFullYear() - birthDate.getFullYear(); const m = today.getMonth() - birthDate.getMonth(); if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) { age--; } const ageStr = age.toString(); setUserAge(ageStr); localStorage.setItem('userAge', ageStr); } }} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10" />
-                                  <button className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Calendar size={12} /></button>
-                                </div>
-                              )}
-
-                              {/* Gender Preference for Parent */}
-                              <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
-                                <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">{userType === 'parent' ? "Tutor Gender Preference" : "Gender"}</label>
-                                  <select value={userGender} onChange={(e) => { setUserGender(e.target.value); localStorage.setItem('userGender', e.target.value); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
-                                    <option value="Any">Any</option><option value="Male">Male</option><option value="Female">Female</option>
-                                  </select>
-                                </div>
-                              </div>
-
-                              {/* Qualification (Teacher Only) */}
-                              {userType === 'teacher' && (
-                                <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
-                                  <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Qualification</label>
-                                    <div className="text-[11px] font-bold text-slate-700 truncate">{(userQualifications || []).length > 0 ? userQualifications[0] : "Not set"}</div>
-                                  </div>
-                                  <button onClick={() => setShowSelectionDrawer({ type: 'qualification', title: 'Qualification', options: QUALIFICATIONS_LIST, selected: userQualifications || [], isMulti: true })} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>                                </div>
-                              )}
-
-                              {/* Fee for Teacher */}
-                              {userType === 'teacher' && (
-                                <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
-                                  <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Expected Fee</label>
-                                    <div className="text-[11px] font-bold text-slate-700 truncate">{userFee ? `₹${userFee}/mo` : "Not set"}</div>
-                                  </div>
-                                  <button onClick={() => { const val = prompt("Enter expected monthly fee:", userFee); if (val !== null) { setUserFee(val); localStorage.setItem('userFee', val); }}} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
-                                </div>
-                              )}
-                              
-                              {/* City Selection */}
-                              <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative col-span-2">
-                                <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">{userType === 'parent' ? "Which City are you in?" : "Work City"}</label>
-                                  <select value={userCity} onChange={(e) => { setUserCity(e.target.value); localStorage.setItem('userCity', e.target.value); setUserLocalities([]); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
-                                    {['All', ...CITIES_LIST].map(city => <option key={city} value={city}>{city}</option>)}
-                                  </select>
-                                </div>
-                              </div>
-
-                              {/* Parent Only Fields: Board & Mode */}
-                              {userType === 'parent' && (
-                                <>
-                                  <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
-                                    <div className="space-y-0.5">
-                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Select School Board</label>
-                                      <select value={userBoard} onChange={(e) => { setUserBoard(e.target.value); localStorage.setItem('userBoard', e.target.value); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
-                                        <option value="CBSE">CBSE</option>
-                                        <option value="ICSE">ICSE</option>
-                                        <option value="IB">IB</option>
-                                        <option value="IGCSE">IGCSE</option>
-                                        <option value="State Board">State Board</option>
-                                        <option value="Other">Other</option>
-                                      </select>
-                                    </div>
-                                  </div>
-                                  <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
-                                    <div className="space-y-0.5">
-                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Tuition Mode</label>
-                                      <select value={userMode} onChange={(e) => { setUserMode(e.target.value); localStorage.setItem('userMode', e.target.value); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
-                                        <option value="Home Tuition">Home Tuition</option>
-                                        <option value="Online">Online</option>
-                                        <option value="Group Tuition">Group Tuition</option>
-                                      </select>
-                                    </div>
-                                  </div>
-                                  <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative col-span-2">
-                                    <div className="space-y-0.5">
-                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Detail Address</label>
-                                      <div className="text-[11px] font-bold text-slate-700 truncate">{userAddress || "Not set"}</div>
-                                    </div>
-                                    <button onClick={() => { const val = prompt("Enter your full address:", userAddress || ""); if (val !== null) { setUserAddress(val); localStorage.setItem('userAddress', val); }}} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
-                                  </div>
-                                </>
-                              )}
-                          </div>
-
-                          {/* 2. ABOUT ME SECTION (Only for Teachers) */}
-                          {userType === 'teacher' && (
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2 px-2">
-                                 <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500"><BookText size={14} /></div>
-                                 <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">About Me</h3>
-                              </div>
-                              <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm group space-y-4">
-                                <textarea 
-                                  value={aboutMe}
-                                  onChange={(e) => { setAboutMe(e.target.value); localStorage.setItem('aboutMe', e.target.value); }}
-                                  placeholder="Write a short, catchy bio. Mention your teaching style and why parents should hire you. (e.g., 'Passionate about making Maths easy for kids through fun shortcuts.')"
-                                  className="w-full min-h-[120px] text-[13px] font-medium text-slate-600 leading-relaxed outline-none border-none resize-none bg-transparent placeholder:text-slate-300"
-                                />
-                                <div className="pt-3 border-t border-slate-50">
-                                   <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100/50">
-                                      <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 leading-relaxed">
-                                        <span>💡</span> 
-                                        <span>Pro-Tip: You can use AI like ChatGPT or Gemini. Limit 100 words</span>
-                                      </p>
-                                   </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 3. PROFESSIONAL DETAILS (Only for Teachers) */}
-                          {userType === 'teacher' && (
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2 px-2">
-                                 <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-500"><Briefcase size={14} /></div>
-                                 <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">Professional Details</h3>
-                              </div>
-                              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-3 grid grid-cols-2 gap-3">
-                                {/* Experience */}
-                                <div className="p-2 border border-slate-100 rounded-xl relative group">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Experience</label>
-                                  <div className="text-[10px] font-bold text-slate-700 truncate mt-1">{userExperience || "Not selected"}</div>
-                                  <button onClick={() => setShowSelectionDrawer({ type: 'experience', title: 'Experience', options: EXPERIENCE_LIST, selected: userExperience ? [userExperience] : [], isMulti: false })} className="absolute right-1 top-1 p-1 bg-slate-50 text-slate-400 rounded-md"><Edit3 size={10} /></button>
-                                </div>
-                                {/* Available Days */}
-                                <div className="p-2 border border-slate-100 rounded-xl relative group">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Days</label>
-                                  <div className="text-[10px] font-bold text-slate-700 truncate mt-1">{userDays || "Not selected"}</div>
-                                  <button onClick={() => setShowSelectionDrawer({ type: 'days', title: 'Days', options: DAYS_LIST, selected: userDays ? userDays.split(', ') : [], isMulti: true })} className="absolute right-1 top-1 p-1 bg-slate-50 text-slate-400 rounded-md"><Edit3 size={10} /></button>
-                                </div>
-                                {/* Preferred Time */}
-                                <div className="p-2 border border-slate-100 rounded-xl relative group col-span-2">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Preferred Time</label>
-                                  <div className="text-[10px] font-bold text-slate-700 truncate mt-1">{userTime || "Not selected"}</div>
-                                  <button onClick={() => setShowSelectionDrawer({ type: 'time', title: 'Preferred Time', options: TIME_LIST, selected: userTime ? userTime.split(', ') : [], isMulti: true })} className="absolute right-2 top-2 p-1 bg-slate-50 text-slate-400 rounded-md"><Edit3 size={12} /></button>
-                                </div>
-                                {/* School Teacher & Vehicle dropdowns */}
-                                <div className="col-span-2 flex justify-between gap-3 border-t border-slate-50 pt-2">
-                                  <div className="flex-1">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">School Exp?</label>
-                                    <select value={isSchoolTeacher} onChange={(e) => { setIsSchoolTeacher(e.target.value); localStorage.setItem('isSchoolTeacher', e.target.value); }} className="w-full bg-transparent text-[10px] font-bold text-slate-700 mt-1 outline-none"><option value="Yes">Yes</option><option value="No">No</option></select>
-                                  </div>
-                                  <div className="flex-1">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Vehicle?</label>
-                                    <select value={hasVehicle} onChange={(e) => { setHasVehicle(e.target.value); localStorage.setItem('hasVehicle', e.target.value); }} className="w-full bg-transparent text-[10px] font-bold text-slate-700 mt-1 outline-none"><option value="Yes">Yes</option><option value="No">No</option></select>
-                                  </div>
-                                </div>
-                                {/* Communication */}
-                                <div className="col-span-2 border-t border-slate-50 pt-2">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Communication Skills</label>
-                                  <select value={userCommunication} onChange={(e) => { setUserCommunication(e.target.value); localStorage.setItem('userCommunication', e.target.value); }} className="w-full bg-transparent text-[10px] font-bold text-slate-700 mt-1 outline-none">
-                                    <option value="">Select Level</option>
-                                    <option value="Excellent">Excellent</option>
-                                    <option value="Good">Good</option>
-                                    <option value="Average">Average</option>
-                                  </select>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 4. ACADEMIC EXPERTISE SECTION (Class & Subjects) */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 px-2">
-                               <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500"><BookOpen size={14} /></div>
-                               <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{userType === 'parent' ? 'Requirement Details' : 'Academic Expertise'}</h3>
-                            </div>
-                            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
-                              {/* Class Groups */}
-                              <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">{userType === 'parent' ? "Student's Class" : "Class Group"}</label>
-                                  <div className="text-sm font-bold text-slate-700">{(userClasses || []).length > 0 ? userClasses[0] : "Not selected"}</div>
-                                </div>
-                                <button 
-                                  onClick={() => setShowSelectionDrawer({
-                                    type: 'classGroup',
-                                    title: 'Select Class Group',
-                                    options: CLASSES_LIST,
-                                    selected: userClasses,
-                                    isMulti: false
-                                  })}
-                                  className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm"
-                                >
-                                  <Edit3 size={16} />
-                                </button>
-                              </div>
-
-                              {/* Subjects */}
-                              {userClasses.length > 0 && (
-                                <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                  <div className="space-y-0.5 flex-1 min-w-0 mr-4">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Expert Subjects</label>
-                                    <div 
-                                      className="font-bold text-slate-700 leading-tight"
-                                      style={{ fontSize: getDynamicFontSize((userSubjects || []).join(', ')) }}
-                                    >
-                                      {((userSubjects || [])).length > 0 ? (userSubjects || []).join(', ') : "Select Subjects"}
-                                    </div>
-                                  </div>
-                                  <button 
-                                    onClick={() => setShowSelectionDrawer({
-                                      type: 'subjects',
-                                      title: 'Select Subjects',
-                                      options: Array.from(new Set(userClasses.flatMap(cls => CLASS_SUBJECTS_DATA[cls] || []))),
-                                      selected: userSubjects,
-                                      isMulti: true
-                                    })}
-                                    className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
-                                  >
-                                    <Edit3 size={16} />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* 5. LOCATIONS SECTION */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 px-2">
-                               <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500"><MapPin size={14} /></div>
-                               <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{userType === 'parent' ? 'Select Location' : 'Preferred Locations'}</h3>
-                            </div>
-                            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
-                              <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">City</label>
-                                  <div className="text-sm font-bold text-slate-700">{userCity}</div>
-                                </div>
-                                <select 
-                                  value={userCity} 
-                                  onChange={(e) => { 
-                                    const val = e.target.value;
-                                    setUserCity(val); 
-                                    localStorage.setItem('userCity', val); 
-                                    setUserLocalities([]); // Reset localities when city changes
-                                    localStorage.setItem('userLocalities', JSON.stringify([]));
-                                  }}
-                                  className="bg-slate-50 text-slate-500 text-[9px] font-bold p-2 rounded-xl border-none outline-none max-w-[120px]"
-                                >
-                                  {['All', ...CITIES_LIST].map(city => <option key={city} value={city}>{city}</option>)}
-                                </select>
-                              </div>
-
-                              {userCity !== 'All' && (() => {
-                                const cityKey = Object.keys(CITY_TO_LOCATIONS_DATA).find(k => k.toLowerCase() === userCity.toLowerCase());
-                                const localities = cityKey ? CITY_TO_LOCATIONS_DATA[cityKey] : null;
-                                if (!localities) return null;
-                                return (
-                                  <div className="p-4 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
-                                    <div className="space-y-0.5 flex-1 min-w-0 mr-4">
-                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.15em]">Specific Localities</label>
-                                      <div 
-                                        className="font-bold text-slate-700 leading-tight"
-                                        style={{ fontSize: getDynamicFontSize((userLocalities || []).join(', ')) }}
-                                      >
-                                        {((userLocalities || [])).length > 0 ? (userLocalities || []).join(', ') : "Select Localities"}
-                                      </div>                                    </div>
-                                    <button 
-                                      onClick={() => setShowSelectionDrawer({
-                                        type: 'localities',
-                                        title: 'Select Localities',
-                                        options: localities,
-                                        selected: userLocalities,
-                                        isMulti: true
-                                      })}
-                                      className="p-2.5 bg-slate-50 text-primary rounded-xl active:scale-95 transition-all border border-slate-100 shadow-sm shrink-0"
-                                    >
-                                      <Edit3 size={16} />
-                                    </button>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-
-                          <div className="pt-4 border-t border-slate-50">
-                             <button 
-                               onClick={() => { playTapSound(); handleUpdateProfile(); }}
-                               disabled={isUpdatingProfile}
-                               className={cn(
-                                 "w-full py-4 rounded-2xl text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2",
-                                 isUpdatingProfile ? "bg-slate-400 cursor-not-allowed" : "bg-primary"
-                               )}
-                             >
-                                {isUpdatingProfile ? (
-                                  <>
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Saving...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Save size={16} /> Save & Close
-                                  </>
-                                )}
-                             </button>
-                             <p className="text-center text-[8px] font-bold text-slate-300 uppercase tracking-[0.2em] mt-6">Last sync: {new Date().toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
+             <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0 bg-white pt-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black">
+                    {currentStep}
+                  </div>
+                  <div>
+                    <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900 leading-none">
+                      Step {currentStep} of 5
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tight">
+                      {currentStep === 1 ? 'Personal Details' : currentStep === 2 ? 'Academic Preferences' : currentStep === 3 ? 'Location & Mode' : currentStep === 4 ? 'Schedule & Time' : 'Account Settings'}
+                    </p>
+                  </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  {currentStep !== 5 && (
+                    <button 
+                      onClick={() => { playTapSound(); setCurrentStep(5); }}
+                      className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-primary transition-all"
+                    >
+                      <Settings size={16} />
+                    </button>
+                  )}
+                  <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition-all"><X size={16} /></button>
+                </div>
+             </div>
 
-                <div className="space-y-4 pt-4 border-t border-slate-100">
-                     {activeUser ? (
-                       <div className="space-y-3">
-                         <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 relative group">
-                           <div className="relative">
+             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={currentStep}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-6"
+                  >
+                    {currentStep === 1 && (
+                      <>
+                        <div className="space-y-4">
+                          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                            Let's get to know you! <br/>What should we call you?
+                          </h2>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Full Name</label>
+                            <div className="relative">
+                              <LucideUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                              <input 
+                                type="text" 
+                                value={userName || ''} 
+                                onChange={(e) => {
+                                  setUserName(e.target.value);
+                                  localStorage.setItem('userName', e.target.value);
+                                }} 
+                                placeholder="e.g. Rahul Sharma" 
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" 
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Where can we reach you?</label>
+                            <div className="relative">
+                              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                              <input 
+                                type="tel" 
+                                value={userPhone || ''} 
+                                onChange={(e) => {
+                                  setUserPhone(e.target.value);
+                                  localStorage.setItem('userPhone', e.target.value);
+                                }} 
+                                placeholder="WhatsApp Number" 
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" 
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Gender</label>
+                            <div className="flex gap-2">
+                              {['Male', 'Female', 'All'].map(g => (
+                                <button
+                                  key={g}
+                                  onClick={() => {
+                                    playTapSound();
+                                    setUserGender(g);
+                                    localStorage.setItem('userGender', g);
+                                  }}
+                                  className={cn(
+                                    "flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all",
+                                    userGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white"
+                                  )}
+                                >
+                                  {g}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {currentStep === 2 && (
+                      <>
+                        <div className="space-y-4">
+                          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                            Which class are you <br/>studying in?
+                          </h2>
+                          
+                          <div className="space-y-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Class Group</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {CLASSES_LIST.map(c => (
+                                  <button
+                                    key={c}
+                                    onClick={() => {
+                                      playTapSound();
+                                      setUserClasses([c]);
+                                      localStorage.setItem('userClasses', JSON.stringify([c]));
+                                      // Reset subjects when class changes
+                                      setUserSubjects([]);
+                                    }}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all",
+                                      userClasses.includes(c) ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white"
+                                    )}
+                                  >
+                                    {c}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Board</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {['CBSE', 'ICSE', 'State Board', 'IB/IGCSE'].map(b => (
+                                  <button
+                                    key={b}
+                                    onClick={() => {
+                                      playTapSound();
+                                      setUserBoard(b);
+                                      localStorage.setItem('userBoard', b);
+                                    }}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all",
+                                      userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white"
+                                    )}
+                                  >
+                                    {b}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Subjects Needed</label>
+                              <div className="flex flex-wrap gap-2">
+                                {(userClasses[0] ? CLASS_SUBJECTS_DATA[userClasses[0]] || [] : []).map(s => (
+                                  <button
+                                    key={s}
+                                    onClick={() => {
+                                      playTapSound();
+                                      const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s];
+                                      setUserSubjects(next);
+                                      localStorage.setItem('userSubjects', JSON.stringify(next));
+                                    }}
+                                    className={cn(
+                                      "px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all",
+                                      userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white"
+                                    )}
+                                  >
+                                    {s}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {currentStep === 3 && (
+                      <>
+                        <div className="space-y-4">
+                          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                            Where do you want <br/>to learn?
+                          </h2>
+
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of Learning</label>
+                            <div className="flex gap-2">
+                              {['Home Tuition', 'Online Class'].map(m => (
+                                <button
+                                  key={m}
+                                  onClick={() => {
+                                    playTapSound();
+                                    setUserMode(m);
+                                    localStorage.setItem('userMode', m);
+                                  }}
+                                  className={cn(
+                                    "flex-1 py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center gap-1",
+                                    userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white"
+                                  )}
+                                >
+                                  <span>{m === 'Home Tuition' ? '🏠' : '💻'}</span>
+                                  <span>{m}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">City</label>
+                              <select 
+                                value={userCity} 
+                                onChange={(e) => {
+                                  setUserCity(e.target.value);
+                                  localStorage.setItem('userCity', e.target.value);
+                                  setUserLocalities([]);
+                                }}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"
+                              >
+                                {CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Locality</label>
+                              <select 
+                                value={userLocalities[0] || ''} 
+                                onChange={(e) => {
+                                  setUserLocalities([e.target.value]);
+                                  localStorage.setItem('userLocalities', JSON.stringify([e.target.value]));
+                                }}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"
+                              >
+                                <option value="">Select Locality</option>
+                                {(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => <option key={l} value={l}>{l}</option>)}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Society / Block / Apartment</label>
+                              <div className="relative">
+                                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                                <input 
+                                  type="text" 
+                                  value={userResidency || ''} 
+                                  onChange={(e) => {
+                                    setUserResidency(e.target.value);
+                                    localStorage.setItem('userResidency', e.target.value);
+                                  }} 
+                                  placeholder="e.g. DLF Phase 3, Block A" 
+                                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" 
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {currentStep === 4 && (
+                      <>
+                        <div className="space-y-4">
+                          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                            When are you <br/>available?
+                          </h2>
+
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Days</label>
+                            <div className="flex flex-wrap gap-2">
+                              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                                <button
+                                  key={day}
+                                  onClick={() => {
+                                    playTapSound();
+                                    const currentDays = userDays ? userDays.split(', ') : [];
+                                    const next = currentDays.includes(day) ? currentDays.filter(v => v !== day) : [...currentDays, day];
+                                    setUserDays(next.join(', '));
+                                    localStorage.setItem('userDays', next.join(', '));
+                                  }}
+                                  className={cn(
+                                    "px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tight transition-all",
+                                    (userDays ? userDays.split(', ') : []).includes(day) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white"
+                                  )}
+                                >
+                                  {day}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Time Slots</label>
+                            <div className="grid grid-cols-3 gap-2 max-h-[200px] overflow-y-auto p-1 custom-scrollbar">
+                              {TIME_LIST.map(time => (
+                                <button
+                                  key={time}
+                                  onClick={() => {
+                                    playTapSound();
+                                    const currentTimes = userTime ? userTime.split(', ') : [];
+                                    const next = currentTimes.includes(time) ? currentTimes.filter(v => v !== time) : [...currentTimes, time];
+                                    setUserTime(next.join(', '));
+                                    localStorage.setItem('userTime', next.join(', '));
+                                  }}
+                                  className={cn(
+                                    "py-2 px-1 rounded-lg border font-bold text-[9px] text-center transition-all",
+                                    (userTime ? userTime.split(', ') : []).includes(time) ? "border-primary bg-primary/10 text-primary" : "border-slate-100 text-slate-400 bg-white"
+                                  )}
+                                >
+                                  {time}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Session Duration</label>
+                            <select 
+                              value={userDuration} 
+                              onChange={(e) => {
+                                setUserDuration(e.target.value);
+                                localStorage.setItem('userDuration', e.target.value);
+                              }}
+                              className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"
+                            >
+                              <option value="1 Hour">1 Hour</option>
+                              <option value="1.5 Hours">1.5 Hours</option>
+                              <option value="2 Hours">2 Hours</option>
+                              <option value="2.5 Hours">2.5 Hours</option>
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {currentStep === 5 && (
+                      <>
+                        <div className="space-y-6">
+                          <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex items-center gap-4">
+                            <div className="relative">
                              {profilePhoto ? (
                                <img src={profilePhoto} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" />
-                             ) : activeUser.photoURL ? (
+                             ) : activeUser?.photoURL ? (
                                <img src={activeUser.photoURL} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" />
                              ) : (
                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-white shadow-md">
                                  <LucideUser size={24} />
                                </div>
                              )}
-                             <label className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg border-2 border-white cursor-pointer active:scale-90 transition-all">
-                               <Camera size={12} strokeWidth={3} />
-                               <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                             </label>
                            </div>
                            <div className="min-w-0 flex-1">
-                             <div className="text-[12px] font-black text-slate-900 truncate">{userName || activeUser.displayName || 'Signed In'}</div>
-                             <div className="text-[10px] font-bold text-slate-400 truncate">{activeUser.email}</div>
+                             <div className="text-[12px] font-black text-slate-900 truncate">{userName || activeUser?.displayName || 'Signed In'}</div>
+                             <div className="text-[10px] font-bold text-slate-400 truncate">{activeUser?.email}</div>
                            </div>
                          </div>
 
@@ -3076,20 +2964,21 @@ export default function App() {
                              <Settings size={16} /> Admin Panel
                            </button>
                          )}
-                         <button onClick={handleLogout} className="w-full bg-rose-50 text-rose-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all mb-4">
+
+                         <button onClick={handleLogout} className="w-full bg-rose-50 text-rose-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all">
                            <LogOut size={16} /> Sign Out
                          </button>
 
                          {/* Delete Profile Section */}
-                         <div className="pt-4 border-t border-slate-100/50">
+                         <div className="pt-6 border-t border-slate-100/50">
                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><AlertCircle size={12} /> Danger Zone</p>
-                           <p className="text-[9px] font-medium text-slate-500 leading-snug mb-3">
+                           <p className="text-[9px] font-medium text-slate-500 leading-snug mb-4">
                              Deleting your profile is permanent and will remove your data from our database.
                            </p>
                            <button
                              onClick={handleDeleteProfile}
                              disabled={isDeletingProfile}
-                             className="w-full bg-rose-500 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                             className="w-full bg-rose-500 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50 shadow-lg shadow-rose-200"
                            >
                              {isDeletingProfile ? <Loader2 size={16} className="animate-spin" /> : (
                                <>
@@ -3097,15 +2986,60 @@ export default function App() {
                                </>
                              )}
                            </button>
-                         </div>                       </div>
-                     ) : null}
-                   </div>
+                         </div>
+                        </div>
+                      </>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+             </div>
 
-                   <div className="text-[7px] font-black text-slate-300 text-center uppercase tracking-[0.3em] pt-8 pb-2">DoAble India Network • v1.13.1</div>                   
-                </div>
+             <div className="p-6 border-t border-slate-50 bg-white flex items-center gap-3">
+                {currentStep > 1 && (
+                  <button 
+                    onClick={() => { playTapSound(); setCurrentStep(prev => prev - 1); }}
+                    className="w-14 h-14 rounded-2xl border-2 border-slate-100 flex items-center justify-center text-slate-400 active:scale-95 transition-all"
+                  >
+                    <ChevronRight size={24} className="rotate-180" />
+                  </button>
+                )}
+                
+                {currentStep < 5 ? (
+                  <button 
+                    onClick={() => {
+                      playTapSound();
+                      if (currentStep < 4) {
+                        setCurrentStep(prev => prev + 1);
+                      } else {
+                        handleUpdateProfile();
+                      }
+                    }}
+                    disabled={isUpdatingProfile}
+                    className={cn(
+                      "flex-1 h-14 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2",
+                      isUpdatingProfile ? "bg-slate-400 cursor-not-allowed" : "bg-primary"
+                    )}
+                  >
+                    {isUpdatingProfile ? (
+                      <Loader2 size={20} className="animate-spin" />
+                    ) : currentStep === 4 ? (
+                      <>Complete Setup <Check size={18} strokeWidth={3} /></>
+                    ) : (
+                      <>Next Step <ChevronRight size={18} strokeWidth={3} /></>
+                    )}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => setShowProfileSetup(false)}
+                    className="flex-1 h-14 rounded-2xl bg-slate-900 text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    Close Settings <Check size={18} strokeWidth={3} />
+                  </button>
+                )}
              </div>
           </div>
-        )}
+        </div>
+      )}
 
       <AnimatePresence>
         {showSelectionDrawer && (

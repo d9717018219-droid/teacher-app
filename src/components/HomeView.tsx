@@ -94,15 +94,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // Dynamic Count Calculations
   const femaleCount = React.useMemo(() => 
-    allTutors.filter(t => (t.gender || '').toLowerCase() === 'female').length, 
+    (allTutors || []).filter(t => (t.gender || '').toLowerCase() === 'female').length, 
   [allTutors]);
   
   const maleCount = React.useMemo(() => 
-    allTutors.filter(t => (t.gender || '').toLowerCase() === 'male').length, 
+    (allTutors || []).filter(t => (t.gender || '').toLowerCase() === 'male').length, 
   [allTutors]);
 
   const getTutorCountForClass = (group: string) => {
-    return allTutors.filter(t => {
+    return (allTutors || []).filter(t => {
       const classes = Array.isArray(t.class_group) ? t.class_group : [];
       return classes.some(c => (c || '').toLowerCase().includes(group.toLowerCase()));
     }).length;
@@ -436,8 +436,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {userCity && userCity !== 'All' && localities.length > 0 ? (
-                localities.map((loc, i) => {
+              {userCity && userCity !== 'All' && (localities || []).length > 0 ? (
+                (localities || []).map((loc, i) => {
                   const count = getTutorCountForLocality(loc);
                   return (
                     <div 

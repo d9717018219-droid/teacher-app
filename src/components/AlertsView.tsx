@@ -360,7 +360,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
     const userGenderLower = (userGender || '').toString().toLowerCase().trim();
     const uLocs = (userLocalities || []).map(l => l.toLowerCase().trim());
 
-    return items.filter(a => {
+    return (items || []).filter(a => {
       const aData = a as any;
       const targetCity = (a.city || aData.City || 'All').toString().toLowerCase().trim();
       if (targetCity !== 'all' && userCityLower !== targetCity) return false;
