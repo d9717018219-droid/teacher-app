@@ -3,15 +3,11 @@ import {
   MapPin, 
   ChevronRight, 
   Briefcase, 
-  Star,
-  CheckCircle2,
   BadgeCheck,
   Heart,
   BookOpen,
   FlaskConical,
   Globe,
-  Monitor,
-  Palette,
   GraduationCap,
   Calculator,
   Zap,
@@ -20,12 +16,19 @@ import {
   TrendingUp,
   Code,
   Trophy,
-  Sparkles,
   Clock,
-  User
+  User,
+  ShieldCheck,
+  Car,
+  CalendarDays,
+  Sparkles,
+  ArrowUpRight,
+  TrendingDown,
+  Percent,
+  Palette
 } from 'lucide-react';
 import { TutorProfile } from '../types';
-import { cn, toTitleCase, formatPostedDate, cleanValue } from '../utils';
+import { cn, toTitleCase } from '../utils';
 
 interface TutorCardProps {
   tutor: TutorProfile;
@@ -37,21 +40,51 @@ interface TutorCardProps {
 const getSubjectStyles = (subjects: string = '') => {
   const s = subjects.toLowerCase();
   
-  if (s.includes('math')) return { bg: 'bg-blue-600', icon: <Calculator size={24} /> };
-  if (s.includes('physics')) return { bg: 'bg-red-500', icon: <Zap size={24} /> };
-  if (s.includes('chem')) return { bg: 'bg-teal-500', icon: <FlaskConical size={24} /> };
-  if (s.includes('bio') || s.includes('science')) return { bg: 'bg-lime-600', icon: <Dna size={24} /> };
-  if (s.includes('english')) return { bg: 'bg-indigo-600', icon: <Languages size={24} /> };
-  if (s.includes('hindi')) return { bg: 'bg-orange-600', icon: <Languages size={24} /> };
-  if (s.includes('history') || s.includes('geo') || s.includes('sst') || s.includes('social')) return { bg: 'bg-emerald-600', icon: <Globe size={24} /> };
-  if (s.includes('eco') || s.includes('stat')) return { bg: 'bg-violet-600', icon: <TrendingUp size={24} /> };
-  if (s.includes('account') || s.includes('business')) return { bg: 'bg-cyan-600', icon: <Briefcase size={24} /> };
-  if (s.includes('comput') || s.includes('coding') || s.includes('it')) return { bg: 'bg-slate-800', icon: <Code size={24} /> };
-  if (s.includes('music') || s.includes('art')) return { bg: 'bg-purple-500', icon: <Palette size={24} /> };
-  if (s.includes('yoga') || s.includes('dance') || s.includes('sport')) return { bg: 'bg-pink-500', icon: <Trophy size={24} /> };
-  if (s.includes('all')) return { bg: 'bg-primary', icon: <Sparkles size={24} /> };
+  if (s.includes('math')) return { bg: 'bg-[#6366F1]', icon: <Calculator size={16} />, gradient: 'from-[#6366F1] to-[#4F46E5]' };
+  if (s.includes('physics')) return { bg: 'bg-[#F43F5E]', icon: <Zap size={16} />, gradient: 'from-[#F43F5E] to-[#E11D48]' };
+  if (s.includes('chem')) return { bg: 'bg-[#14B8A6]', icon: <FlaskConical size={16} />, gradient: 'from-[#14B8A6] to-[#0D9488]' };
+  if (s.includes('bio') || s.includes('science')) return { bg: 'bg-[#84CC16]', icon: <Dna size={16} />, gradient: 'from-[#84CC16] to-[#65A30D]' };
+  if (s.includes('english')) return { bg: 'bg-[#8B5CF6]', icon: <Languages size={16} />, gradient: 'from-[#8B5CF6] to-[#7C3AED]' };
+  if (s.includes('hindi')) return { bg: 'bg-[#F97316]', icon: <Languages size={16} />, gradient: 'from-[#F97316] to-[#EA580C]' };
+  if (s.includes('history') || s.includes('geo') || s.includes('sst') || s.includes('social')) return { bg: 'bg-[#10B981]', icon: <Globe size={16} />, gradient: 'from-[#10B981] to-[#059669]' };
+  if (s.includes('eco') || s.includes('stat')) return { bg: 'bg-[#A855F7]', icon: <TrendingUp size={16} />, gradient: 'from-[#A855F7] to-[#9333EA]' };
+  if (s.includes('account') || s.includes('business')) return { bg: 'bg-[#06B6D4]', icon: <Briefcase size={16} />, gradient: 'from-[#06B6D4] to-[#0891B2]' };
+  if (s.includes('comput') || s.includes('coding') || s.includes('it')) return { bg: 'bg-[#1E293B]', icon: <Code size={16} />, gradient: 'from-[#1E293B] to-[#0F172A]' };
+  if (s.includes('music') || s.includes('art')) return { bg: 'bg-[#D946EF]', icon: <Palette size={16} />, gradient: 'from-[#D946EF] to-[#C026D3]' };
+  if (s.includes('yoga') || s.includes('dance') || s.includes('sport')) return { bg: 'bg-[#F472B6]', icon: <Trophy size={16} />, gradient: 'from-[#F472B6] to-[#DB2777]' };
   
-  return { bg: 'bg-primary', icon: <GraduationCap size={24} /> };
+  return { bg: 'bg-[#3B82F6]', icon: <GraduationCap size={16} />, gradient: 'from-[#3B82F6] to-[#2563EB]' };
+};
+
+const calculatePricing = (experience: string, classGroup: string[]) => {
+  let baseFee = 4000;
+  let sessions = 20;
+
+  const exp = (experience || '').toLowerCase();
+  
+  if (exp.includes('1 to 3') || exp.includes('1-3')) baseFee = 5000;
+  else if (exp.includes('3 to 5') || exp.includes('3-5')) baseFee = 6000;
+  else if (exp.includes('5 to 10') || exp.includes('5-10') || exp.includes('10+') || exp.includes('above')) baseFee = 7000;
+  else baseFee = 4000;
+
+  const classes = (classGroup || []).join(', ').toLowerCase();
+  
+  if (classes.includes('xi to xii') || classes.includes('11') || classes.includes('12')) {
+    baseFee += 1000;
+    sessions = 12;
+  } else if (classes.includes('ix to x') || classes.includes('9') || classes.includes('10')) {
+    sessions = 12;
+  } else if (classes.includes('vi to viii') || classes.includes('6') || classes.includes('7') || classes.includes('8')) {
+    baseFee += 1000;
+    sessions = 20;
+  } else {
+    sessions = 20;
+  }
+
+  const mrp = Math.ceil((baseFee * 1.45) / 500) * 500 - 1; 
+  const discount = Math.round(((mrp - baseFee) / mrp) * 100);
+
+  return { fee: baseFee, sessions, mrp, discount };
 };
 
 export const TutorCard: React.FC<TutorCardProps> = React.memo(({ 
@@ -65,115 +98,136 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
   const tutorId = tutor.tutor_id || 'N/A';
   const name = tutor.name || 'Premium Tutor';
   const city = tutor.city || 'India';
-  const locationArr = tutor.location || [];
-  const area = locationArr.length > 0 ? locationArr[0] : '';
-  const location = area ? `${area} - ${city}` : city;
-  const exp = tutor.experience || '1-3 Years';
+  const exp = tutor.experience || '1 to 3 Years';
   const qualArr = tutor.qualification || [];
   const qual = qualArr.length > 0 ? qualArr[0] : 'Graduate';
   const subjectsArr = tutor.subjects || [];
   const subjectsStr = subjectsArr.join(', ') || 'General';
-  const gender = tutor.gender || '';
-  const classGroupArr = tutor.class_group || [];
-  const classGroupStr = classGroupArr.join(', ') || '';
+  const gender = tutor.gender || 'Any';
+  const age = tutor.age || '25+';
+  const schoolTeacher = tutor.school_teacher === 'Yes';
+  const haveVehicle = tutor.have_vehicle === 'Yes';
   const verified = tutor.verified === 'Yes';
+  const classGroupArr = tutor.class_group || [];
+  const classGroupStr = classGroupArr.join(', ') || 'N/A';
   
-  const { bg, icon } = getSubjectStyles(subjectsStr);
+  const { icon, bg } = getSubjectStyles(subjectsStr);
+  const { fee, sessions, mrp, discount } = calculatePricing(exp, classGroupArr);
 
   return (
     <div 
       onClick={() => onClick(tutor)}
-      className="bg-white rounded-[20px] p-3 shadow-sm border border-slate-100 flex flex-col gap-2.5 active:scale-[0.98] transition-all cursor-pointer relative group overflow-hidden mb-2"
+      className="group relative bg-white rounded-xl p-3 flex flex-col gap-2.5 active:scale-[0.99] transition-all cursor-pointer border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-400/30 mb-1.5"
     >
+      {/* LinkedIn Style Header */}
       <div className="flex items-start gap-2.5">
-        {/* Left Icon Box - Smaller */}
-        <div className={cn("w-[54px] h-[54px] rounded-[16px] flex-shrink-0 flex items-center justify-center transition-transform group-hover:scale-105 shadow-sm text-white", bg)}>
-          {icon}
-        </div>
-
-        {/* Middle Content */}
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="text-primary text-[10.5px] font-[900] tracking-tight">Tutor ID: {tutorId}</span>
-              {verified && (
-                <div className="flex items-center gap-1 ml-2">
-                   <div className="flex items-center gap-1 bg-[#404E78] text-white px-1.5 py-0.5 rounded-lg shadow-lg shadow-[#404E78]/10 border border-white/10">
-                      <BadgeCheck size={11} className="fill-white text-[#404E78]" />
-                      <span className="text-[8.5px] font-[1000] uppercase tracking-widest leading-none">Verified</span>
-                   </div>
-                </div>
-              )}
+        <div className="relative">
+          <div className={cn("w-12 h-12 rounded-lg flex items-center justify-center text-white shadow-sm", bg)}>
+            {React.cloneElement(icon as React.ReactElement, { size: 20 })}
+          </div>
+          {verified && (
+            <div className="absolute -bottom-1 -right-1 bg-blue-600 rounded-full p-0.5 border-2 border-white">
+              <BadgeCheck size={10} className="text-white fill-blue-600" />
             </div>
-            <span className="text-[#94A3B8] text-[9.5px] font-bold uppercase tracking-widest">{location}</span>
-          </div>
-          
-          <h4 className="text-[16px] font-[800] text-[#0F172A] leading-tight tracking-tight truncate">
-            {toTitleCase(name)}
-          </h4>
-          <p className="text-[#64748B] text-[12px] font-[500] truncate">{qual}</p>
-          
-          <div className="flex items-center gap-1.5 pt-1.5 overflow-x-auto no-scrollbar">
-            {gender && (
-              <span className={cn(
-                "text-[9px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950 whitespace-nowrap",
-                gender.toLowerCase().includes('female') 
-                  ? "bg-rose-50 border-rose-100/50" 
-                  : gender.toLowerCase().includes('male')
-                    ? "bg-blue-50 border-blue-100/50"
-                    : "bg-slate-50 border-slate-100/50"
-              )}>
-                <User size={9} strokeWidth={3} className="text-slate-400" /> {gender}
-              </span>
-            )}
-            {classGroupStr && (
-              <span className={cn(
-                "text-[9px] font-[900] px-2 py-0.5 rounded-md border flex items-center gap-1 tracking-tight text-slate-950 whitespace-nowrap",
-                (() => {
-                  const g = classGroupStr.toLowerCase();
-                  if (g.includes('11') || g.includes('12') || g.includes('higher') || g.includes('senior')) return "bg-violet-50 border-violet-100/50";
-                  if (g.includes('9') || g.includes('10') || g.includes('secondary')) return "bg-amber-50 border-amber-100/50";
-                  if (g.includes('6') || g.includes('7') || g.includes('8') || g.includes('middle')) return "bg-emerald-50 border-emerald-100/50";
-                  if (g.includes('1') || g.includes('2') || g.includes('3') || g.includes('4') || g.includes('5') || g.includes('primary')) return "bg-indigo-50 border-indigo-100/50";
-                  return "bg-slate-50 border-slate-100/50";
-                })()
-              )}>
-                <BookOpen size={9} strokeWidth={3} className="text-slate-400" /> {classGroupStr}
-              </span>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Compact Right Side (Removed redundant icons, moved to bottom) */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-0.5">
+            <h4 className="text-[14px] font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors leading-tight">
+              {toTitleCase(name)}
+            </h4>
+            <div className="flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shrink-0">
+              <MapPin size={8} className="text-blue-600" />
+              <span className="text-[8px] font-bold uppercase tracking-tight">{city}</span>
+            </div>
+          </div>
+          <p className="text-[10px] text-blue-600 font-bold leading-none mb-1">#{tutorId}</p>
+          
+          <div className="flex items-center gap-1.5 flex-wrap text-[9px] text-slate-500 font-medium">
+             <span className="flex items-center gap-1"><User size={9} /> {gender}</span>
+             <span className="text-slate-300">•</span>
+             <span>{age} Yrs</span>
+             <span className="text-slate-300">•</span>
+             <span className="flex items-center gap-1 font-bold text-slate-700">{exp} Exp</span>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-2 pt-2 mt-1 border-t border-slate-50">
-        <div className="flex justify-between items-center opacity-70">
-          <div className="flex items-center gap-1">
-            <CheckCircle2 size={9} className="text-primary" />
-            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tight">School Exp.: {tutor.school_teacher || 'No'}</span>
-          </div>
-          <span className="text-[#94A3B8] text-[8px] font-black uppercase tracking-tight">Own Vehicle: {tutor.have_vehicle || 'No'}</span>
-        </div>
+      {/* Professional Detail Rows */}
+      <div className="flex flex-col gap-2 py-0.5">
+         {/* Row 1: Qualification & Class Group */}
+         <div className="flex flex-wrap gap-1.5">
+            <div className="flex items-center gap-1.5 bg-white text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50/30">
+               <GraduationCap size={11} className="text-blue-500" />
+               <span className="text-[10px] font-bold tracking-tight">{qual}</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm transition-all hover:border-indigo-200 hover:bg-indigo-50/30">
+               <BookOpen size={11} className="text-indigo-500" />
+               <span className="text-[10px] font-bold tracking-tight">{classGroupStr}</span>
+            </div>
+         </div>
 
-        <div className="flex items-center gap-2">
-           <button 
-             onClick={() => onClick(tutor)}
-             className="flex-1 bg-slate-100 text-slate-900 h-8 rounded-lg font-[900] text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1.5"
-           >
-             View Profile
-             <ChevronRight size={12} strokeWidth={3} className="text-slate-400" />
-           </button>
-           <button 
-             onClick={(e) => { e.stopPropagation(); onShortlistToggle?.(tutorId, e); }}
-             className={cn(
-               "w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 border",
-               isShortlisted ? "bg-rose-50 border-rose-100 text-rose-500" : "bg-white border-slate-100 text-slate-300"
-             )}
-           >
-             <Heart size={14} fill={isShortlisted ? "currentColor" : "none"} />
-           </button>
-        </div>
+         {/* Row 2: Teacher & Vehicle Status */}
+         <div className="flex flex-wrap gap-1.5">
+            <div className={cn(
+               "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border shadow-sm transition-all",
+               schoolTeacher 
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                : "bg-slate-50 text-slate-400 border-slate-100"
+            )}>
+               <ShieldCheck size={11} className={schoolTeacher ? "text-emerald-500" : "text-slate-300"} />
+               <span className="text-[9px] font-black uppercase tracking-tight">School Teacher: {schoolTeacher ? 'Yes' : 'No'}</span>
+            </div>
+            <div className={cn(
+               "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border shadow-sm transition-all",
+               haveVehicle 
+                ? "bg-blue-50 text-blue-700 border-blue-200" 
+                : "bg-slate-50 text-slate-400 border-slate-100"
+            )}>
+               <Car size={11} className={haveVehicle ? "text-blue-500" : "text-slate-300"} />
+               <span className="text-[9px] font-black uppercase tracking-tight">Own Vehicle: {haveVehicle ? 'Yes' : 'No'}</span>
+            </div>
+         </div>
+      </div>
+
+      {/* LinkedIn Style Subjects */}
+      <div className="text-[9px] text-slate-600 line-clamp-1 border-t border-slate-50 pt-1.5 flex items-center gap-1.5">
+         <div className="w-1 h-1 bg-blue-400 rounded-full" />
+         <span className="font-bold text-slate-500 uppercase text-[8px] tracking-wider">Expertise:</span>
+         <span className="font-medium text-slate-700">{subjectsStr}</span>
+      </div>
+
+      {/* Pricing & CTA Row */}
+      <div className="flex items-center justify-between mt-0.5 pt-2 border-t border-slate-100">
+         <div className="flex flex-col">
+            <div className="flex items-baseline gap-1">
+               <span className="text-[17px] font-extrabold text-slate-900 leading-none">₹{fee.toLocaleString()}</span>
+               <span className="text-[10px] text-slate-400 line-through font-medium">₹{mrp.toLocaleString()}</span>
+               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">/mo</span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5">
+               <span className="text-[9px] font-black text-green-600 flex items-center gap-0.5">
+                  {discount}% OFF
+               </span>
+               <span className="text-[8px] font-bold text-slate-400">• {sessions} SESS</span>
+            </div>
+         </div>
+
+         <div className="flex items-center gap-1.5">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onShortlistToggle?.(tutorId, e); }}
+              className={cn(
+                "p-1.5 rounded-lg border transition-all active:scale-90",
+                isShortlisted ? "bg-red-50 border-red-100 text-red-500" : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
+              )}
+            >
+              <Heart size={14} fill={isShortlisted ? "currentColor" : "none"} />
+            </button>
+            <button className="bg-[#0A66C2] hover:bg-[#004182] text-white px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors shadow-sm active:scale-95 flex items-center gap-1.5">
+               View <ArrowUpRight size={12} />
+            </button>
+         </div>
       </div>
     </div>
   );
