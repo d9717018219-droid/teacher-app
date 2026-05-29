@@ -2083,6 +2083,41 @@ export default function App() {
             onShortlistToggle={toggleShortlist}
             profileCompletion={profileCompletion}
             setShowProfileSetup={setShowProfileSetup}
+            localities={CITY_TO_LOCATIONS_DATA[userCity] || []}
+            allTutors={finalTutors}
+            onClassClick={(cls) => {
+              playTapSound();
+              // Reset other filters for a clean search
+              setTutorFilterClasses([cls]);
+              setTutorFilterLocalities([]);
+              setTutorFilterGender('All');
+              setTutorSearchQuery('');
+              setActiveTab('tutors');
+              setVisibleTutorsCount(10);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onLocalityClick={(loc) => {
+              playTapSound();
+              // Reset other filters for a clean search
+              setTutorFilterLocalities([loc]);
+              setTutorFilterClasses([]);
+              setTutorFilterGender('All');
+              setTutorSearchQuery('');
+              setActiveTab('tutors');
+              setVisibleTutorsCount(10);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onGenderClick={(gender) => {
+              playTapSound();
+              // Reset other filters for a clean search
+              setTutorFilterGender(gender);
+              setTutorFilterClasses([]);
+              setTutorFilterLocalities([]);
+              setTutorSearchQuery('');
+              setActiveTab('tutors');
+              setVisibleTutorsCount(10);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
        {activeTab === 'jobs' && (
