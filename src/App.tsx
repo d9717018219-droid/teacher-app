@@ -371,7 +371,8 @@ export default function App() {
         // Map frontend state to lowercase database column names
         const parentData: any = {
           action: 'upsert',
-          order_id: activeUser.email, 
+          email: activeUser.email,
+          phone: userPhone,
           name: userName,
           class: userClasses.join(', '),
           subjects: userSubjects.join(', '),
@@ -2707,37 +2708,35 @@ export default function App() {
                               {/* Name */}
                               <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
                                 <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Name</label>
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">{userType === 'parent' ? "What is your Name?" : "Your Name"}</label>
                                   <div className="text-[11px] font-bold text-slate-700 truncate">{userName || "Not set"}</div>
                                 </div>
                                 <button onClick={() => { const val = prompt("Enter name:", userName || ""); if (val !== null) { setUserName(val); localStorage.setItem('userName', val); }}} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
                               </div>
 
                               {/* Phone */}
-                              {userType === 'teacher' && (
-                                <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
-                                  <div className="space-y-0.5">
-                                    <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Phone</label>
-                                    <div className="text-[11px] font-bold text-slate-700 truncate">{userPhone || "Not set"}</div>
-                                  </div>
-                                  <button onClick={() => { 
-                                    const cleanPhone = userPhone ? userPhone.replace('+91 ', '').replace('+91', '') : '';
-                                    const val = prompt("Enter phone:", cleanPhone);
-                                    if (val !== null) { 
-                                      const digits = val.replace(/\D/g, '').slice(-10);
-                                      if (digits.length === 10) {
-                                        const formatted = "+91 " + digits;
-                                        setUserPhone(formatted); 
-                                        localStorage.setItem('userPhone', formatted);
-                                      } else {
-                                        alert("Please enter exactly 10 digits.");
-                                      }
-                                    }
-                                  }} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
+                              <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
+                                <div className="space-y-0.5">
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">{userType === 'parent' ? "Primary Phone No." : "Phone Number"}</label>
+                                  <div className="text-[11px] font-bold text-slate-700 truncate">{userPhone || "Not set"}</div>
                                 </div>
-                              )}
+                                <button onClick={() => { 
+                                  const cleanPhone = userPhone ? userPhone.replace('+91 ', '').replace('+91', '') : '';
+                                  const val = prompt("Enter phone number:", cleanPhone);
+                                  if (val !== null) { 
+                                    const digits = val.replace(/\D/g, '').slice(-10);
+                                    if (digits.length === 10) {
+                                      const formatted = "+91 " + digits;
+                                      setUserPhone(formatted); 
+                                      localStorage.setItem('userPhone', formatted);
+                                    } else {
+                                      alert("Please enter exactly 10 digits.");
+                                    }
+                                  }
+                                }} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>
+                              </div>
 
-                              {/* DOB */}
+                              {/* DOB (Teacher Only) */}
                               {userType === 'teacher' && (
                                 <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative overflow-hidden">
                                   <div className="space-y-0.5">
@@ -2749,17 +2748,17 @@ export default function App() {
                                 </div>
                               )}
 
-                              {/* Gender */}
+                              {/* Gender Preference for Parent */}
                               <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
                                 <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Gender</label>
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">{userType === 'parent' ? "Tutor Gender Preference" : "Gender"}</label>
                                   <select value={userGender} onChange={(e) => { setUserGender(e.target.value); localStorage.setItem('userGender', e.target.value); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
                                     <option value="Any">Any</option><option value="Male">Male</option><option value="Female">Female</option>
                                   </select>
                                 </div>
                               </div>
 
-                              {/* Qualification */}
+                              {/* Qualification (Teacher Only) */}
                               {userType === 'teacher' && (
                                 <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
                                   <div className="space-y-0.5">
@@ -2769,7 +2768,7 @@ export default function App() {
                                   <button onClick={() => setShowSelectionDrawer({ type: 'qualification', title: 'Qualification', options: QUALIFICATIONS_LIST, selected: userQualifications || [], isMulti: true })} className="absolute right-2 top-2 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Edit3 size={12} /></button>                                </div>
                               )}
 
-                              {/* Fee */}
+                              {/* Fee for Teacher */}
                               {userType === 'teacher' && (
                                 <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
                                   <div className="space-y-0.5">
@@ -2780,10 +2779,10 @@ export default function App() {
                                 </div>
                               )}
                               
-                              {/* City */}
+                              {/* City Selection */}
                               <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative col-span-2">
                                 <div className="space-y-0.5">
-                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">City</label>
+                                  <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">{userType === 'parent' ? "Which City are you in?" : "Work City"}</label>
                                   <select value={userCity} onChange={(e) => { setUserCity(e.target.value); localStorage.setItem('userCity', e.target.value); setUserLocalities([]); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
                                     {['All', ...CITIES_LIST].map(city => <option key={city} value={city}>{city}</option>)}
                                   </select>
@@ -2795,7 +2794,7 @@ export default function App() {
                                 <>
                                   <div className="p-3 bg-white border border-slate-100 rounded-2xl flex flex-col justify-between group relative">
                                     <div className="space-y-0.5">
-                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Board</label>
+                                      <label className="text-[8px] font-black uppercase text-slate-300 tracking-[0.1em]">Select School Board</label>
                                       <select value={userBoard} onChange={(e) => { setUserBoard(e.target.value); localStorage.setItem('userBoard', e.target.value); }} className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none p-0 mt-1 cursor-pointer">
                                         <option value="CBSE">CBSE</option>
                                         <option value="ICSE">ICSE</option>
