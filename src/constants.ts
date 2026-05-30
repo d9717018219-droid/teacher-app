@@ -1,3 +1,15 @@
+export const TUTOR_QUALIFICATIONS_LIST = [
+  "B.Arch", "B.Com", "B.Ed", "B.LLB", "B.Lib", "B.Ped", "B.Pharma", "B.Sc", "B.Tech", "BA", "BBA", "BBM", "BCA", "BDS", "BFA", "BHM", "BJ", "BPT", "CA", "CFA", "CS", "D.Ed", "D.El.Ed", "DM", "DNB", "Ed.D.", "ICWA", "LLB", "LLM", "M.Arch", "M.Com", "M.Ed", "M.Ped", "M.Pharma", "M.Sc", "M.Tech", "MA", "MBA", "MBBS", "MCA", "MD", "MDS", "MS", "NTT", "PGDCA", "PGDM", "Ph.D."
+];
+
+export const TUTOR_EXPERIENCE_LIST = [
+  "Less than 1 Year", "1 to 3 Years", "3 to 5 Years", "5 to 10 Years", "More than 10 Years"
+];
+
+export const TUTOR_FEE_LIST = [
+  "₹200/hr (Entry Level)", "₹300/hr (Standard)", "₹400/hr (Recommended)", "₹500/hr (Experienced)", "₹600/hr (Expert)", "₹700/hr (Senior)", "₹800/hr (Premium)", "₹1000+/hr (Specialist)"
+];
+
 export const CITIES_LIST = [
   "Ahmedabad",
   "Ajmer",
@@ -116,7 +128,9 @@ export const CLASS_GROUP_MAPPING: Record<string, string[]> = {
   "Class I to V": ["1st Std", "2nd Std", "3rd Std", "4th Std", "5th Std"],
   "Class VI to VIII": ["6th Std", "7th Std", "8th Std"],
   "Class IX to X": ["9th Std", "10th Std"],
-  "Class XI to XII": ["11th Std", "12th Std"]
+  "Class XI to XII": ["11th Std", "12th Std"],
+  "Competitive": ["NEET", "JEE", "CUET", "NDA", "CLAT", "Competitive", "Entrance"],
+  "Language": ["French", "German", "Spanish", "IELTS", "TOEFL", "Language", "English Speaking"]
 };
 
 export const CLASS_SUBJECTS_DATA: Record<string, string[]> = {

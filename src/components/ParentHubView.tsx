@@ -7,36 +7,36 @@ interface ParentHubViewProps {
   userName: string | null;
   playTapSound: () => void;
   setActiveTab: (tab: any) => void;
-  setShowFormModal: (show: boolean) => void;
-  setFormType: (type: 'teacher' | 'parent') => void;
+  onPostRequirement: () => void;
+  onHideNeed: () => void;
 }
 
 export const ParentHubView: React.FC<ParentHubViewProps> = ({ 
   userName, 
   playTapSound, 
   setActiveTab,
-  setShowFormModal,
-  setFormType
+  onPostRequirement,
+  onHideNeed
 }) => {
   return (
     <div className="flex flex-col p-5 pb-40 space-y-7 max-w-lg mx-auto font-sans bg-[#FAFBFF]">
       
-      {/* ─── ELITE CONCIERGE HEADER ─── */}
+      {/* ─── POST MY NEED HEADER ─── */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <div className="w-2 h-6 bg-[#572149] rounded-full" />
-            <h2 className="text-2xl font-[1000] text-slate-900 tracking-tighter">Concierge</h2>
+            <h2 className="text-2xl font-[1000] text-slate-900 tracking-tighter">Post My Need</h2>
           </div>
           {userName && (
             <div className="flex items-center gap-1.5 px-1 whitespace-nowrap">
               <Star size={9} className="text-amber-500 fill-amber-500" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Exclusive Access: {userName}</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Parent Portal: {userName}</span>
             </div>
           )}
         </div>
         <div className="bg-[#572149]/5 px-2 py-1 rounded-full border border-[#572149]/10 shrink-0 whitespace-nowrap">
-           <span className="text-[8.5px] font-black text-[#572149] uppercase tracking-tight">Premium Member</span>
+           <span className="text-[8.5px] font-black text-[#572149] uppercase tracking-tight">Verified Parent</span>
         </div>
       </motion.div>
 
@@ -56,7 +56,7 @@ export const ParentHubView: React.FC<ParentHubViewProps> = ({
 
            <div className="flex flex-col gap-3">
               <button 
-                onClick={() => { playTapSound(); setFormType('parent'); setShowFormModal(true); }}
+                onClick={() => { playTapSound(); onPostRequirement(); }}
                 className="w-full bg-[#572149] hover:bg-[#572149]/90 text-white py-5 rounded-2xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-black/40 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
               >
                 <Calendar size={20} strokeWidth={3} /> Post a Requirement
@@ -64,29 +64,30 @@ export const ParentHubView: React.FC<ParentHubViewProps> = ({
               
               <div className="grid grid-cols-2 gap-3">
                 <button 
-                  onClick={() => { playTapSound(); setActiveTab('tutors'); }}
+                  onClick={() => { playTapSound(); onHideNeed(); }}
                   className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center justify-center gap-2 hover:bg-white/10 transition-all"
                 >
                   <Search className="text-white/60" size={18} />
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Find Tutors</span>
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Hide My Need</span>
                 </button>
-                <button 
-                  onClick={() => { playTapSound(); setActiveTab('support'); }}
+                <a 
+                  href="tel:9717018219"
+                  onClick={() => playTapSound()}
                   className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center justify-center gap-2 hover:bg-white/10 transition-all"
                 >
                   <MessageCircle className="text-white/60" size={18} />
                   <span className="text-[10px] font-black text-white uppercase tracking-widest">Talk to Expert</span>
-                </button>
+                </a>
               </div>
            </div>
         </div>
       </motion.div>
 
-      {/* ─── CONCIERGE SERVICES ─── */}
+      {/* ─── MATCHING SERVICES ─── */}
       <div className="space-y-4">
         <div className="px-1 flex items-center gap-2">
            <Sparkles size={14} className="text-[#572149]" />
-           <h3 className="text-[12px] font-extrabold text-slate-900 tracking-tight">Personalized Concierge Benefits</h3>
+           <h3 className="text-[12px] font-extrabold text-slate-900 tracking-tight">Premium Matching Benefits</h3>
         </div>
         
         <div className="grid grid-cols-1 gap-3">
@@ -94,7 +95,7 @@ export const ParentHubView: React.FC<ParentHubViewProps> = ({
              { title: 'Identity Verified Tutors', desc: 'We verify Aadhaar, Qualifications, and Address for your peace of mind.', icon: <CheckCircle2 size={18} />, color: 'text-emerald-500', bg: 'bg-emerald-50' },
              { title: 'Collaborative Success Group', desc: 'A dedicated group with Tutor & RMN for daily attendance, curriculum tracking, and PTM feedback.', icon: <Users size={18} />, color: 'text-blue-500', bg: 'bg-blue-50' },
              { title: 'Flexible Payment Methods', desc: 'Pay via UPI, Cards, Netbanking, or Cash. Payments are due 1 week after trial confirmation.', icon: <CreditCard size={18} />, color: 'text-[#572149]', bg: 'bg-[#572149]/5' },
-             { title: 'Priority Scheduling', desc: 'Get your demo session scheduled within 24 hours of posting.', icon: <Clock size={18} />, color: 'text-amber-500', bg: 'bg-amber-50' }
+             { title: 'Priority Matching', desc: 'Get your demo session scheduled within 24 hours of posting.', icon: <Clock size={18} />, color: 'text-amber-500', bg: 'bg-amber-50' }
            ].map((item, i) => (
              <div key={i} className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex items-start gap-4 hover:border-[#572149]/20 transition-colors">
                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", item.bg, item.color)}>
@@ -116,7 +117,7 @@ export const ParentHubView: React.FC<ParentHubViewProps> = ({
          </div>
          <div className="space-y-0.5">
             <h4 className="text-[13px] font-black text-emerald-900 uppercase tracking-tight">Zero Platform Fees</h4>
-            <p className="text-[10px] font-medium text-emerald-700/70 leading-snug">Our concierge service is 100% free for parents. You only pay the tutor after successful trials.</p>
+            <p className="text-[10px] font-medium text-emerald-700/70 leading-snug">Our matching service is 100% free for parents. You only pay the tutor after successful trials.</p>
          </div>
       </div>
     </div>

@@ -116,28 +116,56 @@ export function getTutorId(tutor: any): string {
   return (tutor.tutor_id || tutor['Tutor ID'] || tutor.tutorId || tutor.id || tutor.ID || 'N/A').toString();
 }
 
+// ─── Haptic-like tap sound & vibrate ───────────────────────────────
+const TAP_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
+const tapAudio = typeof Audio !== 'undefined' ? new Audio(TAP_SOUND_URL) : null;
+if (tapAudio) tapAudio.load();
+
+export function playTapSound() {
+  try {
+    if (tapAudio) {
+      tapAudio.currentTime = 0;
+      tapAudio.volume = 0.4;
+      tapAudio.play().catch(() => {});
+    }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(15);
+    }
+  } catch {}
+}
+
 export function calculateProfileCompletion(userData: any, userType: 'parent' | 'teacher' | null): number {
   if (!userType) return 0;
   
   let totalFields = 0;
   let filledFields = 0;
 
-  const commonFields = ['name', 'email', 'city', 'gender'];
-  const teacherFields = ['phone', 'dob', 'qualification', 'experience', 'about', 'classes', 'subjects', 'photo'];
-  const parentFields = ['classes', 'subjects', 'address', 'mode', 'board'];
+  // Fields that are essential for everyone
+  const commonFields = ['name', 'phone', 'gender', 'city', 'classes', 'subjects', 'mode'];
+  
+  // Role-specific fields
+  const teacherSpecific = ['dob', 'age', 'qualification', 'experience', 'communication', 'localities', 'days', 'time', 'about', 'aadhar', 'address'];
+  const parentSpecific = ['board', 'localities', 'residency', 'days', 'time', 'duration', 'fee'];
 
-  const fieldsToCheck = [...commonFields, ...(userType === 'teacher' ? teacherFields : parentFields)];
+  const fieldsToCheck = [...commonFields, ...(userType === 'teacher' ? teacherSpecific : parentSpecific)];
   
   totalFields = fieldsToCheck.length;
 
   fieldsToCheck.forEach(field => {
     const val = userData[field];
-    if (val && (Array.isArray(val) ? val.length > 0 : val.toString().trim() !== '')) {
-      filledFields++;
+    // Check for array length or non-empty string/number
+    if (val !== undefined && val !== null) {
+      if (Array.isArray(val)) {
+        if (val.length > 0) filledFields++;
+      } else if (val.toString().trim() !== '') {
+        filledFields++;
+      }
     }
   });
 
-  return Math.round((filledFields / totalFields) * 100);
+  // Calculate percentage and cap at 100
+  const percentage = Math.round((filledFields / totalFields) * 100);
+  return Math.min(percentage, 100);
 }
 
 /**

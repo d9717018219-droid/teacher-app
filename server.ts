@@ -14,11 +14,14 @@ async function startServer() {
   // API Proxy Route
   app.get('/api/leads', async (req, res) => {
     try {
-      console.log('Fetching leads from external API...');
+      console.log('Fetching leads from external API with query:', req.query);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); 
       
-      const response = await fetch('https://doableindia.com/app-sys/api_data.php', { 
+      const queryString = new URLSearchParams(req.query as any).toString();
+      const targetUrl = `https://doableindia.com/app-sys/api_data.php${queryString ? '?' + queryString : ''}`;
+      
+      const response = await fetch(targetUrl, { 
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -72,11 +75,12 @@ async function startServer() {
 
   app.post('/api/auth/signup', express.json(), async (req, res) => {
     try {
-      console.log('Forwarding signup to Hostinger...');
+      console.log('Forwarding signup to Hostinger...', JSON.stringify(req.body));
       const response = await fetch('https://doableindia.com/app-sys/app_auth.php', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
         },
         body: JSON.stringify({ action: 'signup', ...req.body })
       });
@@ -89,13 +93,50 @@ async function startServer() {
 
   app.post('/api/auth/signin', express.json(), async (req, res) => {
     try {
-      console.log('Forwarding signin to Hostinger...');
+      console.log('Forwarding signin to Hostinger...', JSON.stringify(req.body));
       const response = await fetch('https://doableindia.com/app-sys/app_auth.php', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
         },
         body: JSON.stringify({ action: 'signin', ...req.body })
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  app.post('/api/auth/forgot-password', express.json(), async (req, res) => {
+    try {
+      console.log('Forwarding forgot-password to Hostinger...', JSON.stringify(req.body));
+      const response = await fetch('https://doableindia.com/app-sys/app_auth.php', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        },
+        body: JSON.stringify({ action: 'forgot_password', ...req.body })
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  app.post('/api/auth/reset-password', express.json(), async (req, res) => {
+    try {
+      console.log('Forwarding reset-password to Hostinger...', JSON.stringify(req.body));
+      const response = await fetch('https://doableindia.com/app-sys/app_auth.php', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        },
+        body: JSON.stringify({ action: 'reset_password', ...req.body })
       });
       const data = await response.json();
       res.status(response.status).json(data);

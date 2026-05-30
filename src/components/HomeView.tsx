@@ -34,6 +34,7 @@ import { JobLead, TutorProfile, UserType } from '../types';
 import { cn, formatCurrency, getJobId, getTutorId, toTitleCase } from '../utils';
 import { JobCard } from './JobCard';
 import { TutorCard } from './TutorCard';
+import { CLASS_GROUP_MAPPING, CITIES_LIST, CITY_TO_LOCATIONS_DATA } from '../constants';
 
 interface HomeViewProps {
   userName: string | null;
@@ -43,11 +44,13 @@ interface HomeViewProps {
   activeTutorsCount: number;
   featuredJobs: JobLead[];
   featuredTutors: TutorProfile[];
+  allJobs: JobLead[];
+  allTutors: TutorProfile[];
   playTapSound: () => void;
   setFormType: (type: 'parent' | 'teacher') => void;
   setShowFormModal: (show: boolean) => void;
   onSignUpClick: () => void;
-  setActiveTab: (tab: 'home' | 'jobs' | 'tutors' | 'alerts' | 'admin' | 'support' | 'shortlist' | 'payments') => void;
+  setActiveTab: (tab: 'home' | 'jobs' | 'tutors' | 'alerts' | 'admin' | 'support' | 'earnings' | 'post_need') => void;
   getDynamicGreeting: () => string;
   setShowFilterDrawer: (show: boolean) => void;
   onJobClick: (job: JobLead) => void;
@@ -57,10 +60,11 @@ interface HomeViewProps {
   profileCompletion: number;
   setShowProfileSetup: (show: boolean) => void;
   localities: string[];
-  allTutors: TutorProfile[];
   onClassClick?: (className: string) => void;
   onLocalityClick?: (locality: string) => void;
   onGenderClick?: (gender: 'Male' | 'Female') => void;
+  onCityClick?: (city: string) => void;
+  onModeClick?: (mode: string) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -71,6 +75,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   activeTutorsCount,
   featuredJobs,
   featuredTutors,
+  allJobs,
+  allTutors,
   playTapSound,
   setFormType,
   setShowFormModal,
@@ -85,40 +91,99 @@ export const HomeView: React.FC<HomeViewProps> = ({
   profileCompletion,
   setShowProfileSetup,
   localities,
-  allTutors,
   onClassClick,
   onLocalityClick,
-  onGenderClick
+  onGenderClick,
+  onCityClick,
+  onModeClick
 }) => {
   const [currentBanner, setCurrentBanner] = React.useState(0);
 
-  // Dynamic Count Calculations
-  const femaleCount = React.useMemo(() => 
-    (allTutors || []).filter(t => (t.gender || '').toLowerCase() === 'female').length, 
+  // Dynamic Count Calculations (Tutors)
+  const femaleTutorCount = React.useMemo(() => 
+    (allTutors || []).filter(t => {
+      const g = (t.gender || (t as any).Gender || '').toLowerCase().trim();
+      return g === 'female' || g.includes('any') || g.includes('both') || (g.includes('male') && g.includes('female')) || g.includes('/');
+    }).length, 
   [allTutors]);
   
-  const maleCount = React.useMemo(() => 
-    (allTutors || []).filter(t => (t.gender || '').toLowerCase() === 'male').length, 
+  const maleTutorCount = React.useMemo(() => 
+    (allTutors || []).filter(t => {
+      const g = (t.gender || (t as any).Gender || '').toLowerCase().trim();
+      return g === 'male' || g.includes('any') || g.includes('both') || (g.includes('male') && g.includes('female')) || g.includes('/');
+    }).length, 
   [allTutors]);
+
+  // Dynamic Count Calculations (Jobs)
+  const femaleJobCount = React.useMemo(() => 
+    (allJobs || []).filter(j => {
+      const g = (j.Gender || (j as any).gender || '').toLowerCase().trim();
+      const isAny = g.includes('any') || g.includes('both') || g.includes('/');
+      return isAny || g === 'female';
+    }).length, 
+  [allJobs]);
+  
+  const maleJobCount = React.useMemo(() => 
+    (allJobs || []).filter(j => {
+      const g = (j.Gender || (j as any).gender || '').toLowerCase().trim();
+      const isAny = g.includes('any') || g.includes('both') || g.includes('/');
+      return isAny || g === 'male';
+    }).length, 
+  [allJobs]);
 
   const getTutorCountForClass = (group: string) => {
     return (allTutors || []).filter(t => {
-      const classes = Array.isArray(t.class_group) ? t.class_group : [];
-      return classes.some(c => (c || '').toLowerCase().includes(group.toLowerCase()));
+      const tutorClasses = Array.isArray(t.class_group) ? t.class_group.join(', ').toLowerCase() : (t.class_group || (t as any).classes || '').toString().toLowerCase();
+      if (tutorClasses.includes(group.toLowerCase())) return true;
+      const mapped = CLASS_GROUP_MAPPING[group];
+      if (mapped && mapped.some(m => tutorClasses.includes(m.toLowerCase()))) return true;
+      return false;
+    }).length;
+  };
+
+  const getJobCountForClass = (group: string) => {
+    return (allJobs || []).filter(l => {
+        const jobClass = (l.Class || l['Class / Board'] || (l as any).class_group || (l as any).class || '').toLowerCase();
+        if (jobClass.includes(group.toLowerCase())) return true;
+        const mappedClasses = CLASS_GROUP_MAPPING[group];
+        if (mappedClasses && mappedClasses.some(m => jobClass.includes(m.toLowerCase()))) return true;
+        return false;
     }).length;
   };
 
   const getTutorCountForLocality = (loc: string) => {
     const searchLoc = (loc || '').toLowerCase().trim();
     if (!searchLoc) return 0;
-    
     return allTutors.filter(t => {
-      // Handle both array and string cases for robustness
-      const tutorLocs = Array.isArray(t.location) 
-        ? t.location.join(', ').toLowerCase() 
-        : (t.location || '').toString().toLowerCase();
-        
+      const tutorLocs = JSON.stringify(t.location || []).toLowerCase();
       return tutorLocs.includes(searchLoc);
+    }).length;
+  };
+
+  const getJobCountForLocality = (loc: string) => {
+    const searchLoc = (loc || '').toLowerCase().trim();
+    if (!searchLoc) return 0;
+    return allJobs.filter(l => {
+      const jobLocs = (l.Locations || (l as any).location || (l as any).locations || '').toLowerCase();
+      return jobLocs.includes(searchLoc);
+    }).length;
+  };
+
+  const getJobCountForCity = (city: string) => {
+    const c = city.toLowerCase().trim();
+    return allJobs.filter(l => (l.City || (l as any).city || '').toLowerCase().includes(c)).length;
+  };
+
+  const getTutorCountForCity = (city: string) => {
+    const c = city.toLowerCase().trim();
+    return allTutors.filter(t => (t.city || (t as any).City || '').toLowerCase().includes(c)).length;
+  };
+
+  const getJobCountForMode = (mode: string) => {
+    const m = mode.toLowerCase().trim();
+    return allJobs.filter(l => {
+      const jobMode = (l.Mode || (l as any).mode || (l as any)['Mode of Teaching'] || '').toLowerCase();
+      return jobMode.includes(m) || jobMode.includes('any') || jobMode.includes('both');
     }).length;
   };
 
@@ -294,7 +359,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <ExploreCard icon={<Briefcase size={14} fill="white" className="text-white" />} label="Jobs" sub="Live" onClick={() => setActiveTab('jobs')} iconBg="bg-purple-500" />
           <ExploreCard icon={<GraduationCap size={14} fill="white" className="text-white" />} label="Tutors" sub="Elite" onClick={() => setActiveTab('tutors')} iconBg="bg-emerald-500" />
           <ExploreCard icon={<CreditCard size={14} fill="white" className="text-white" />} label="Pay" sub="Now" onClick={() => { playTapSound(); window.open("https://zohosecurepay.in/checkout/i9db4wt2-verz1l6gn6ogo/Make-a-secure-payment-now", "_system"); }} iconBg="bg-orange-500" />
-          <ExploreCard icon={<Calendar size={14} fill="white" className="text-white" />} label="Trial" sub="Book" onClick={() => { setFormType('parent'); setShowFormModal(true); }} iconBg="bg-pink-500" />
+          <ExploreCard icon={<Calendar size={14} fill="white" className="text-white" />} label="Trial" sub="Book" onClick={() => { playTapSound(); setActiveTab('post_need'); }} iconBg="bg-pink-500" />
           <ExploreCard icon={<MessageCircle size={14} fill="white" className="text-white" />} label="Help" sub="Care" onClick={() => setActiveTab('support')} iconBg="bg-[#347475]" />
         </div>
       </section>
@@ -321,15 +386,20 @@ export const HomeView: React.FC<HomeViewProps> = ({
               >
                 <div className="absolute -top-10 -right-10 w-24 h-24 bg-rose-50 rounded-full group-hover:scale-150 transition-transform duration-500" />
                 <div className="relative z-10 flex flex-col gap-2">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-200">
-                    <Venus size={24} strokeWidth={2.5} />
+                  <div className="flex justify-between items-start">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                      <Venus size={24} strokeWidth={2.5} />
+                    </div>
+                    <div className="text-[10px] font-black text-rose-600 bg-white px-2 py-1 rounded-full border border-rose-100 shadow-sm">
+                      {femaleTutorCount}+
+                    </div>
                   </div>
                   <div>
                     <div className="text-[14px] font-[900] text-rose-950 tracking-tight leading-tight">Female Tutors</div>
                     <div className="flex items-center gap-1.5 mt-1">
                       <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
                       <span className="text-[9px] font-black text-rose-600/60 uppercase tracking-widest">
-                        {femaleCount > 0 ? `${femaleCount} Verified` : 'Elite Profiles'}
+                        Elite Instructors
                       </span>
                     </div>
                   </div>
@@ -348,15 +418,20 @@ export const HomeView: React.FC<HomeViewProps> = ({
               >
                 <div className="absolute -top-10 -right-10 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-150 transition-transform duration-500" />
                 <div className="relative z-10 flex flex-col gap-2">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                    <Mars size={24} strokeWidth={2.5} />
+                  <div className="flex justify-between items-start">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                      <Mars size={24} strokeWidth={2.5} />
+                    </div>
+                    <div className="text-[10px] font-black text-blue-600 bg-white px-2 py-1 rounded-full border border-blue-100 shadow-sm">
+                      {maleTutorCount}+
+                    </div>
                   </div>
                   <div>
                     <div className="text-[14px] font-[900] text-blue-950 tracking-tight leading-tight">Male Tutors</div>
                     <div className="flex items-center gap-1.5 mt-1">
                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
                       <span className="text-[9px] font-black text-blue-600/60 uppercase tracking-widest">
-                        {maleCount > 0 ? `${maleCount} Experts` : 'Top Mentors'}
+                        Premium Mentors
                       </span>
                     </div>
                   </div>
@@ -379,10 +454,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
             
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'Class I to V', sub: 'Primary', match: 'I to V', color: 'bg-amber-500', bg: 'bg-amber-50/30', border: 'border-amber-100' },
-                { label: 'Class VI to VIII', sub: 'Middle', match: 'VI to VIII', color: 'bg-indigo-500', bg: 'bg-indigo-50/30', border: 'border-indigo-100' },
-                { label: 'Class IX to X', sub: 'Secondary', match: 'IX to X', color: 'bg-blue-500', bg: 'bg-blue-50/30', border: 'border-blue-100' },
-                { label: 'Class XI to XII', sub: 'Sr. Secondary', match: 'XI to XII', color: 'bg-emerald-500', bg: 'bg-emerald-50/30', border: 'border-emerald-100' },
+                { label: 'Class I to V', sub: 'Primary', match: 'Class I to V', color: 'bg-amber-500', bg: 'bg-amber-50/30', border: 'border-amber-100' },
+                { label: 'Class VI to VIII', sub: 'Middle', match: 'Class VI to VIII', color: 'bg-indigo-500', bg: 'bg-indigo-50/30', border: 'border-indigo-100' },
+                { label: 'Class IX to X', sub: 'Secondary', match: 'Class IX to X', color: 'bg-blue-500', bg: 'bg-blue-50/30', border: 'border-blue-100' },
+                { label: 'Class XI to XII', sub: 'Sr. Secondary', match: 'Class XI to XII', color: 'bg-emerald-500', bg: 'bg-emerald-50/30', border: 'border-emerald-100' },
                 { label: 'NEET/JEE', sub: 'Entrance', match: 'Competitive', color: 'bg-rose-500', bg: 'bg-rose-50/30', border: 'border-rose-100' },
                 { label: 'Languages', sub: 'IELTS/French', match: 'Language', color: 'bg-purple-500', bg: 'bg-rose-50/30', border: 'border-purple-100' }
               ].map((group, i) => {
@@ -408,7 +483,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <div className="text-[8px] font-bold text-slate-400 truncate w-full">{group.sub}</div>
                     </div>
                     <div className="text-[8px] font-black text-primary/80 bg-white px-1.5 py-0.5 rounded-full border border-slate-100">
-                      {count > 0 ? count : '50'}+
+                      {count}+
                     </div>
                   </div>
                 );
@@ -458,7 +533,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <div className="flex flex-col min-w-0 flex-1">
                         <span className="text-[9px] font-[900] text-slate-800 tracking-tight truncate leading-tight block">{loc}</span>
                         <span className="text-[7.5px] font-black text-emerald-600/70 uppercase tracking-tighter truncate">
-                          {count > 0 ? `${count} Experts` : 'Top Hub'}
+                          {count}+ Experts
                         </span>
                       </div>
                     </div>
@@ -466,25 +541,35 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 })
               ) : (
                 [
-                  { city: 'Agra', img: '🏰', tutors: '850+' },
-                  { city: 'Lucknow', img: '🕌', tutors: '1.2K+' },
-                  { city: 'Gwalior', img: '⛰️', tutors: '420+' },
-                  { city: 'Kanpur', img: '🏭', tutors: '960+' }
-                ].map((item, i) => (
-                  <div 
-                    key={i}
-                    onClick={() => { playTapSound(); setActiveTab('tutors'); }}
-                    className="group bg-white border border-slate-100 rounded-[16px] p-2 flex items-center gap-2.5 shadow-sm active:scale-95 transition-all cursor-pointer hover:border-primary/20 hover:shadow-lg"
-                  >
-                    <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-xl shadow-inner border border-slate-100/50 group-hover:bg-primary/5 group-hover:scale-110 transition-all duration-300 shrink-0">
-                      {item.img}
+                  { city: 'Agra', img: '🏰' },
+                  { city: 'Lucknow', img: '🕌' },
+                  { city: 'Gwalior', img: '⛰️' },
+                  { city: 'Kanpur', img: '🏭' }
+                ].map((item, i) => {
+                  const count = getTutorCountForCity(item.city);
+                  return (
+                    <div 
+                      key={i}
+                      onClick={() => { 
+                        playTapSound(); 
+                        if (onCityClick) {
+                          onCityClick(item.city);
+                        } else {
+                          setActiveTab('tutors');
+                        }
+                      }}
+                      className="group bg-white border border-slate-100 rounded-[16px] p-2 flex items-center gap-2.5 shadow-sm active:scale-95 transition-all cursor-pointer hover:border-primary/20 hover:shadow-lg"
+                    >
+                      <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-xl shadow-inner border border-slate-100/50 group-hover:bg-primary/5 group-hover:scale-110 transition-all duration-300 shrink-0">
+                        {item.img}
+                      </div>
+                      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                        <span className="text-[13px] font-[900] text-slate-800 tracking-tight truncate block">{item.city}</span>
+                        <span className="text-[9px] font-black text-primary/70 uppercase tracking-tighter truncate">{count}+ Experts</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                      <span className="text-[13px] font-[900] text-slate-800 tracking-tight truncate block">{item.city}</span>
-                      <span className="text-[9px] font-black text-primary/70 uppercase tracking-tighter truncate">{item.tutors} Experts</span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </section>
@@ -494,8 +579,248 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* Conditional Rendering for Tutors */}
       {userType === 'teacher' && (
         <>
-          {/* Latest Jobs Section for Tutors */}
+          {/* Expert Category Sections for Tutors */}
           <section className="px-4 space-y-2.5">
+            <div className="flex items-center gap-2 px-1">
+              <div className="w-1 h-5 bg-indigo-600 rounded-full" />
+              <h3 className="text-[13px] font-[900] text-[#0F172A] tracking-tight">Jobs by Gender</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div 
+                onClick={() => { 
+                  playTapSound(); 
+                  if (onGenderClick) {
+                    onGenderClick('Female');
+                  } else {
+                    setActiveTab('jobs');
+                  }
+                }}
+                className="group relative bg-white border border-rose-100 rounded-[28px] p-5 overflow-hidden active:scale-95 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:shadow-rose-500/10"
+              >
+                <div className="absolute -top-10 -right-10 w-24 h-24 bg-rose-50 rounded-full group-hover:scale-150 transition-transform duration-500" />
+                <div className="relative z-10 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                      <Venus size={24} strokeWidth={2.5} />
+                    </div>
+                    <div className="text-[10px] font-black text-rose-600 bg-white px-2 py-1 rounded-full border border-rose-100 shadow-sm">
+                      {femaleJobCount}+
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] font-[900] text-rose-950 tracking-tight leading-tight">Parents looking for<br/>Female Tutors</div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
+                      <span className="text-[9px] font-black text-rose-600/60 uppercase tracking-widest">
+                        Girls/Ladies Jobs
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div 
+                onClick={() => { 
+                  playTapSound(); 
+                  if (onGenderClick) {
+                    onGenderClick('Male');
+                  } else {
+                    setActiveTab('jobs');
+                  }
+                }}
+                className="group relative bg-white border border-blue-100 rounded-[28px] p-5 overflow-hidden active:scale-95 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:shadow-blue-500/10"
+              >
+                <div className="absolute -top-10 -right-10 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-150 transition-transform duration-500" />
+                <div className="relative z-10 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                      <Mars size={24} strokeWidth={2.5} />
+                    </div>
+                    <div className="text-[10px] font-black text-blue-600 bg-white px-2 py-1 rounded-full border border-blue-100 shadow-sm">
+                      {maleJobCount}+
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] font-[900] text-blue-950 tracking-tight leading-tight">Parents looking for<br/>Male Tutors</div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                      <span className="text-[9px] font-black text-blue-600/60 uppercase tracking-widest">
+                        Boys/Gents Jobs
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Jobs by Class Group */}
+          <section className="px-4 space-y-2.5">
+            <div className="flex justify-between items-center px-1">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 bg-indigo-500 rounded-full" />
+                <h3 className="text-[13px] font-[900] text-[#0F172A] tracking-tight">Jobs by Class Group</h3>
+              </div>
+              <button onClick={() => setActiveTab('jobs')} className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">
+                All Classes
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Class I to V', sub: 'Primary', match: 'Class I to V', color: 'bg-amber-500', bg: 'bg-amber-50/30', border: 'border-amber-100' },
+                { label: 'Class VI to VIII', sub: 'Middle', match: 'Class VI to VIII', color: 'bg-indigo-500', bg: 'bg-indigo-50/30', border: 'border-indigo-100' },
+                { label: 'Class IX to X', sub: 'Secondary', match: 'Class IX to X', color: 'bg-blue-500', bg: 'bg-blue-50/30', border: 'border-blue-100' },
+                { label: 'Class XI to XII', sub: 'Sr. Secondary', match: 'Class XI to XII', color: 'bg-emerald-500', bg: 'bg-emerald-50/30', border: 'border-emerald-100' },
+                { label: 'NEET/JEE', sub: 'Entrance', match: 'Competitive', color: 'bg-rose-500', bg: 'bg-rose-50/30', border: 'border-rose-100' },
+                { label: 'Languages', sub: 'IELTS/French', match: 'Language', color: 'bg-purple-500', bg: 'bg-rose-50/30', border: 'border-purple-100' }
+              ].map((group, i) => {
+                const count = getJobCountForClass(group.match);
+                return (
+                  <div 
+                    key={i}
+                    onClick={() => { 
+                      playTapSound(); 
+                      if (onClassClick) {
+                        onClassClick(group.match);
+                      } else {
+                        setActiveTab('jobs');
+                      }
+                    }}
+                    className={cn("p-2 rounded-[16px] border flex flex-col items-center text-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm relative overflow-hidden backdrop-blur-md", group.bg, group.border)}
+                  >
+                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm", group.color)}>
+                      <LayoutGrid size={14} strokeWidth={3} />
+                    </div>
+                    <div className="flex flex-col -space-y-0.5">
+                      <div className="text-[9px] font-[900] text-slate-800 leading-tight truncate w-full">{group.label}</div>
+                      <div className="text-[8px] font-bold text-slate-400 truncate w-full">{group.sub}</div>
+                    </div>
+                    <div className="text-[8px] font-black text-primary/80 bg-white px-1.5 py-0.5 rounded-full border border-slate-100">
+                      {count}+
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Jobs by Locality */}
+          <section className="px-4 space-y-2.5">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <div className={cn("w-1 h-5 rounded-full", userCity && userCity !== 'All' ? "bg-emerald-500" : "bg-rose-500")} />
+                <h3 className="text-[15px] font-[900] text-[#0F172A] tracking-tight">
+                  {userCity && userCity !== 'All' ? `Jobs in ${userCity}` : 'Premium Job Locations'}
+                </h3>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {userCity && userCity !== 'All' && (localities || []).length > 0 ? (
+                (localities || []).slice(0, 8).map((loc, i) => {
+                  const count = getJobCountForLocality(loc);
+                  return (
+                    <div 
+                      key={i}
+                      onClick={() => { 
+                        playTapSound(); 
+                        if (onLocalityClick) {
+                          onLocalityClick(loc);
+                        } else {
+                          setActiveTab('jobs');
+                        }
+                      }}
+                      className="group bg-white border border-slate-100 rounded-[16px] p-2 flex items-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-500/5"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-inner border border-emerald-100/50 group-hover:scale-110 transition-transform shrink-0">
+                        <MapPin size={13} strokeWidth={3} />
+                      </div>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-[9px] font-[900] text-slate-800 tracking-tight truncate leading-tight block">{loc}</span>
+                        <span className="text-[7.5px] font-black text-emerald-600/70 uppercase tracking-tighter truncate">
+                          {count}+ Openings
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                [
+                  { city: 'Delhi', img: '🏛️' },
+                  { city: 'Gurgaon', img: '🏢' },
+                  { city: 'Noida', img: '🏙️' },
+                  { city: 'Ghaziabad', img: '🌆' }
+                ].map((item, i) => {
+                  const count = getJobCountForCity(item.city);
+                  return (
+                    <div 
+                      key={i}
+                      onClick={() => { 
+                        playTapSound(); 
+                        if (onCityClick) {
+                          onCityClick(item.city);
+                        } else {
+                          setActiveTab('jobs');
+                        }
+                      }}
+                      className="group bg-white border border-slate-100 rounded-[16px] p-2 flex items-center gap-2.5 shadow-sm active:scale-95 transition-all cursor-pointer hover:border-primary/20 hover:shadow-lg"
+                    >
+                      <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-xl shadow-inner border border-slate-100/50 group-hover:bg-primary/5 group-hover:scale-110 transition-all duration-300 shrink-0">
+                        {item.img}
+                      </div>
+                      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                        <span className="text-[13px] font-[900] text-slate-800 tracking-tight truncate block">{item.city}</span>
+                        <span className="text-[9px] font-black text-primary/70 uppercase tracking-tighter truncate">{count}+ Jobs</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </section>
+
+          {/* Jobs by Mode of Teaching */}
+          <section className="px-4 space-y-2.5 pt-4">
+            <div className="flex justify-between items-center px-1">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 bg-purple-500 rounded-full" />
+                <h3 className="text-[13px] font-[900] text-[#0F172A] tracking-tight">Mode of Teaching</h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { mode: 'Home Tuition', icon: '🏠', color: 'bg-rose-50', textColor: 'text-rose-600', countColor: 'bg-rose-100', borderColor: 'border-rose-100' },
+                { mode: 'Online Class', icon: '💻', color: 'bg-indigo-50', textColor: 'text-indigo-600', countColor: 'bg-indigo-100', borderColor: 'border-indigo-100' }
+              ].map((item, i) => {
+                const count = getJobCountForMode(item.mode);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      playTapSound();
+                      if (onModeClick) {
+                        onModeClick(item.mode);
+                      } else {
+                        setActiveTab('jobs');
+                      }
+                    }}
+                    className={cn("relative p-4 rounded-[20px] border flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer shadow-sm overflow-hidden", item.color, item.borderColor)}
+                  >
+                    <div className="text-3xl">{item.icon}</div>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className={cn("text-[12px] font-black tracking-tight", item.textColor)}>{item.mode}</span>
+                      <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", item.countColor, item.textColor)}>
+                        {count}+ Jobs
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Latest Jobs Section for Tutors */}
+          <section className="px-4 space-y-2.5 pt-4">
             <div className="flex justify-between items-center">
               <h3 className="text-[16px] font-bold text-[#0F172A] tracking-tighter">Available Jobs</h3>
               <button onClick={() => setActiveTab('jobs')} className="text-[11px] font-bold text-primary uppercase tracking-widest">
