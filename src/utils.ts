@@ -137,23 +137,26 @@ export function playTapSound() {
 export function calculateProfileCompletion(userData: any, userType: 'parent' | 'teacher' | null): number {
   if (!userType) return 0;
   
-  let totalFields = 0;
   let filledFields = 0;
 
-  // Fields that are essential for everyone
-  const commonFields = ['name', 'phone', 'gender', 'city', 'classes', 'subjects', 'mode'];
+  // Essential for everyone
+  const commonFields = ['name', 'phone', 'gender', 'classes', 'subjects', 'mode'];
   
   // Role-specific fields
-  const teacherSpecific = ['dob', 'age', 'qualification', 'experience', 'communication', 'localities', 'days', 'time', 'about', 'aadhar', 'address'];
-  const parentSpecific = ['board', 'localities', 'residency', 'days', 'time', 'duration', 'fee'];
+  const teacherSpecific = ['dob', 'age', 'qualification', 'experience', 'communication', 'days', 'time', 'about', 'aadhar', 'address'];
+  // board, residency and about are optional for parents, so they are not included here to prevent blocking 100%
+  const parentSpecific = ['days', 'time', 'duration'];
 
-  const fieldsToCheck = [...commonFields, ...(userType === 'teacher' ? teacherSpecific : parentSpecific)];
+  // Conditional fields (Only required for Home Tuition)
+  const isOnline = (userData.mode || '').toString().toLowerCase().includes('online');
+  const locationFields = isOnline ? [] : ['city', 'localities'];
+
+  const fieldsToCheck = [...commonFields, ...locationFields, ...(userType === 'teacher' ? teacherSpecific : parentSpecific)];
   
-  totalFields = fieldsToCheck.length;
+  const totalFields = fieldsToCheck.length;
 
   fieldsToCheck.forEach(field => {
     const val = userData[field];
-    // Check for array length or non-empty string/number
     if (val !== undefined && val !== null) {
       if (Array.isArray(val)) {
         if (val.length > 0) filledFields++;
@@ -163,7 +166,6 @@ export function calculateProfileCompletion(userData: any, userType: 'parent' | '
     }
   });
 
-  // Calculate percentage and cap at 100
   const percentage = Math.round((filledFields / totalFields) * 100);
   return Math.min(percentage, 100);
 }

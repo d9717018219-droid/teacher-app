@@ -1,577 +1,295 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
+import React, { useMemo } from 'react';
 import { 
-  TrendingUp, 
-  Search, 
-  DollarSign, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  Plus, 
-  ChevronRight,
+  Trophy, 
   Briefcase,
-  Calendar,
-  Wallet,
   MapPin,
-  ArrowRight,
-  Loader2,
-  Trash2,
+  BadgeCheck,
+  Crown,
+  Flame,
   User,
-  MessageCircle,
-  Phone,
-  Sparkles,
-  Trophy,
-  Zap,
-  Target,
-  X,
-  CreditCard,
   ShieldCheck,
-  Navigation
+  GraduationCap,
+  BookOpen,
+  Edit3,
+  CheckCircle2,
+  Eye,
+  Smartphone,
+  TrendingUp,
+  Target,
+  Clock,
+  Navigation,
+  Calendar,
+  Plus,
+  Sparkles
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { JobLead } from '../types';
-import { cn, formatCurrency, toTitleCase, openWhatsApp, openWhatsAppTo } from '../utils';
+import { motion } from 'framer-motion';
+import { TutorProfile } from '../types';
+import { cn, formatCurrency, toTitleCase, getTutorId } from '../utils';
 
 interface EarningsViewProps {
-  leads: JobLead[];
-  firestoreLeads: JobLead[];
-  userName?: string | null;
+  tutorProfile?: TutorProfile | null;
+  allTutors?: TutorProfile[];
   userCity?: string | null;
-  tutorId?: string | null;
   playTapSound: () => void;
-  setSelectedJob: (job: JobLead | null) => void;
+  onEditProfile: () => void;
+  onRequestApproval: () => void;
 }
 
-interface EarningRecord {
-  orderId: string;
-  amount: number;
-  classGroup: string;
-  city: string;
-  days?: string;
-  duration?: string;
-  time?: string;
-  assignedTutor?: string;
-  startDate?: string;
-  status: 'pending' | 'verified' | 'paid';
-  date: string;
-}
-
-const CARD_ACCENTS = [
-  { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-100', iconBg: 'bg-indigo-600' },
-  { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', iconBg: 'bg-emerald-600' },
-  { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100', iconBg: 'bg-amber-600' },
-  { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-100', iconBg: 'bg-rose-600' },
-  { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100', iconBg: 'bg-blue-600' },
-  { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100', iconBg: 'bg-purple-600' },
-];
-
-export const EarningsView: React.FC<EarningsViewProps> = ({ leads, firestoreLeads, userName, userCity, tutorId, playTapSound, setSelectedJob }) => {
-  const [orderIdInput, setOrderIdInput] = useState('');
-  const [showAddInput, setShowAddInput] = useState(false);
-  const [assignedBookings, setAssignedBookings] = useState<any[]>([]);
-  const [myEarnings, setMyEarnings] = useState<EarningRecord[]>(() => {
-    const saved = localStorage.getItem('userEarnings');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [isFetching, setIsFetching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem('userEarnings', JSON.stringify(myEarnings));
-  }, [myEarnings]);
-
-  useEffect(() => {
-    const rawId = tutorId || localStorage.getItem('tutorId');
-    const tId = rawId ? String(rawId).trim() : '';
-    console.log('[EarningsView] Fetching bookings for tutorId:', tId);
-    
-    if (!tId || tId === 'NEW_USER' || tId === 'NEW' || tId === 'null') {
-      console.log('[EarningsView] Early return: tutorId is invalid:', tId);
-      setAssignedBookings([]);
-      return;
-    }
-
-    const q = query(collection(db, 'assigned_bookings'), where('tutorId', '==', tId));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log('[EarningsView] Real-time data received:', data.length, 'bookings found for', tId);
-      setAssignedBookings(data);
-    }, (err) => {
-      console.error('[EarningsView] Firestore Error:', err);
-    });
-
-    return () => unsubscribe();
-  }, [tutorId]);
-
-  const fetchJobDetails = () => {
-    if (!orderIdInput.trim()) return;
-    setIsFetching(true);
-    setError(null);
-
-    setTimeout(() => {
-      const allLeads = [...leads, ...firestoreLeads];
-      const job = allLeads.find(l => 
-        (l['Order ID'] || (l as any).id || '').toString().toLowerCase().trim() === orderIdInput.toLowerCase().trim()
-      );
-
-      if (job) {
-        const remark = (job['Internal Remark'] || '').trim().toLowerCase();
-        
-        if (remark !== 'hired') {
-          setError(`Cannot add: Status is "${toTitleCase(remark)}". Please talk to RMN Support for verification.`);
-          setIsFetching(false);
-          return;
-        }
-
-        playTapSound();
-        const amount = parseInt((job.Fee || (job as any)['Fee/Month'] || '0').toString().replace(/[^0-9]/g, '')) || 0;
-        const classGroup = job.Class || job['Class / Board'] || (job as any).class || 'General';
-        
-        const locationStr = (job.Locations || job.City || (job as any).Area || 'India').toString();
-        const cityPart = job.City || 'India';
-        const localityPart = locationStr.split(/[;,]/)[0].trim().split('-')[0].trim();
-        const displayLocation = (localityPart && localityPart.toLowerCase() !== cityPart.toLowerCase()) 
-          ? `${toTitleCase(localityPart)}, ${toTitleCase(cityPart)}` 
-          : toTitleCase(cityPart);
-
-        const assignedTutor = (job as any).Assign_Tutor || (job as any).Tutor_s_Name || (job as any).assignedTutor || (job as any)['Assigned Tutor'] || (job as any).Tutor || 'N/A';
-        const startDate = (job as any).Start_Date || (job as any).Date_of_Start || (job as any)['Start Date'] || (job as any).startDate || (job as any).Date || (job as any).date || (job as any).Start_Time || '';
-
-        if (myEarnings.some(e => e.orderId.toLowerCase() === (job['Order ID'] || orderIdInput).toString().toLowerCase().trim())) {
-          setError('Tuition already added.');
-        } else {
-          const newEarning: EarningRecord = {
-            orderId: (job['Order ID'] || orderIdInput).toString().toUpperCase().trim(),
-            amount: amount,
-            classGroup: classGroup,
-            city: displayLocation,
-            days: job.days || (job as any).Days || '',
-            duration: job.duration || (job as any).Duration || '',
-            time: job.time || (job as any).Time || '',
-            assignedTutor: assignedTutor,
-            startDate: startDate,
-            status: 'pending',
-            date: new Date().toISOString()
-          };
-          setMyEarnings([newEarning, ...myEarnings]);
-          setOrderIdInput('');
-          setShowAddInput(false);
-        }
-      } else {
-        setError('Job ID not found. Verify and try again.');
-      }
-      setIsFetching(false);
-    }, 800);
-  };
-
-  const clearAll = () => {
-    if (window.confirm('Reset all records?')) {
-      setMyEarnings([]);
-      localStorage.removeItem('userEarnings');
-    }
-  };
-
-  const removeEarning = (orderId: string) => {
-    playTapSound();
-    if (window.confirm('Stop tracking this tuition?')) {
-      setMyEarnings(prev => prev.filter(e => e.orderId !== orderId));
-    }
-  };
-
-  const totalMonthlyIncome = myEarnings.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  const totalTuitions = myEarnings.length;
+export const EarningsView: React.FC<EarningsViewProps> = ({ tutorProfile, allTutors = [], userCity, playTapSound, onEditProfile, onRequestApproval }) => {
   
-  // FIXED GOAL: 50,000
-  const nextGoal = 50000;
-  const progress = Math.min((totalMonthlyIncome / nextGoal) * 100, 100);
+  // FAIL-SAFE: Loading state
+  if (!tutorProfile) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 space-y-4 min-h-[60vh] text-center">
+        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-300">
+           <User size={40} />
+        </div>
+        <p className="text-slate-400 font-bold text-sm">Loading your growth dashboard...</p>
+      </div>
+    );
+  }
 
-  const recommendedJobs = [...leads, ...firestoreLeads]
-    .filter(l => {
-      const jobCity = (l.City || '').toLowerCase();
-      const currentCity = (userCity || '').toLowerCase();
-      const cityMatch = currentCity === 'all' || jobCity.includes(currentCity) || currentCity.includes(jobCity);
-      const notAdded = !myEarnings.some(e => e.orderId === (l['Order ID'] || (l as any).id || '').toString().toUpperCase());
-      const isSearching = (l['Internal Remark'] || '').trim().toLowerCase() === 'searching';
-      return cityMatch && notAdded && isSearching;
-    })
-    .slice(0, 3);
+  // Real-time Ranking Logic
+  const topEarners = useMemo(() => {
+    return [...allTutors]
+      .sort((a, b) => {
+        const scoreA = (Number(a.monthly_earnings) || 0) + (Number(a.active_tuitions) || 0) * 1000;
+        const scoreB = (Number(b.monthly_earnings) || 0) + (Number(b.active_tuitions) || 0) * 1000;
+        return scoreB - scoreA;
+      })
+      .slice(0, 3);
+  }, [allTutors]);
 
-  const getPaymentCycle = () => {
-    const now = new Date();
-    const firstDay = '1st';
-    const monthName = now.toLocaleString('en-IN', { month: 'long' });
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const suffix = (n: number) => ["th", "st", "nd", "rd"][(n % 100 > 10 && n % 100 < 20) ? 0 : (n % 10 < 4) ? n % 10 : 0];
-    return `${firstDay} ${monthName} - ${getOrdinal(lastDay)} ${monthName}`;
-  };
+  // Calculate filled fields count for 24-point profile
+  const filledFieldsCount = useMemo(() => {
+    const fields = [
+      'name', 'email', 'phone', 'gender', 'dob', 'age', 'qualification', 'experience', 
+      'school_teacher', 'days', 'time', 'class_group', 'subjects', 'city', 'location', 
+      'have_vehicle', 'communication', 'fee', 'aadhar', 'address', 'residency', 'about', 'photo', 'status',
+      'active_tuitions', 'monthly_earnings'
+    ];
+    return fields.filter(f => {
+      const val = (tutorProfile as any)[f];
+      if (Array.isArray(val)) return val.length > 0;
+      return val && val.toString().trim() !== '';
+    }).length;
+  }, [tutorProfile]);
 
-  const getOrdinal = (n: number) => {
-    const s = ["th", "st", "nd", "rd"];
-    const v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-  };
-
-  const getSupportContact = () => {
-    const rmnCities = ['ghaziabad', 'faridabad', 'delhi', 'mumbai', 'pune', 'ahmedabad'];
-    const currentCity = (userCity || '').toLowerCase().trim();
-    if (rmnCities.some(c => currentCity.includes(c))) return { name: 'RMN Support', phone: '9971969197' };
-    return { name: 'Kanishka Arora', phone: '9711898248' };
-  };
-
-  const handleSupportAction = () => {
-    playTapSound();
-    window.open(`tel:${getSupportContact().phone}`, '_system');
-  };
+  const activeTuitions = Number(tutorProfile.active_tuitions) || 0;
+  const totalIncome = Number(tutorProfile.monthly_earnings) || 0;
+  const goal = 50000;
+  const progress = Math.min((totalIncome / goal) * 100, 100);
+  const cityLabel = userCity && userCity.toLowerCase() !== 'all' ? `in ${userCity}` : 'in India';
 
   return (
-    <div className="flex flex-col p-5 pb-40 space-y-7 max-w-lg mx-auto font-sans bg-[#FAFBFF]">
+    <div className="flex flex-col p-5 pb-40 space-y-7 max-w-lg mx-auto bg-slate-50 min-h-screen font-sans">
       
-      {/* ─── PREMIUM HEADER ─── */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-6 bg-[#7A2157] rounded-full" />
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Earnings Hub</h2>
-          </div>
-          {userName && (
-            <div className="flex items-center gap-1.5 px-1">
-              <Sparkles size={10} className="text-amber-500 fill-amber-500" />
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{userName}</span>
+      {/* ─── HERO DASHBOARD ─── */}
+      <div className="bg-[#0F172A] rounded-[40px] p-8 relative overflow-hidden shadow-2xl border border-white/5">
+        <div className="absolute top-[-10%] right-[-10%] w-48 h-48 bg-indigo-500/10 blur-[80px] rounded-full" />
+        <div className="relative z-10 space-y-6 text-center">
+           <div className="space-y-1">
+             <div className="flex items-center justify-center gap-2 text-orange-400">
+               <Flame size={14} className="fill-orange-500" />
+               <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Verified Earnings • {cityLabel.toUpperCase()}</p>
+             </div>
+             <div className="text-5xl font-black text-white tracking-tighter">₹{totalIncome.toLocaleString()}</div>
+             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Admin Confirmed Monthly Active</p>
+           </div>
+
+           <div className="grid grid-cols-2 gap-3">
+             <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/5">
+                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Active Jobs</p>
+                <p className="text-xl font-black text-white">{activeTuitions}</p>
+             </div>
+             <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/5">
+                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Goal Progress</p>
+                <p className="text-xl font-black text-emerald-400">{Math.round(progress)}%</p>
+             </div>
+           </div>
+        </div>
+      </div>
+
+      {/* ─── PUBLIC IDENTITY PREVIEW ─── */}
+      <div className="space-y-4">
+        <div className="flex flex-col gap-1 px-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Eye size={18} className="text-indigo-600" />
+              <h3 className="text-[13px] font-black text-slate-900 uppercase tracking-widest">Public Identity</h3>
             </div>
-          )}
-        </div>
-        {myEarnings.length > 0 && (
-          <button onClick={clearAll} className="text-[10px] font-bold text-slate-400 hover:text-rose-500 transition-colors px-2 py-1">Reset All</button>
-        )}
-      </motion.div>
-
-      {/* ─── DYNAMIC GLOW CARD ─── */}
-      <motion.div layout className="bg-gradient-to-r from-[#FF8C00] to-[#EC4899] rounded-[36px] p-8 relative overflow-hidden shadow-[0_20px_50px_rgba(249,115,22,0.3)] group">
-        <div className="absolute top-[-20%] right-[-10%] w-[180px] h-[180px] bg-[#7A2157]/20 blur-[60px] rounded-full group-hover:scale-125 transition-transform duration-1000" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-[140px] h-[140px] bg-blue-500/20 blur-[50px] rounded-full group-hover:scale-125 transition-transform duration-1000" />
-        
-        <div className="relative z-10 flex flex-col space-y-8">
-           <div className="flex justify-between items-start">
-             <div className="space-y-1">
-               <p className="text-[11px] font-bold text-white/40 tracking-[0.2em] uppercase">Est. Monthly Income</p>
-               <div className="text-5xl font-extrabold text-white tracking-tighter flex items-baseline gap-1">
-                 <span className="text-[#7A2157] text-2xl font-black mr-1">₹</span>
-                 {formatCurrency(totalMonthlyIncome)}
-               </div>
-             </div>
-             <div className="w-12 h-12 bg-white/5 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/10">
-               <Wallet className="text-white/80" size={24} />
-             </div>
-           </div>
-
-           <div className="space-y-2.5">
-             <div className="flex justify-between items-center text-[10px] font-bold text-white/40 uppercase tracking-wider">
-               <span>Level Progress</span>
-               <span className="text-white/60">Goal: ₹{formatCurrency(nextGoal)}</span>
-             </div>
-             <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, ease: "easeOut" }} className="h-full bg-gradient-to-r from-[#7A2157] via-[#943973] to-blue-500 shadow-[0_0_15px_rgba(122,45,92,0.5)]" />
-             </div>
-           </div>
-
-           <div className="space-y-2.5 pt-2">
-             <div className="bg-white/5 backdrop-blur-md rounded-[22px] px-5 py-3 border border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Briefcase size={14} className="text-[#7A2157]" />
-                  <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Active Jobs</span>
-                </div>
-                <span className="text-[16px] font-extrabold text-white">{totalTuitions}/10</span>
-             </div>
-             <div className="bg-white/5 backdrop-blur-md rounded-[22px] px-5 py-3 border border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-orange-400" />
-                  <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Cycle Date</span>
-                </div>
-                <span className="text-[11px] font-extrabold text-white text-right leading-none">{getPaymentCycle()}</span>
-             </div>
-           </div>
-        </div>
-      </motion.div>
-
-      {/* ─── ENGAGEMENT MILESTONES ─── */}
-      <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar no-scrollbar">
-         {totalTuitions >= 1 && (
-           <div className="shrink-0 flex items-center gap-2 bg-emerald-50 border border-emerald-100 px-4 py-2.5 rounded-2xl">
-             <Trophy size={14} className="text-emerald-600" />
-             <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-tight">Active Educator</span>
-           </div>
-         )}
-         {totalMonthlyIncome >= 10000 && (
-           <div className="shrink-0 flex items-center gap-2 bg-amber-50 border border-amber-100 px-4 py-2.5 rounded-2xl">
-             <Zap size={14} className="text-amber-600 fill-amber-500" />
-             <span className="text-[10px] font-extrabold text-amber-800 uppercase tracking-tight">Pro Earner</span>
-           </div>
-         )}
-         <div className="shrink-0 flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-4 py-2.5 rounded-2xl">
-           <Target size={14} className="text-indigo-600" />
-           <span className="text-[10px] font-extrabold text-indigo-800 uppercase tracking-tight">Level 1</span>
-         </div>
-      </div>
-
-      {/* ─── MY BOOKINGS ─── */}
-      <div className="space-y-5">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Calendar size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em]">My Bookings</h3>
+            <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+               <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+               <span className="text-[9px] font-black text-indigo-700 uppercase tracking-tight">{filledFieldsCount}/24 Fields Verified</span>
+            </div>
           </div>
-          <button onClick={() => { playTapSound(); setShowAddInput(!showAddInput); setError(null); }} className="bg-[#7A2157] hover:bg-[#7A2157]/90 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg shadow-[#7A2157]/20 active:scale-95 transition-all flex items-center gap-1.5">{showAddInput ? <X size={12} strokeWidth={4} /> : <Plus size={12} strokeWidth={4} />} Add My Job</button>
-        </div>
-
-        <AnimatePresence>
-          {showAddInput && (
-            <motion.div initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} className="overflow-hidden">
-              <div className="bg-slate-900 rounded-[28px] p-5 shadow-2xl border border-white/5 space-y-3 mx-1 mb-2">
-                <div className="relative flex items-center">
-                  <div className="absolute left-4 text-white/30"><Plus size={16} /></div>
-                  <input type="text" value={orderIdInput} onChange={(e) => setOrderIdInput(e.target.value)} placeholder="Enter Order ID (e.g. DL12345)" className="w-full bg-white/5 border border-white/5 rounded-2xl py-3.5 pl-10 pr-12 text-white font-bold placeholder:text-white/20 outline-none focus:border-[#7A2157]/50 transition-all text-sm" />
-                  <button onClick={fetchJobDetails} disabled={isFetching || !orderIdInput} className="absolute right-2 w-9 h-9 bg-[#7A2157] text-white rounded-xl flex items-center justify-center active:scale-90 transition-all disabled:opacity-30">{isFetching ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} strokeWidth={3} />}</button>
-                </div>
-                {error && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-start gap-2 text-rose-300 text-[10px] font-bold px-3 leading-tight"><AlertCircle size={12} className="shrink-0 mt-0.5" /><p>{error}</p></motion.div>}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="space-y-4">
-           {assignedBookings.length === 0 ? (
-             <motion.div className="bg-white p-6 rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-slate-100 relative overflow-hidden mt-4">
-               <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-300" />
-               <div className="text-center space-y-3 py-6">
-                 <Calendar size={32} className="mx-auto text-slate-300" />
-                 <p className="text-[12px] font-black uppercase tracking-widest text-slate-500">No Demos Assigned</p>
-                 <p className="text-[11px] font-medium text-slate-400 max-w-[200px] mx-auto">You have no active demo sessions right now.</p>
-               </div>
-             </motion.div>
-           ) : (
-             assignedBookings.map((b) => (
-                <motion.div key={b.id} layout className="bg-white p-6 rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-slate-100 relative overflow-hidden mt-4">
-                  <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
-                  
-                  <div className="space-y-4">
-                    <div className="text-[12px] font-medium text-slate-700 leading-relaxed">
-                      <p className="font-black text-[15px] text-slate-900 mb-2">Hello {userName ? userName.split(' ')[0] : 'Tutor'},</p>
-                      <p>This is a service update regarding your assigned demo session. Please review the booking information below 👇</p>
-                      
-                      <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 my-5 space-y-3">
-                        <div className="flex items-start gap-2">
-                          <span className="shrink-0 text-[14px]">🆔</span> 
-                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Order ID</span> <span className="font-black text-primary text-[13px]">{b.orderId || `DEMO-${b.id.slice(-4).toUpperCase()}`}</span></div>
-                        </div>
-                        <div className="h-px bg-blue-100/50 w-full" />
-                        <div className="flex items-start gap-2">
-                          <span className="shrink-0 text-[14px]">😎</span> 
-                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Client Name</span> <span className="font-black text-slate-900 text-[13px]">{b.clientName || 'N/A'}</span></div>
-                        </div>
-                        <div className="h-px bg-blue-100/50 w-full" />
-                        <div className="flex items-start gap-2">
-                          <span className="shrink-0 text-[14px]">📶</span> 
-                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Contact</span> <span className="font-black text-slate-900 text-[13px]">{b.contact || 'N/A'}</span></div>
-                        </div>
-                        <div className="h-px bg-blue-100/50 w-full" />
-                        <div className="flex items-start gap-2">
-                          <span className="shrink-0 text-[14px]">📍</span> 
-                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Address</span> <span className="font-black text-slate-900 text-[13px] leading-snug">{b.address || 'N/A'}</span></div>
-                        </div>
-                        <div className="h-px bg-blue-100/50 w-full" />
-                        <div className="flex items-start gap-2">
-                          <span className="shrink-0 text-[14px]">🗓️</span> 
-                          <div className="flex-1 mt-0.5"><span className="font-bold text-slate-500 uppercase tracking-widest text-[9px] block mb-0.5">Demo Schedule</span> <span className="font-black text-slate-900 text-[13px]">{b.schedule || 'N/A'}</span></div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 mb-5 bg-amber-50/50 p-4 rounded-2xl border border-amber-100/50">
-                        <p className="font-black text-amber-800 text-[11px] uppercase tracking-widest flex items-center gap-1.5 mb-3">🔔 Service Instructions:</p>
-                        <ul className="text-[11px] font-medium text-amber-900/80 space-y-2.5 pl-1">
-                          <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Please contact the client before leaving for the location.</li>
-                          <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> Be present at the scheduled time and conduct the demo as discussed.</li>
-                          <li className="flex gap-2 items-start"><div className="mt-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/> After completion, kindly update the service status for record and tracking.</li>
-                        </ul>
-                      </div>
-
-                      <div className="text-[11px] text-slate-500 mt-4 leading-relaxed">
-                        <p>Regards,</p>
-                        <p className="font-black text-slate-800 text-[12px]">DoAble India Enterprises</p>
-                        <p>Gurgaon</p>
-                        <p className="font-bold">M : 9971969197</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="grid grid-cols-4 gap-2 pt-5 mt-5 border-t border-slate-100">
-                    <button 
-                      onClick={() => openWhatsAppTo(b.contact || '', `Hi ${b.clientName || ''}, I am your assigned tutor from DoAble India.`)}
-                      className="flex flex-col items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 py-3 rounded-2xl border border-emerald-100 shadow-sm active:scale-95 transition-all"
-                    >
-                      <MessageCircle size={18} />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Chat</span>
-                    </button>
-                    <button onClick={() => window.open(`tel:${b.contact}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-600 py-3 rounded-2xl border border-blue-100 shadow-sm active:scale-95 transition-all">
-                      <Phone size={18} />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Call</span>
-                    </button>
-                    <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(b.address || '')}`, '_system')} className="flex flex-col items-center justify-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 py-3 rounded-2xl border border-rose-100 shadow-sm active:scale-95 transition-all">
-                      <Navigation size={18} />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Maps</span>
-                    </button>
-                    <button onClick={() => window.open('tel:+919971969197', '_system')} className="flex flex-col items-center justify-center gap-1 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl shadow-md active:scale-95 transition-all">
-                      <Phone size={18} className="text-amber-400" />
-                      <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">Support</span>
-                    </button>
-                  </div>
-                </motion.div>
-             ))
-           )}
-        </div>
-      </div>
-
-      {/* ─── EARNINGS LIST ─── */}
-      <div className="space-y-5">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Clock size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em]">Tuition History</h3>
+          <div className="w-full h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
+             <motion.div initial={{ width: 0 }} animate={{ width: `${(filledFieldsCount/24)*100}%` }} className="h-full bg-indigo-500" />
           </div>
         </div>
 
-        <div className="space-y-4">
-          <AnimatePresence mode="popLayout">
-            {myEarnings.length === 0 ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-[32px] border-2 border-dashed border-slate-100 p-16 text-center space-y-4">
-                <div className="w-20 h-20 bg-slate-50 text-slate-200 rounded-[32px] flex items-center justify-center mx-auto"><TrendingUp size={40} /></div>
-                <div className="space-y-1">
-                  <p className="text-slate-400 text-[12px] font-extrabold uppercase tracking-widest">No Active Tuitions</p>
-                  <p className="text-slate-300 text-[10px] font-medium">Add your first job ID above to start tracking.</p>
-                </div>
-              </motion.div>
-            ) : (
-              myEarnings.map((earning, i) => {
-                const accent = CARD_ACCENTS[i % CARD_ACCENTS.length];
-                return (
-                  <motion.div key={earning.orderId} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={cn("bg-white p-4 rounded-[24px] border shadow-sm transition-all flex flex-col gap-3 relative overflow-hidden group", accent.border)} style={{ minHeight: '100px' }}>
-                    <div className={cn("absolute left-0 top-0 bottom-0 w-1", accent.iconBg)} />
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-10 h-10 border rounded-[16px] flex items-center justify-center shrink-0 font-black text-sm shadow-inner", accent.bg, accent.text, accent.border)}>{i + 1}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8.2px] font-bold">
-                              <span className="text-slate-900 font-black">ID: {earning.orderId}</span>
-                              <span className="text-slate-300">•</span>
-                              <span className="text-[#2D7A53] flex items-center gap-0.5"><MapPin size={8} /> {earning.city}</span>
-                              <span className="text-slate-300">•</span>
-                              <span className="text-slate-600 flex items-center gap-0.5"><Briefcase size={8} /> {toTitleCase(earning.classGroup || (earning as any).subject || 'General')}</span>
-                              <span className="text-slate-300">•</span>
-                              <span className="text-slate-400 flex items-center gap-0.5"><Calendar size={8} /> {earning.startDate || 'N/A'}</span>
-                           </div>
-                           <button onClick={(e) => { e.stopPropagation(); removeEarning(earning.orderId); }} className="p-1 text-slate-200 hover:text-rose-500 transition-all shrink-0"><Trash2 size={12} /></button>
-                        </div>
-                        {(earning.duration || earning.days || earning.time) && (
-                          <div className="flex flex-wrap items-center gap-x-1.5 mt-1.5 pt-1.5 border-t border-slate-50 text-[8px] font-bold text-slate-500">
-                             {earning.duration && <span className="flex items-center gap-1"><Clock size={8} /> {earning.duration}</span>}
-                             {earning.days && (<><span className="text-slate-200">•</span><span className="flex items-center gap-1"><Calendar size={8} /> {earning.days}</span></>)}
-                             {earning.time && (<><span className="text-slate-200">•</span><span className="flex items-center gap-1"><Clock size={8} /> {earning.time}</span></>)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className={cn("text-[14px] font-black tracking-tighter leading-none", accent.text)}>₹{formatCurrency(earning.amount)}</div>
-                        <span className="text-[7px] font-bold text-slate-300 uppercase tracking-tight block mt-0.5">Monthly</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* ─── EARN MORE: CITY RECOMMENDATIONS ─── */}
-      {recommendedJobs.length > 0 && (
-        <div className="space-y-5">
-           <div className="flex flex-col gap-1 px-1">
-              <div className="flex items-center gap-2">
-                <Zap size={14} className="text-emerald-500 fill-emerald-500" />
-                <h3 className="text-[13px] font-extrabold text-slate-900 tracking-tight">Earn More in {userCity || 'Your City'}</h3>
-              </div>
-              <p className="text-[10px] font-bold text-slate-400">You're only <span className="text-primary">₹{formatCurrency(50000 - totalMonthlyIncome)}</span> away from your ₹50,000 goal! 🚀</p>
-           </div>
-           <div className="space-y-4">
-              {recommendedJobs.map((job) => (
-                <motion.div key={job['Order ID'] || (job as any).id} className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-[32px] text-white shadow-xl relative overflow-hidden group">
-                  <div className="absolute top-[-10%] right-[-10%] w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
-                  <div className="relative z-10 flex justify-between items-start gap-4">
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                       <div className="bg-white/10 w-fit px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest text-primary-foreground border border-white/5">{job.Class || 'Premium'}</div>
-                       <h4 className="text-[11px] font-extrabold text-white/90 leading-snug line-clamp-2">{job.subjects || 'General Tuition'}</h4>
-                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400"><MapPin size={10} className="text-emerald-400" /> {job.Locations || job.City}</div>
-                    </div>
-                    <div className="text-right"><div className="text-[18px] font-black text-emerald-400">₹{formatCurrency(job.Fee || job['Fee/Month'] || 0)}</div><span className="text-[9px] font-bold text-white/30 uppercase tracking-tighter">Monthly Fee</span></div>
-                  </div>
-                  <button onClick={() => { playTapSound(); setSelectedJob(job); }} className="mt-5 w-full bg-white text-slate-900 py-4 rounded-2xl font-extrabold text-[11px] uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2">View Details <Search size={16} /></button>
-                </motion.div>
-              ))}
-              <button onClick={() => { playTapSound(); window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'jobs' })); }} className="w-full py-4 text-slate-400 text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:text-primary transition-colors">View all jobs in {userCity} <ChevronRight size={14} /></button>
-           </div>
-        </div>
-      )}
-
-      {/* ─── PREMIUM TUTOR PAYMENT SECTION ─── */}
-      <div className="space-y-4">
-        <div className="px-1 flex items-center gap-2">
-           <CreditCard size={14} className="text-[#304B70]" />
-           <h3 className="text-[12px] font-extrabold text-slate-900 tracking-tight">One-Time Service Fee</h3>
-        </div>
-        <div className="bg-gradient-to-br from-[#304B70] to-[#1D2E45] rounded-[32px] p-6 shadow-xl shadow-blue-100 relative overflow-hidden text-white">
-           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full" />
-           <div className="relative z-10 space-y-4">
-              <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20"><Zap size={20} className="fill-white" /></div>
-                 <div><h4 className="text-[14px] font-black tracking-tight">We Earn When You Earn</h4><p className="text-[9px] font-bold text-white/80 uppercase tracking-widest">Fair Transparent Growth</p></div>
-              </div>
-              <div className="space-y-2 bg-black/10 rounded-2xl p-4 border border-white/5">
-                 <p className="text-[11px] font-semibold leading-relaxed">Pay <span className="font-black text-amber-300">50% one-time</span> service fee for your first month. 🤝</p>
-                 <div className="h-px bg-white/10 w-full" />
-                 <p className="text-[10px] font-medium opacity-90 leading-snug">After 11 months of excellence, a <span className="font-black text-amber-300">25% renewal fee</span> helps us keep supporting your journey. Let's grow together! ❤️🔄</p>
-                 <div className="h-px bg-white/10 w-full" />
-                 <p className="text-[10px] font-medium opacity-90 leading-snug">We only win when you win. Fee is due only AFTER your first payment. From month 2, you keep 100% of your hard-earned money! 🚀</p>
-              </div>
-              <button onClick={() => { playTapSound(); window.open("https://zohosecurepay.in/checkout/i9db4wt2-verz1l6gn6ogo/Make-a-secure-payment-now", "_system"); }} className="w-full bg-white text-[#304B70] py-4 rounded-2xl font-black text-[12px] uppercase tracking-widest shadow-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-2">Proceed to Pay <ArrowRight size={18} strokeWidth={3} /></button>
-              <div className="flex items-center justify-center gap-2 opacity-60"><ShieldCheck size={12} /><span className="text-[8px] font-black uppercase tracking-widest text-white">100% Encrypted Gateway</span></div>
-           </div>
-        </div>
-      </div>
-
-      {/* ─── PREMIUM SUPPORT CONCIERGE ─── */}
-      <div className="space-y-4">
-        <div className="px-1 flex items-center gap-2">
-           <User size={14} className="text-[#347475]" />
-           <h3 className="text-[12px] font-extrabold text-slate-900 tracking-tight">Premium Support Concierge</h3>
-        </div>
-        <button onClick={handleSupportAction} className="w-full bg-slate-900 rounded-[36px] p-6 flex items-center justify-between group transition-all active:scale-[0.98] shadow-2xl relative overflow-hidden border border-white/5">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#347475]/10 blur-3xl rounded-full" />
-          <div className="flex flex-col items-start text-left gap-1 relative z-10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#347475] rounded-[18px] flex items-center justify-center text-white shadow-lg shadow-[#347475]/30"><Phone size={20} /></div>
-              <div className="flex flex-col min-w-0">
-                 <div className="flex items-center gap-2">
-                    <span className="text-[15px] font-black text-white tracking-tight truncate max-w-[120px]">{getSupportContact().name}</span>
-                    <div className="bg-emerald-500 w-2 h-2 rounded-full animate-pulse shrink-0" />
+        <div className="bg-white rounded-[40px] border border-slate-100 shadow-2xl overflow-hidden">
+           {/* Verified Identity Header */}
+           <div className="p-6 bg-gradient-to-br from-[#191445] to-indigo-900 text-white flex items-center gap-5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-2xl rounded-full -mr-16 -mt-16" />
+              <div className="relative">
+                 <div className="w-20 h-20 rounded-[32px] bg-white/20 flex items-center justify-center border-4 border-white/30 overflow-hidden shadow-2xl">
+                    {tutorProfile.selfie ? (
+                      <img src={tutorProfile.selfie} className="w-full h-full object-cover" />
+                    ) : tutorProfile.photo ? (
+                      <img src={tutorProfile.photo} className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={40} />
+                    )}
                  </div>
-                 <p className="text-[9.5px] font-bold text-white/40 leading-none mt-1 whitespace-nowrap">9am to 6pm • Mon to Fri</p>
+                 <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1.5 rounded-full border-2 border-[#191445] shadow-lg">
+                    <ShieldCheck size={12} strokeWidth={3} />
+                 </div>
               </div>
+              <div className="min-w-0 flex-1 space-y-0.5">
+                 <h4 className="text-2xl font-black tracking-tight truncate">{toTitleCase(tutorProfile.name) || 'Set Name'}</h4>
+                 <div className="flex items-center gap-1.5 text-emerald-400">
+                    <BadgeCheck size={12} strokeWidth={3} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em]">Verified Identity</span>
+                 </div>
+                 <div className="flex items-center gap-1.5 opacity-60 text-[10px] font-bold">
+                    <MapPin size={10} />
+                    <span className="uppercase tracking-widest">{tutorProfile.city || 'Select City'}</span>
+                 </div>
+              </div>
+           </div>
+
+           <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                 <PreviewItem icon={<GraduationCap size={13} />} label="Qualification" value={Array.isArray(tutorProfile.qualification) ? tutorProfile.qualification.join(', ') : tutorProfile.qualification || 'N/A'} />
+                 <PreviewItem icon={<Briefcase size={13} />} label="Experience" value={tutorProfile.experience || 'N/A'} />
+                 <PreviewItem icon={<BookOpen size={13} />} label="Class Group" value={Array.isArray(tutorProfile.class_group) ? tutorProfile.class_group.join(', ') : tutorProfile.class_group || 'N/A'} />
+                 <PreviewItem icon={<Target size={13} />} label="Subjects" value={Array.isArray(tutorProfile.subjects) ? tutorProfile.subjects.join(', ') : tutorProfile.subjects || 'N/A'} />
+                 
+                 <PreviewItem icon={<Smartphone size={13} />} label="Phone" value={`${tutorProfile.phone || 'N/A'} (Private)`} isPrivate />
+                 <PreviewItem icon={<ShieldCheck size={13} />} label="Email" value={`${tutorProfile.email || 'N/A'} (Private)`} isPrivate />
+                 
+                 <PreviewItem icon={<Calendar size={13} />} label="Birth Date" value={tutorProfile.dob || 'N/A'} />
+                 <PreviewItem icon={<TrendingUp size={13} />} label="Age" value={tutorProfile.age || 'N/A'} />
+                 <PreviewItem icon={<User size={13} />} label="Gender" value={tutorProfile.gender || 'N/A'} />
+                 <PreviewItem icon={<MapPin size={13} />} label="Locality" value={Array.isArray(tutorProfile.location) ? tutorProfile.location.join(', ') : tutorProfile.location || 'N/A'} />
+                 
+                 <PreviewItem icon={<Clock size={13} />} label="Pref. Time" value={tutorProfile.time || 'Flexible'} />
+                 <PreviewItem icon={<Calendar size={13} />} label="Available Days" value={tutorProfile.days || 'All Days'} />
+                 <PreviewItem icon={<Navigation size={13} />} label="Teaching Mode" value={tutorProfile.communication || 'Home Tuition'} />
+                 <PreviewItem icon={<Flame size={13} />} label="Fee Expectation" value={`₹${formatCurrency(tutorProfile.fee)}`} />
+
+                 <PreviewItem icon={<ShieldCheck size={13} />} label="Aadhar Card" value={`${tutorProfile.aadhar || 'N/A'} (Private)`} isPrivate />
+                 <PreviewItem icon={<MapPin size={13} />} label="Full Address" value={`${tutorProfile.address || 'N/A'} (Private)`} isPrivate />
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Public Bio / Pitch</p>
+                 <p className="text-[10px] font-bold text-slate-600 italic leading-relaxed line-clamp-3">
+                   "{tutorProfile.about || 'Complete your bio to get noticed by parents.'}"
+                 </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                 <button onClick={() => { playTapSound(); onEditProfile(); }} className="flex-1 bg-slate-100 text-slate-900 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 border border-slate-200 shadow-sm"><Edit3 size={14} /> Refine Info</button>
+                 <button onClick={() => { playTapSound(); onRequestApproval(); }} className="flex-[1.2] bg-[#191445] text-white py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-indigo-100 active:scale-95 transition-all flex items-center justify-center gap-2"><CheckCircle2 size={14} /> Go Live Now</button>
+              </div>
+           </div>
+        </div>
+      </div>
+
+      {/* ─── HALL OF FAME: COMPETITIVE LEADERBOARD ─── */}
+      <div className="space-y-4 pt-4 pb-10">
+        <div className="flex items-center justify-between px-1 gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shrink-0 shadow-lg shadow-amber-200">
+              <Trophy size={20} className="text-white" />
+            </div>
+            <div className="flex flex-col">
+               <motion.h3 
+                 animate={{ opacity: [0.7, 1, 0.7] }}
+                 transition={{ duration: 3, repeat: Infinity }}
+                 className="text-[15px] font-[1000] bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600 bg-clip-text text-transparent uppercase tracking-tight leading-none"
+               >
+                 Top 20 Earners of Month
+               </motion.h3>
+               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">{cityLabel}</span>
             </div>
           </div>
-          <div className="relative z-10 shrink-0"><div className="bg-gradient-to-r from-[#347475] to-[#265354] text-[11px] font-black text-white px-7 py-3.5 rounded-[20px] uppercase tracking-widest shadow-xl shadow-black/40 group-hover:scale-105 transition-all">Call Now</div></div>
-        </button>
+          <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 shrink-0 shadow-sm">
+             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+             <span className="text-[8px] font-black text-emerald-700 uppercase tracking-widest">Live</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {topEarners.length === 0 ? (
+            <div className="p-10 text-center bg-white rounded-[32px] border border-dashed border-slate-200">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Calculating Standings...</p>
+            </div>
+          ) : (
+            topEarners.map((t, i) => (
+              <motion.div 
+                key={t.tutor_id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className={cn(
+                  "p-5 rounded-[36px] flex flex-col gap-3 overflow-hidden group transition-all active:scale-[0.98]",
+                  i === 0 ? "bg-gradient-to-br from-[#FFF9E6] to-[#FFF1CC] border border-amber-200 shadow-xl shadow-amber-500/10" : "bg-white border border-slate-100 shadow-sm"
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shrink-0",
+                    i === 0 ? "bg-gradient-to-br from-amber-400 to-yellow-600 border-2 border-white/50" : "bg-slate-100 text-slate-400"
+                  )}>
+                    {i === 0 ? <Crown size={20} /> : i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className={cn("text-[15px] font-black truncate", i === 0 ? "text-amber-950" : "text-slate-900")}>{toTitleCase(t.name)}</h4>
+                      {i === 0 && <BadgeCheck size={14} className="text-blue-500" />}
+                    </div>
+                    <div className="flex items-center gap-2 text-[8.5px] font-black uppercase tracking-widest opacity-60">
+                      <span>ID: #{getTutorId(t)}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={cn("text-[17px] font-black tracking-tighter", i === 0 ? "text-amber-600" : "text-slate-900")}>₹{Number(t.monthly_earnings).toLocaleString()}</div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t.active_tuitions} Tuitions</p>
+                  </div>
+                </div>
+                {i === 0 && (
+                   <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-3 border border-amber-200/50">
+                      <p className="text-[9.5px] font-bold text-amber-900 leading-tight">
+                        ⭐ <span className="font-black">Success Tip:</span> High profile completion and fast response leads to top ranking!
+                      </p>
+                   </div>
+                )}
+              </motion.div>
+            ))
+          )}
+        </div>
       </div>
+
     </div>
   );
 };
+
+function PreviewItem({ icon, label, value, isPrivate }: { icon: React.ReactNode; label: string; value: string; isPrivate?: boolean }) {
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0 overflow-hidden">
+      <div className="flex items-center gap-1 text-slate-400">
+        {icon}
+        <span className="text-[7.5px] font-black uppercase tracking-widest truncate">{label}</span>
+      </div>
+      <p className={cn(
+        "text-[9.5px] font-[900] leading-tight break-words",
+        isPrivate ? "text-slate-400 font-bold" : "text-slate-800"
+      )}>
+        {value}
+      </p>
+    </div>
+  );
+}

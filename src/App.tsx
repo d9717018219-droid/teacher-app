@@ -222,11 +222,11 @@ export default function App() {
         userType: 'parent',
         status: 'Searching',
         Status: 'Searching',
-        classes: userClasses.join(', '),
-        class: userClasses.join(', '),
-        Class: userClasses.join(', '),
-        class_group: userClasses.join(', '),
-        'Class / Board': `${userClasses.join(', ')} (${userBoard})`,
+        classes: userClasses[1] || userClasses[0] || '',
+        class: userClasses[1] || userClasses[0] || '',
+        Class: userClasses[1] || userClasses[0] || '',
+        class_group: userClasses[0] || '',
+        'Class / Board': `${userClasses[1] || userClasses[0] || ''} (${userBoard})`,
         subjects: userSubjects.join(', '),
         Subjects: userSubjects.join(', '),
         'Subject(s)': userSubjects.join(', '),
@@ -467,6 +467,10 @@ export default function App() {
           address: userAddress,
           Address: userAddress,
           about: aboutMe,
+          photo: profilePhoto || '',
+          selfie: userSelfie || '',
+          active_tuitions: tutors.find(t => t.email?.toLowerCase().trim() === activeUser.email?.toLowerCase().trim())?.active_tuitions || 0,
+          monthly_earnings: tutors.find(t => t.email?.toLowerCase().trim() === activeUser.email?.toLowerCase().trim())?.monthly_earnings || 0,
           status: localStorage.getItem('tutorStatus') || 'Active',
           verified: localStorage.getItem('isVerified') || 'No',
           created_time: new Date().toISOString().split('T')[0]
@@ -567,9 +571,9 @@ export default function App() {
           Phone: userPhone,
           name: userName,
           Name: userName,
-          class_group: userClasses.join(', '), 
-          Class: userClasses.join(', '),
-          'Class / Board': `${userClasses.join(', ')} (${userBoard})`,
+          class_group: userClasses[0] || '', 
+          Class: userClasses[1] || userClasses[0] || '',
+          'Class / Board': `${userClasses[1] || userClasses[0] || ''} (${userBoard})`,
           subjects: userSubjects.join(', '),
           Subjects: userSubjects.join(', '),
           'Subject(s)': userSubjects.join(', '),
@@ -713,10 +717,11 @@ export default function App() {
   const [userAddress, setUserAddress] = useState<string>(localStorage.getItem('userAddress') || '');
   const [userDays, setUserDays] = useState<string>(localStorage.getItem('userDays') || '');
   const [userTime, setUserTime] = useState<string>(localStorage.getItem('userTime') || '');
-  const [userDuration, setUserDuration] = useState<string>(localStorage.getItem('userDuration') || '');
+  const [userDuration, setUserDuration] = useState<string>(localStorage.getItem('userDuration') || '1 Hour');
   const [userFee, setUserFee] = useState<string>(localStorage.getItem('userFee') || '');
   const [userResidency, setUserResidency] = useState<string>(localStorage.getItem('userResidency') || '');
   const [userAadhar, setUserAadhar] = useState<string>(localStorage.getItem('userAadhar') || '');
+  const [userSelfie, setUserSelfie] = useState<string | null>(localStorage.getItem('userSelfie'));
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Calculate age from DOB
@@ -734,6 +739,23 @@ export default function App() {
       localStorage.setItem('userAge', ageStr);
     }
   }, [userDob]);
+
+  const handleSelfieChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert("Image is too large. Please select an image under 5MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setUserSelfie(base64String);
+        localStorage.setItem('userSelfie', base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -793,6 +815,7 @@ export default function App() {
         gender: userGender,
         phone: userPhone,
         dob: userDob,
+        age: userAge,
         qualification: userQualifications,
         experience: userExperience,
         about: aboutMe,
@@ -801,7 +824,14 @@ export default function App() {
         photo: profilePhoto,
         address: userAddress,
         mode: userMode,
-        board: userBoard
+        board: userBoard,
+        aadhar: userAadhar,
+        communication: userCommunication,
+        localities: userLocalities,
+        days: userDays,
+        time: userTime,
+        residency: userResidency,
+        fee: userFee
       };
       const completion = calculateProfileCompletion(userData, userType);
       
@@ -824,60 +854,64 @@ export default function App() {
 
   // Auto-fill profile from tutors list when user signs in
   useEffect(() => {
-    if (activeUser?.email && tutors.length > 0 && !isTutorFetched) {
+    // Only auto-fill if userType is 'teacher' (or not yet set)
+    if (activeUser?.email && tutors.length > 0 && userType === 'teacher') {
       const email = activeUser.email.toLowerCase().trim();
       const tutor = tutors.find(t => {
-        const tEmail = (t.Email || (t as any).email || '').toString().toLowerCase().trim();
+        const tEmail = (t.email || t.Email || '').toString().toLowerCase().trim();
         return tEmail === email;
       });
 
       if (tutor) {
         console.log('Found matching tutor profile for:', email);
-        const name = (tutor['Full Name'] || (tutor as any).fullName || tutor.Name || '').toString();
-        const gender = (tutor.Gender || (tutor as any).gender || 'Male').toString();
-        const city = (tutor['Preferred City'] || (tutor as any).preferredCity || (tutor as any).City || 'All').toString();
-        const classGroup = (tutor['Preferred Class Group'] || (tutor as any).preferredClassGroup || (tutor as any).classGroup || '').toString();
-        const tutorId = (tutor['Tutor ID'] || (tutor as any).tutorId || (tutor as any).id || '').toString();
-        const phone = (tutor.Phone || (tutor as any).phone || '').toString();
-        const about = (tutor.About || (tutor as any).about || '').toString();
-        const dob = (tutor.DOB || (tutor as any).dob || '').toString();
-        let qualification: string[] = [];
-        try {
-          const rawQ = (tutor.Qualification || (tutor as any).qualification || '').toString();
-          qualification = rawQ.startsWith('[') ? JSON.parse(rawQ) : (rawQ ? [rawQ] : []);
-        } catch { qualification = []; }
-        
-        const experience = (tutor.Experience || (tutor as any).experience || '').toString();
-        const schoolExp = (tutor['School Exp.'] || tutor.School_Experience || 'No').toString();
-        const vehicle = (tutor['Have own Vehicle'] || tutor.Vehicle || 'No').toString();
-        let subjects: string[] = [];
-        try {
-          const rawS = (tutor['Preferred Subject(s)'] || tutor.Subject_Field || '[]').toString();
-          subjects = rawS.startsWith('[') ? JSON.parse(rawS) : (rawS ? rawS.split(',').map((s: any) => s.trim()).filter(Boolean) : []);
-        } catch { subjects = []; }
+        // Map all fields correctly from normalized tutor object
+        const name = (tutor.name || '').toString();
+        const gender = (tutor.gender || '').toString();
+        const city = (tutor.city || '').toString();
+        const classGroupArray = (tutor.class_group as string[]) || [];
+        const classGroup = classGroupArray.join(', ');
+        const tId = (tutor.tutor_id || '').toString();
+        const phone = (tutor.phone || '').toString();
+        const about = (tutor.about || '').toString();
+        const dob = (tutor.dob || '').toString();
+        const aadhar = (tutor.aadhar || '').toString();
+        const address = (tutor.address || '').toString();
+        const communication = (tutor.communication || '').toString();
+        const days = (tutor.days || '').toString();
+        const time = (tutor.time || '').toString();
+        const residency = (tutor.residency || '').toString();
+        const fee = (tutor.fee || '').toString();
+        const qualification = (tutor.qualification as string[]) || [];
+        const experience = (tutor.experience || '').toString();
+        const schoolExp = (tutor.school_teacher || '').toString();
+        const vehicle = (tutor.have_vehicle || '').toString();
+        const subjects = (tutor.subjects as string[]) || [];
+        const localities = (tutor.location || tutor.localities || []).map((l: any) => l.toString());
 
-        let localities: string[] = [];
-        try {
-          const rawL = (tutor['Preferred Location(s)'] || tutor.Preferred_Location || '[]').toString();
-          localities = rawL.startsWith('[') ? JSON.parse(rawL) : (rawL ? rawL.split(',').map((l: any) => l.trim()).filter(Boolean) : []);
-        } catch { localities = []; }
+        // STRICT ADDITIVE SYNC: Only update if server has non-empty value
+        if (name && name.trim() !== '') { setUserName(toTitleCase(name)); localStorage.setItem('userName', toTitleCase(name)); }
+        if (gender && gender.trim() !== '') { setUserGender(toTitleCase(gender)); localStorage.setItem('userGender', toTitleCase(gender)); }
+        if (city && city.trim() !== '') { setUserCity(toTitleCase(city)); localStorage.setItem('userCity', toTitleCase(city)); }
+        if (phone && phone.trim() !== '') { setUserPhone(phone); localStorage.setItem('userPhone', phone); }
+        if (about && about.trim() !== '') { setAboutMe(about); localStorage.setItem('aboutMe', about); }
+        if (dob && dob.trim() !== '') { setUserDob(dob); localStorage.setItem('userDob', dob); }
+        if (qualification && qualification.length > 0) { setUserQualifications(qualification); localStorage.setItem('userQualifications', JSON.stringify(qualification)); }
+        if (experience && experience.trim() !== '') { setUserExperience(experience); localStorage.setItem('userExperience', experience); }
+        if (schoolExp && schoolExp.trim() !== '') { setIsSchoolTeacher(schoolExp); localStorage.setItem('isSchoolTeacher', schoolExp); }
+        if (vehicle && vehicle.trim() !== '') { setHasVehicle(vehicle); localStorage.setItem('hasVehicle', vehicle); }
+        if (subjects && subjects.length > 0) { setUserSubjects(subjects); localStorage.setItem('userSubjects', JSON.stringify(subjects)); }
+        if (localities && localities.length > 0) { setUserLocalities(localities); localStorage.setItem('userLocalities', JSON.stringify(localities)); }
+        if (aadhar && aadhar.trim() !== '') { setUserAadhar(aadhar); localStorage.setItem('userAadhar', aadhar); }
+        if (address && address.trim() !== '') { setUserAddress(address); localStorage.setItem('userAddress', address); }
+        if (communication && communication.trim() !== '') { setUserCommunication(communication); localStorage.setItem('userCommunication', communication); }
+        if (days && days.trim() !== '') { setUserDays(days); localStorage.setItem('userDays', days); }
+        if (time && time.trim() !== '') { setUserTime(time); localStorage.setItem('userTime', time); }
+        if (residency && residency.trim() !== '') { setUserResidency(residency); localStorage.setItem('userResidency', residency); }
+        if (fee && fee.toString().trim() !== '') { setUserFee(fee.toString()); localStorage.setItem('userFee', fee.toString()); }
 
-        setUserName(toTitleCase(name));
-        setUserGender(toTitleCase(gender));
-        setUserCity(toTitleCase(city));
-        setUserPhone(phone);
-        setAboutMe(about);
-        setUserDob(dob);
-        setUserQualifications(qualification);
-        setUserExperience(experience);
-        setIsSchoolTeacher(schoolExp);
-        setHasVehicle(vehicle);
-        setUserSubjects(subjects);
-        setUserLocalities(localities);
-
-        if (tutorId) {
-          localStorage.setItem('tutorId', tutorId);
-          setTutorId(tutorId);
+        if (tId) {
+          localStorage.setItem('tutorId', tId);
+          setTutorId(tId);
         }
 
         // Set User Type as Teacher automatically
@@ -885,32 +919,15 @@ export default function App() {
         localStorage.setItem('userType', 'teacher');
         setShowOnboarding(false);
         
-        // Match Class Groups - Enforce single selection
-        const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
-        const matchedGroups = groups.filter(g => classGroup.toLowerCase().includes(g.toLowerCase().replace('class ', '')));
-        if (matchedGroups.length > 0) {
-          const singleGroup = [matchedGroups[0]];
-          setUserClasses(singleGroup);
-          localStorage.setItem('userClasses', JSON.stringify(singleGroup));
-        } else {
-          setUserClasses([]);
-          localStorage.setItem('userClasses', JSON.stringify([]));
+        if (classGroup && classGroup.trim() !== '') {
+          const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
+          const matchedGroups = groups.filter(g => classGroup.toLowerCase().includes(g.toLowerCase().replace('class ', '')));
+          if (matchedGroups.length > 0) {
+            const singleGroup = [matchedGroups[0]];
+            setUserClasses(singleGroup);
+            localStorage.setItem('userClasses', JSON.stringify(singleGroup));
+          }
         }
-        
-        // Save to LocalStorage
-        localStorage.setItem('userName', toTitleCase(name));
-        localStorage.setItem('userGender', toTitleCase(gender));
-        localStorage.setItem('userCity', toTitleCase(city));
-        localStorage.setItem('userPhone', phone);
-        localStorage.setItem('aboutMe', about);
-        localStorage.setItem('userDob', dob);
-        localStorage.setItem('userQualifications', JSON.stringify(qualification));
-        localStorage.setItem('userExperience', experience);
-        localStorage.setItem('isSchoolTeacher', schoolExp);
-        localStorage.setItem('hasVehicle', vehicle);
-        localStorage.setItem('userSubjects', JSON.stringify(subjects));
-        localStorage.setItem('userLocalities', JSON.stringify(localities));
-        if (matchedGroups.length > 0) localStorage.setItem('userClasses', JSON.stringify(matchedGroups));
         
         setIsTutorFetched(true);
       }
@@ -1440,6 +1457,7 @@ export default function App() {
       tutor_id: t.tutor_id || t['Tutor ID'] || t.id || '',
       name: t.name || t.Name || '',
       email: t.email || t.Email || '',
+      phone: t.phone || t.Phone || '',
       internal_phone: t.phone || t.Phone || '',
       gender: t.gender || t.Gender || '',
       age: t.age || t.Age || '',
@@ -1456,10 +1474,16 @@ export default function App() {
       have_vehicle: t.have_vehicle || t['Have own Vehicle'] || 'No',
       communication: t.communication || t.Communication || t['Mode of Teaching'] || t['Mode of teaching'] || '',
       fee: t.fee || t.Fee || t['Fee/Month'] || '',
+      aadhar: t.aadhar || t.Aadhar || t['Aadhar Number'] || t['Aadhar'] || '',
+      address: t.address || t.Address || t['Full Address'] || t['address'] || '',
+      residency: t.residency || t.Residency || t['Residency'] || t['society'] || t['block'] || '',
       about: t.about || t.About || '',
       status: t.status || t.Status || 'Active',
       photo: t.photo || t.Photo || '',
       verified: t.verified || t.Verified || 'No',
+      selfie: t.selfie || t.Selfie || '',
+      active_tuitions: parseInt(t.active_tuitions || t.Active_Tuitions || '0'),
+      monthly_earnings: parseFloat(t.monthly_earnings || t.Monthly_Earnings || '0'),
       created_time: t.created_time || t['Record Added'] || ''
     };
   };
@@ -1788,22 +1812,44 @@ export default function App() {
         if (!matchesClass) return false;
       }
 
-      // Gender Filter (Handles 'Any', 'Both', 'Male/Female')
+      // Gender Filter (Handles 'Any', 'Both', 'Male/Female', and partial matches)
       if (jobFilterGender !== 'All') {
-        const jobGender = (l.Gender || (l as any).gender || '').toLowerCase().trim();
+        // Prioritize 'gender' column as requested by the user, then fallbacks
+        const jobGender = ((l as any).gender || l.Gender || (l as any).preferred_gender || (l as any).requiredGender || '').toLowerCase().trim();
         const fGender = jobFilterGender.toLowerCase().trim();
+
+        // Use regex for precise matching (prevents "female" matching "male")
+        const hasFemale = /female/i.test(jobGender);
+        const hasMale = /\bmale\b/i.test(jobGender); // \b ensures it doesn't match "female"
         
-        const isAny = jobGender.includes('any') || jobGender.includes('both') || jobGender.includes('/');
-        const isExactMatch = jobGender === fGender;
+        const isAny = jobGender === '' || /any/i.test(jobGender) || /both/i.test(jobGender) || jobGender.includes('/') || (hasFemale && hasMale);
         
-        if (!isAny && !isExactMatch) return false;
+        if (!isAny) {
+          if (fGender === 'female') {
+            if (!hasFemale) return false;
+          } else if (fGender === 'male') {
+            if (!hasMale) return false;
+          }
+        }
       }
 
       // Mode Filter
       if (jobFilterMode !== 'All') {
-        const jobMode = (l.Mode || (l as any).mode || (l as any)['Mode of Teaching'] || '').toLowerCase().trim();
+        const jobMode = (l.Mode || (l as any).mode || (l as any)['Mode of Teaching'] || (l as any)['Mode of teaching'] || '').toLowerCase().trim();
         const fMode = jobFilterMode.toLowerCase().trim();
-        if (!jobMode.includes(fMode) && !jobMode.includes('any') && !jobMode.includes('both')) return false;
+        
+        const isOnlineFilter = fMode.includes('online');
+        const isHomeFilter = fMode.includes('home');
+        
+        const isOnlineJob = jobMode.includes('online');
+        const isHomeJob = jobMode.includes('home') || jobMode.includes('offline') || jobMode === '';
+        const isAny = jobMode.includes('any') || jobMode.includes('both');
+        
+        if (!isAny) {
+          if (isOnlineFilter && !isOnlineJob) return false;
+          if (isHomeFilter && !isHomeJob) return false;
+          if (!isOnlineFilter && !isHomeFilter && !jobMode.includes(fMode)) return false;
+        }
       }
 
       if (jobSearchQuery) {
@@ -1875,10 +1921,12 @@ export default function App() {
         const tGender = (t.gender || (t as any).Gender || '').toLowerCase().trim();
         const fGender = tutorFilterGender.toLowerCase().trim();
         
-        const isAny = tGender.includes('any') || tGender.includes('both') || tGender.includes('/');
-        const isExactMatch = tGender === fGender;
-        
-        if (!isAny && !isExactMatch) return false;
+        if (tGender !== '') {
+          const isAny = tGender.includes('any') || tGender.includes('both') || tGender.includes('/');
+          const isExactMatch = tGender === fGender;
+          
+          if (!isAny && !isExactMatch) return false;
+        }
       }
 
       if (tutorSearchQuery) {
@@ -2388,8 +2436,8 @@ export default function App() {
             activeTutorsCount={localActiveTutors.length} 
             featuredJobs={localActiveJobs.slice(0, 3)} 
             featuredTutors={localActiveTutors.slice(0, 3)} 
-            allJobs={localActiveJobs}
             allTutors={localActiveTutors}
+            allJobs={localActiveJobs}
             playTapSound={playTapSound}
             setFormType={setFormType}
             setShowFormModal={setShowFormModal}
@@ -2512,6 +2560,19 @@ export default function App() {
             setSelectedJob={setSelectedJob}
             shortlistedIds={shortlistedIds}
             toggleShortlist={toggleShortlist}
+          />
+       )}
+       {activeTab === 'earnings' && (
+          <EarningsView 
+            tutorProfile={finalTutors.find(t => t.email?.toLowerCase().trim() === activeUser?.email?.toLowerCase().trim())}
+            allTutors={finalTutors}
+            userCity={userCity}
+            playTapSound={playTapSound}
+            onEditProfile={() => setShowProfileSetup(true)}
+            onRequestApproval={() => {
+              playTapSound();
+              openWhatsApp(`Hi RMN Support, my profile is 100% complete (Tutor ID: #${tutorId}). Please verify and make it live for parents.`);
+            }}
           />
        )}
        {activeTab === 'tutors' && (
@@ -2860,22 +2921,29 @@ export default function App() {
                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Class Group</label>
                              <div className="grid grid-cols-2 gap-2">
                                {CLASSES_LIST.map(c => {
-                                 const isGroupActive = userClasses.includes(c);
+                                 // Check if this group or any of its sub-classes are active
+                                 const isGroupActive = userClasses.includes(c) || (CLASS_GROUP_MAPPING[c] || []).some(sub => userClasses.includes(sub));
                                  return (
                                    <button key={c} onClick={() => { playTapSound(); setUserClasses([c]); localStorage.setItem('userClasses', JSON.stringify([c])); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
                                  );
                                })}
                              </div>
                            </div>
-                           {userType === 'parent' && userClasses.length > 0 && (
-                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Specific Class</label>
-                               <div className="flex flex-wrap gap-2">
-                                 {(CLASS_GROUP_MAPPING[CLASSES_LIST.find(g => userClasses.includes(g)) || ''] || []).map(sub => (
-                                   <button key={sub} onClick={() => { playTapSound(); setUserClasses([sub]); localStorage.setItem('userClasses', JSON.stringify([sub])); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter transition-all", userClasses.includes(sub) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{sub}</button>
-                                 ))}
-                               </div>
-                             </div>
+                           {userType === 'parent' && (
+                             (() => {
+                               const currentGroup = CLASSES_LIST.find(g => userClasses.includes(g) || (CLASS_GROUP_MAPPING[g] || []).some(s => userClasses.includes(s)));
+                               if (!currentGroup) return null;
+                               return (
+                                 <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
+                                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Specific Class</label>
+                                   <div className="flex flex-wrap gap-2">
+                                     {(CLASS_GROUP_MAPPING[currentGroup] || []).map(sub => (
+                                       <button key={sub} onClick={() => { playTapSound(); setUserClasses([currentGroup, sub]); localStorage.setItem('userClasses', JSON.stringify([currentGroup, sub])); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter transition-all", userClasses.includes(sub) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{sub}</button>
+                                     ))}
+                                   </div>
+                                 </div>
+                               );
+                             })()
                            )}
                            <div className="space-y-1.5">
                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Board</label>
@@ -3012,8 +3080,52 @@ export default function App() {
                        </div>
                      )}
 
-                     {/* ─── PARENT STEP 5 or TUTOR STEP 8: SETTINGS ─── */}
-                     {((currentStep === 5 && userType === 'parent') || (currentStep === 8 && userType === 'teacher')) && (
+                     {/* ─── TUTOR STEP 8: SELFIE VERIFICATION ─── */}
+                     {currentStep === 8 && userType === 'teacher' && (
+                       <div className="space-y-6">
+                         <div className="space-y-1.5">
+                           <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Selfie Verification</h2>
+                           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                             Please upload a clear face image, professional image
+                           </p>
+                         </div>
+
+                         <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200 gap-4">
+                            {userSelfie ? (
+                              <div className="relative group">
+                                <img src={userSelfie} alt="Selfie" className="w-48 h-48 rounded-[32px] object-cover border-4 border-white shadow-2xl" />
+                                <button 
+                                  onClick={() => { setUserSelfie(null); localStorage.removeItem('userSelfie'); }}
+                                  className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90"
+                                >
+                                  <X size={16} strokeWidth={3} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-4 py-4">
+                                 <div className="w-20 h-20 bg-primary/10 rounded-[24px] flex items-center justify-center text-primary">
+                                   <Camera size={40} />
+                                 </div>
+                                 <label className="bg-[#191445] text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all cursor-pointer">
+                                    Capture / Upload
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleSelfieChange} />
+                                 </label>
+                                 <p className="text-[9px] font-bold text-slate-400 uppercase">Max Size: 5MB • Any Format</p>
+                              </div>
+                            )}
+                         </div>
+
+                         <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 flex items-start gap-4">
+                            <ShieldCheck size={20} className="text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[10px] font-bold text-amber-800 leading-snug">
+                              Your selfie is used to verify your identity. It will be shown to parents as part of your <span className="font-black underline">Verified Profile</span>.
+                            </p>
+                         </div>
+                       </div>
+                     )}
+
+                     {/* ─── PARENT STEP 5 or TUTOR STEP 9: SETTINGS ─── */}
+                     {((currentStep === 5 && userType === 'parent') || (currentStep === 9 && userType === 'teacher')) && (
                        <div className="space-y-6">
                          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Account Settings</h2>
                          {userType === 'parent' && (
@@ -3052,7 +3164,7 @@ export default function App() {
                  )}
                  
                  {(() => {
-                   const totalSteps = userType === 'teacher' ? 8 : 5;
+                   const totalSteps = userType === 'teacher' ? 9 : 5;
                    if (currentStep < totalSteps) {
                      return (
                        <button 
@@ -3093,6 +3205,188 @@ export default function App() {
            </div>
          </div>
        )}
+
+      <AnimatePresence>
+        {selectedJob && (
+          <div className="fixed inset-0 z-[18000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedJob(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+               {/* Premium Header */}
+               <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0 bg-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full -mr-16 -mt-16" />
+                  <div className="relative z-10 space-y-0.5">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Job Opportunity</h3>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 flex items-center gap-1">
+                         <BadgeCheck size={10} strokeWidth={3} /> VERIFIED LEAD
+                       </span>
+                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{getJobId(selectedJob)}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedJob(null)} className="relative z-10 p-2.5 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-600 transition-all active:scale-90">
+                    <X size={18} strokeWidth={3} />
+                  </button>
+               </div>
+
+               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-12">
+                  {/* Primary Info Card */}
+                  <div className="bg-slate-900 rounded-[32px] p-6 text-white shadow-xl relative overflow-hidden">
+                    <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-primary/20 rounded-full blur-3xl" />
+                    <div className="relative z-10 space-y-4">
+                      <div className="space-y-1">
+                        <div className="bg-white/10 w-fit px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-primary-foreground border border-white/5">
+                          {selectedJob.Class || selectedJob['Class / Board'] || 'Premium Class'}
+                        </div>
+                        <h4 className="text-[16px] font-[1000] text-white leading-snug tracking-tight">
+                          {selectedJob.subjects || selectedJob['Preferred Subject(s)'] || 'General Subjects'}
+                        </h4>
+                      </div>
+                      <div className="flex justify-between items-end pt-2">
+                        <div className="flex flex-col gap-0.5 min-w-0 flex-1 pr-4">
+                          <div className="flex items-center gap-1.5 text-emerald-400 text-[9.5px] font-[1000] tracking-tight uppercase">
+                            <MapPin size={10} strokeWidth={3} /> {selectedJob.City || (selectedJob as any).city || 'India'}
+                          </div>
+                          <div className="text-slate-300 text-[8.5px] font-bold line-clamp-1 leading-tight">
+                            {cleanValue(selectedJob.residency || (selectedJob as any).residency || '', '') ? `${selectedJob.residency || (selectedJob as any).residency}, ` : ''}{cleanValue(selectedJob.Locations || (selectedJob as any).locations || (selectedJob as any).location || (selectedJob as any).locality || '', 'All Areas')}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {(() => {
+                            const rawFee = selectedJob.Fee || (selectedJob as any).fee || (selectedJob as any).budget || selectedJob['Fee/Month'] || (selectedJob as any).monthly_fee || '';
+                            const isNumeric = /[0-9]/.test(rawFee.toString());
+                            return (
+                              <>
+                                <div className="text-[24px] font-black text-emerald-400 leading-none">
+                                  {isNumeric ? `₹${formatCurrency(rawFee)}` : rawFee || '₹0'}
+                                </div>
+                                <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Monthly Budget</span>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <DetailItem icon={<LucideUser size={12} className="text-indigo-500" />} label="Tutor Gender" value={selectedJob.Gender || (selectedJob as any).gender || 'Any Preference'} />
+                    <DetailItem icon={<Clock size={12} className="text-rose-500" />} label="Preferred Time" value={selectedJob.time || (selectedJob as any).Time || (selectedJob as any)['Preferred Time'] || 'Flexible'} />
+                    <DetailItem icon={<Calendar size={12} className="text-amber-500" />} label="Weekly Days" value={selectedJob.days || (selectedJob as any).Days || (selectedJob as any)['Available Days'] || 'N/A'} />
+                    <DetailItem icon={<Navigation size={12} className="text-blue-500" />} label="Teaching Mode" value={(selectedJob as any).Mode || (selectedJob as any).mode || (selectedJob as any)['Mode of Teaching'] || 'Home Tuition'} />
+                    <DetailItem icon={<Zap size={12} className="text-emerald-500" />} label="Avg. Duration" value={selectedJob.duration || (selectedJob as any).Duration || '1.5 Hours'} />
+                    <DetailItem icon={<BadgeCheck size={12} className="text-purple-500" />} label="Lead Status" value={selectedJob['Internal Remark'] || selectedJob.status || (selectedJob as any)['status'] || 'Active'} />
+                  </div>
+
+                  {/* Requirements Section */}
+                  <div className="bg-slate-50 rounded-[28px] p-5 border border-slate-100 space-y-2.5">
+                    <div className="text-[10px] font-black uppercase text-slate-400 tracking-[0.15em] flex items-center gap-2">
+                      <FileText size={12} className="text-slate-400" /> Parent's Requirement
+                    </div>
+                    <p className="text-[13px] font-bold text-slate-600 leading-relaxed italic">
+                      "{selectedJob.Notes || 'Looking for an experienced tutor who can help with core concepts and regular practice sessions.'}"
+                    </p>
+                  </div>
+
+                  {/* Security Advice */}
+                  <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100/50 flex items-start gap-3">
+                    <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
+                    <p className="text-[10.5px] font-bold text-blue-800 leading-snug">
+                      Your safety is our priority. DoAble India verifies every lead, but we recommend meeting in a safe environment for the first session.
+                    </p>
+                  </div>
+               </div>
+
+               {/* Action Footer */}
+               <div className="p-6 pt-2 border-t border-slate-50 bg-white shrink-0">
+                  <button 
+                    onClick={() => { playTapSound(); openWhatsApp(`Hi, I am interested in Job Order ID: #${getJobId(selectedJob)}. Subjects: ${selectedJob.subjects || 'General'}. Please share details.`); }}
+                    className="w-full bg-[#191445] text-white h-16 rounded-[24px] font-black text-[13px] uppercase tracking-[0.2em] shadow-2xl shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-3"
+                  >
+                    Apply for this Job <ArrowRight size={20} strokeWidth={3} />
+                  </button>
+                  <p className="text-center text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-4">Mention Order ID: #{getJobId(selectedJob)}</p>
+               </div>
+            </motion.div>
+          </div>
+        )}
+
+        {selectedTutor && (
+          <div className="fixed inset-0 z-[18000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedTutor(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+               <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0 bg-slate-50/50">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Tutor Profile</h3>
+                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5"><BadgeCheck size={10} /> {selectedTutor.verified === 'Yes' ? 'Verified Expert' : 'Awaiting Verification'}</p>
+                  </div>
+                  <button onClick={() => setSelectedTutor(null)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm transition-all">
+                    <X size={16} />
+                  </button>
+               </div>
+
+               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      {selectedTutor.photo ? (
+                        <img src={selectedTutor.photo} alt={selectedTutor.name} className="w-20 h-20 rounded-[28px] object-cover border-4 border-white shadow-xl" />
+                      ) : (
+                        <div className="w-20 h-20 rounded-[28px] bg-indigo-50 flex items-center justify-center text-indigo-500 border-4 border-white shadow-xl">
+                          <LucideUser size={32} />
+                        </div>
+                      )}
+                      {selectedTutor.verified === 'Yes' && (
+                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-full border-2 border-white">
+                          <Check size={10} strokeWidth={4} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-[20px] font-[1000] text-slate-900 tracking-tight leading-tight">{toTitleCase(selectedTutor.name)}</h4>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{getTutorId(selectedTutor)}</span>
+                        <div className="w-1 h-1 bg-slate-200 rounded-full" />
+                        <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{selectedTutor.experience} Experience</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <DetailItem icon={<GraduationCap size={12} />} label="Qualification" value={selectedTutor.qualification[0] || 'Graduate'} />
+                    <DetailItem icon={<MapPin size={12} />} label="City" value={selectedTutor.city} />
+                    <DetailItem icon={<BookOpen size={12} />} label="Classes" value={selectedTutor.class_group[0] || 'All Classes'} />
+                    <DetailItem icon={<TrendingUp size={12} />} label="Expectation" value={`₹${formatCurrency(selectedTutor.fee)}`} />
+                  </div>
+
+                  <div className="space-y-3">
+                    <h5 className="text-[11px] font-black uppercase text-slate-400 tracking-widest ml-1">Expertise Subjects</h5>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedTutor.subjects.slice(0, 6).map(s => (
+                        <span key={s} className="bg-slate-50 text-slate-700 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-slate-100">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-[28px] p-5 border border-slate-100 space-y-2">
+                    <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5"><FileText size={10} /> About Tutor</h5>
+                    <p className="text-[12px] font-bold text-slate-600 leading-relaxed italic line-clamp-4">
+                      "{selectedTutor.about || `Passionate educator with ${selectedTutor.experience} of teaching experience in ${selectedTutor.city}.`}"
+                    </p>
+                  </div>
+               </div>
+
+               <div className="p-6 border-t border-slate-100 bg-white shrink-0">
+                  <button 
+                    onClick={() => { playTapSound(); openWhatsApp(`Hi, I am interested in hiring Tutor ID: #${getTutorId(selectedTutor)} (${selectedTutor.name}). Please share more details.`); }}
+                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+                  >
+                    Hire this Tutor <ArrowRight size={18} strokeWidth={3} />
+                  </button>
+               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showSelectionDrawer && (
@@ -3229,5 +3523,17 @@ function NavButton({ active, onClick, icon, label, activeColor, activeBg, inacti
       )}
       <span className="text-[7px] font-[1000] tracking-tight">{label}</span>
     </button>
+  );
+}
+
+function DetailItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex flex-col gap-1.5 shadow-sm">
+      <div className="flex items-center gap-1.5 text-slate-400">
+        {icon}
+        <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
+      </div>
+      <span className="text-[11px] font-[900] text-slate-800 tracking-tight leading-tight line-clamp-1">{value}</span>
+    </div>
   );
 }
