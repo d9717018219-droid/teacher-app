@@ -122,7 +122,84 @@ export const CITIES_LIST = [
   "Zirakpur"
 ];
 
-export const CLASSES_LIST = ["Class I to V", "Class VI to VIII", "Class IX to X", "Class XI to XII"];
+export const CLASSES_LIST = ["Class I to V", "Class VI to VIII", "Class IX to X", "Class XI to XII", "Entrance Exam & Specialization"];
+
+export const SPECIALIZED_SUB_CATEGORIES: Record<string, string[]> = {
+  "Entrance Exam & Specialization": ["JEE", "NEET", "IELTS / TOEFL", "Foreign Languages", "Regional & Indian Languages"]
+};
+
+export const SPECIALIZED_SUBJECTS: Record<string, any> = {
+  "JEE": [
+    "Physics (IIT-JEE Mains & Advanced)",
+    "Organic Chemistry",
+    "Inorganic Chemistry",
+    "Physical Chemistry",
+    "Mathematics (IIT-JEE Mains & Advanced)"
+  ],
+  "NEET": [
+    "Physics (NEET Level)",
+    "Organic Chemistry",
+    "Inorganic Chemistry",
+    "Physical Chemistry",
+    "Botany",
+    "Zoology"
+  ],
+  "IELTS / TOEFL": [
+    "Speaking & Listening",
+    "Reading & Writing",
+    "General Training Prep",
+    "Academic Test Prep"
+  ],
+  "Foreign Languages": {
+    "Most Popular & Academic": [
+      "English (Spoken, Business & Corporate)",
+      "French (School Curriculum & DELF Prep)",
+      "German (Goethe Institute Exam Prep)",
+      "Spanish (DELE Exam Prep)"
+    ],
+    "Asian Languages - High Demand": [
+      "Japanese (JLPT N5 to N1 Prep)",
+      "Mandarin / Chinese (HSK Prep)",
+      "Korean (TOPIK Exam Prep)",
+      "Arabic (Modern Standard & Conversational)"
+    ],
+    "European Languages": [
+      "Italian",
+      "Russian",
+      "Portuguese"
+    ]
+  },
+  "Regional & Indian Languages": {
+    "National & Classical": [
+      "Hindi (Academic & Spoken)",
+      "Sanskrit",
+      "Urdu"
+    ],
+    "North & West India": [
+      "Punjabi",
+      "Gujarati",
+      "Marathi",
+      "Marwari / Rajasthani",
+      "Kashmiri",
+      "Konkani",
+      "Sindhi"
+    ],
+    "South India": [
+      "Tamil",
+      "Telugu",
+      "Kannada",
+      "Malayalam"
+    ],
+    "East & Northeast India": [
+      "Bengali",
+      "Odia",
+      "Assamese",
+      "Maithili",
+      "Nepali",
+      "Manipuri"
+    ]
+  }
+};
 
 export const CLASS_GROUP_MAPPING: Record<string, string[]> = {
   "Class I to V": ["1st Std", "2nd Std", "3rd Std", "4th Std", "5th Std"],

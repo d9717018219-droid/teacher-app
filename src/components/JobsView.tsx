@@ -94,10 +94,10 @@ export const JobsView: React.FC<JobsViewProps> = ({
            <>
              {finalJobs.slice(0, visibleJobsCount).map((job) => (
                <JobCard 
-                 key={job.id || job.order_id} 
+                 key={job.id || job['Order ID']} 
                  job={job} 
                  onClick={setSelectedJob} 
-                 isShortlisted={shortlistedIds.includes(job.id || job.order_id || '')} 
+                 isShortlisted={shortlistedIds.includes(job.id || job['Order ID'] || '')} 
                  onShortlistToggle={toggleShortlist} 
                />
              ))}

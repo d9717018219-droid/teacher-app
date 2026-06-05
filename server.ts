@@ -11,6 +11,33 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Debug endpoint - test PHP API directly
+  app.get('/api/debug/test-php', async (req, res) => {
+    console.log('DEBUG: Hit /api/debug/test-php');
+    try {
+      const testData = new URLSearchParams();
+      testData.append('action', 'get');
+      testData.append('email', 'd9711738891@gmail.com');
+
+      const response = await fetch('https://doableindia.com/app-sys/api.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: testData.toString()
+      });
+
+      const text = await response.text();
+      res.json({
+        status: 'ok',
+        phpResponse: text,
+        parsed: (() => { try { return JSON.parse(text); } catch(e) { return text; } })()
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // API Proxy Route
   app.get('/api/leads', async (req, res) => {
     try {
@@ -148,21 +175,21 @@ async function startServer() {
   app.post('/api/profile/update', express.json(), async (req, res) => {
     try {
       const payload: any = { action: 'upsert', ...req.body };
-      console.log('Forwarding profile update to Hostinger (api_copy.php)...');
-      
-      const response = await fetch('https://doableindia.com/app-sys/api_copy.php', {
+      console.log('Forwarding profile update to Hostinger (api.php)...');
+
+      const response = await fetch('https://doableindia.com/app-sys/api.php', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
           'Accept': 'application/json'
         },
         body: JSON.stringify(payload)
       });
-      
+
       const responseText = await response.text();
       console.log('Raw response from Hostinger:', responseText.slice(0, 500));
-      
+
       let data;
       try {
         data = JSON.parse(responseText);
@@ -171,7 +198,7 @@ async function startServer() {
         res.status(500).json({ status: 'error', message: 'Invalid response from server', raw: responseText.slice(0, 200) });
         return;
       }
-      
+
       console.log('Response from Hostinger (parsed):', JSON.stringify(data).slice(0, 200) + '...');
       res.status(response.status).json(data);
     } catch (error: any) {
@@ -180,21 +207,35 @@ async function startServer() {
     }
   });
 
-  app.post('/api/profile/parent/update', express.json(), async (req, res) => {
+  app.post('/api/profile/parent/update', express.urlencoded({ extended: true }), async (req, res) => {
     try {
-      console.log('Forwarding parent profile update to Hostinger (api_copy.php)...');
-      const response = await fetch('https://doableindia.com/app-sys/api_copy.php', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ action: 'upsert', ...req.body })
+      console.log('🔍 Received parent update request:', JSON.stringify(req.body).slice(0, 200));
+
+      const params = new URLSearchParams();
+      params.append('action', 'upsert');
+      Object.entries(req.body).forEach(([key, val]) => {
+        params.append(key, String(val));
       });
-      const data = await response.json();
+
+      const bodyStr = params.toString();
+      console.log('📤 Sending to PHP API:', bodyStr.slice(0, 200));
+
+      const response = await fetch('https://doableindia.com/app-sys/api.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        },
+        body: bodyStr
+      });
+
+      const responseText = await response.text();
+      console.log('📥 PHP API Response:', responseText.slice(0, 300));
+
+      const data = JSON.parse(responseText);
       res.status(response.status).json(data);
     } catch (error: any) {
+      console.error('❌ Parent update proxy error:', error.message);
       res.status(500).json({ status: 'error', message: error.message });
     }
   });

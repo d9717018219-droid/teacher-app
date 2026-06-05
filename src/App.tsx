@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle, Mail, Lock, Camera, Phone, Plus, Trash2, BadgeCheck, LogIn, UserPlus, ChevronLeft, Eye, EyeOff } from 'lucide-react';
+import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle, Mail, Lock, Camera, Phone, Plus, Trash2, BadgeCheck, LogIn, UserPlus, ChevronLeft, Eye, EyeOff, Smartphone } from 'lucide-react';
 import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc, getDocsFromServer, enableNetwork } from 'firebase/firestore';
 import { db, auth, auth as firebaseAuth } from './firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
@@ -26,6 +26,8 @@ import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, 
 import {
   CITIES_LIST,
   CLASSES_LIST,
+  SPECIALIZED_SUB_CATEGORIES,
+  SPECIALIZED_SUBJECTS,
   CLASS_SUBJECTS_DATA,
   CLASS_GROUP_MAPPING,
   CITY_TO_LOCATIONS_DATA,
@@ -211,24 +213,31 @@ export default function App() {
     try {
       const url = 'https://doableindia.com/app-sys/api.php';
       
+      const fullPhone = (userCountryCode + userPhone).replace(/\s+/g, '');
       const parentData = {
         action: 'upsert',
         email: activeUser.email,
         Email: activeUser.email,
-        name: userName || '',
-        Name: userName || '',
-        phone: userPhone || '',
-        Phone: userPhone || '',
+        name: `${userFirstName} ${userLastName}`.trim() || userName,
+        Name: `${userFirstName} ${userLastName}`.trim() || userName,
+        First_Name: userFirstName,
+        Last_Name: userLastName,
+        'First Name': userFirstName,
+        'Last Name': userLastName,
+        phone: fullPhone,
+        Phone: fullPhone,
         userType: 'parent',
         status: 'Searching',
         Status: 'Searching',
-        classes: userClasses[1] || userClasses[0] || '',
+        classes: userClasses, // Zoho Multi-select
         class: userClasses[1] || userClasses[0] || '',
         Class: userClasses[1] || userClasses[0] || '',
         class_group: userClasses[0] || '',
-        'Class / Board': `${userClasses[1] || userClasses[0] || ''} (${userBoard})`,
-        subjects: userSubjects.join(', '),
-        Subjects: userSubjects.join(', '),
+        'Class / Board': userClasses.includes('Entrance Exam & Specialization') 
+          ? userBoard 
+          : `${userClasses[1] || userClasses[0] || ''} (${userBoard})`,
+        subjects: userSubjects, // Zoho Multi-select
+        Subjects: userSubjects,
         'Subject(s)': userSubjects.join(', '),
         city: userCity,
         City: userCity,
@@ -440,7 +449,9 @@ export default function App() {
         const profileData: any = {
           action: 'upsert',
           tutor_id: currentTutorId,
-          name: userName || 'Tutor',
+          first_name: userFirstName,
+          last_name: userLastName,
+          name: `${userFirstName} ${userLastName}`.trim() || userName || 'Tutor',
           email: activeUser.email,
           phone: userPhone,
           gender: userGender,
@@ -461,6 +472,7 @@ export default function App() {
           society: userResidency,
           have_vehicle: hasVehicle === 'Yes' ? 'Yes' : 'No',
           communication: userCommunication,
+          mode: userMode,
           fee: userFee,
           aadhar: userAadhar,
           Aadhar: userAadhar,
@@ -534,7 +546,12 @@ export default function App() {
             localStorage.setItem('tutorId', newId.toString());
             setTutorId(newId.toString());
           }
+          
+          // Prevent auto-revert: Save timestamp of this update (Email specific)
+          localStorage.setItem(`lastProfileUpdate_${activeUser.email}`, Date.now().toString());
+
           loadData();
+          setShowSuccess(true);
           setActiveToast({ title: 'Success ✅', body: 'Profile updated successfully!' });
           setShowProfileSetup(false);
           setTimeout(() => setActiveToast(null), 4000);
@@ -542,22 +559,26 @@ export default function App() {
           setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
           setTimeout(() => setActiveToast(null), 5000);
         }
-      } 
+      }
       else if (userType === 'parent') {
-        const url = 'https://doableindia.com/app-sys/api.php';
+        const url = Capacitor.isNativePlatform() ? 'https://doableindia.com/app-sys/api.php' : '/api/profile/parent/update';
         
         let currentParentId = localStorage.getItem('tutorId') || ''; // Reusing tutorId key for parent unique ID
-        if (currentParentId.includes('@') || currentParentId === 'NEW_USER' || currentParentId === 'NEW') {
+        
+        // Only reset if it's a non-numeric or default placeholder
+        if (currentParentId.includes('@') || currentParentId === 'NEW_USER' || currentParentId === 'NEW' || !/^\d+$/.test(currentParentId)) {
           currentParentId = '';
         }
 
         if (!currentParentId) {
-          // Generate a unique 5-digit ID based on timestamp to avoid collisions
+          // Only generate a random ID if no valid numeric ID exists
           const uniqueId = Math.floor(10000 + Math.random() * 90000);
           currentParentId = uniqueId.toString();
           localStorage.setItem('tutorId', currentParentId);
           setTutorId(currentParentId);
         }
+
+        const fullPhone = (userCountryCode + userPhone).replace(/\s+/g, '');
 
         // Map frontend state to lowercase database column names
         const parentData: any = {
@@ -567,20 +588,27 @@ export default function App() {
           'Order ID': currentParentId,
           email: activeUser.email,
           Email: activeUser.email,
-          phone: userPhone,
-          Phone: userPhone,
-          name: userName,
-          Name: userName,
+          phone: fullPhone,
+          Phone: fullPhone,
+          name: `${userFirstName} ${userLastName}`.trim() || userName,
+          Name: `${userFirstName} ${userLastName}`.trim() || userName,
+          First_Name: userFirstName,
+          Last_Name: userLastName,
+          'First Name': userFirstName,
+          'Last Name': userLastName,
           class_group: userClasses[0] || '', 
+          classes: [userClasses[1] || userClasses[0]].filter(c => c), // Only specific class, as array
           Class: userClasses[1] || userClasses[0] || '',
-          'Class / Board': `${userClasses[1] || userClasses[0] || ''} (${userBoard})`,
-          subjects: userSubjects.join(', '),
-          Subjects: userSubjects.join(', '),
+          'Class / Board': userClasses.includes('Entrance Exam & Specialization') 
+          ? userBoard 
+          : `${userClasses[1] || userClasses[0] || ''} (${userBoard})`,
+          subjects: userSubjects, // Zoho Multi-select
+          Subjects: userSubjects,
           'Subject(s)': userSubjects.join(', '),
           city: userCity,
           City: userCity,
-          locality: userLocalities.join(', '),
-          Locality: userLocalities.join(', '),
+          locality: userLocalities, // Send raw array for api.php to map dynamically
+          Locality: userLocalities,
           location: userLocalities.map(loc => `${loc}-${userCity}`).join(', '), // Mapped to location with city suffix (no spaces)
           Location: userLocalities.map(loc => `${loc}-${userCity}`).join(', '),
           residency: userResidency, // Mapped to residency
@@ -598,23 +626,15 @@ export default function App() {
           Board: userBoard,
           mode: userMode,
           Mode: userMode,
-          'Mode of Teaching': userMode,
-          time: userTime, // Mapped to time
-          Time: userTime,
-          'Preferred Time': userTime,
-          days: userDays,
-          Days: userDays,
-          'Available Days': userDays,
+          days: userDays.split(', ').filter(d => d), // Zoho Multi-select array
+          time: userTime.split(', ').filter(t => t), // Zoho Multi-select array
           duration: userDuration,
           Duration: userDuration,
           fee: userFee,
           Fee: userFee,
-          'Fee/Month': userFee,
           notes: aboutMe,
           Notes: aboutMe,
-          About: aboutMe,
-          created_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
-          locations: userLocalities.map(loc => `${loc}-${userCity}`).join(', ')
+          created_time: new Date().toISOString().slice(0, 19).replace('T', ' ')
         };
 
         console.log(`Syncing parent profile to ${url}...`, parentData);
@@ -624,14 +644,19 @@ export default function App() {
             url: url,
             headers: {
               'Content-Type': 'application/json'
-            },            data: parentData
+            },
+            data: parentData
           });
           console.log('📡 Parent profile sync native response:', response.status, response.data);
           data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         } else {
           const params = new URLSearchParams();
           Object.entries(parentData).forEach(([key, val]) => {
-            params.append(key, String(val));
+            if (Array.isArray(val)) {
+              params.append(key, val.join(', ')); // For web fetch fallback
+            } else {
+              params.append(key, String(val));
+            }
           });
 
           const response = await fetch(url, {
@@ -655,11 +680,41 @@ export default function App() {
         console.log('Parent profile sync response:', data);
         
         if (data && (data.status === 'success' || data.message?.includes('success'))) {
+          // Fix Order ID Mismatch: Use the ID returned by Zoho (the real 5-digit ID)
+          const finalId = data.order_id || data.zoho_id || data.id || currentParentId;
+          localStorage.setItem('tutorId', finalId.toString());
+          setTutorId(finalId.toString());
+
+          // Persistence Fix: Ensure all fields are saved to localStorage explicitly
+          localStorage.setItem('userName', `${userFirstName} ${userLastName}`.trim());
+          localStorage.setItem('userFirstName', userFirstName);
+          localStorage.setItem('userLastName', userLastName);
+          localStorage.setItem('userPhone', userPhone);
+          localStorage.setItem('userCountryCode', userCountryCode);
+          localStorage.setItem('userCity', userCity);
+          localStorage.setItem('userGender', userGender || '');
+          localStorage.setItem('userBoard', userBoard);
+          localStorage.setItem('userMode', userMode);
+          localStorage.setItem('userResidency', userResidency);
+          localStorage.setItem('userClasses', JSON.stringify(userClasses));
+          localStorage.setItem('userSubjects', JSON.stringify(userSubjects));
+          localStorage.setItem('userLocalities', JSON.stringify(userLocalities));
+          localStorage.setItem('userDays', userDays);
+          localStorage.setItem('userTime', userTime);
+          localStorage.setItem('userDuration', userDuration);
+          localStorage.setItem('userFee', userFee);
+          localStorage.setItem('aboutMe', aboutMe);
+
+          // Prevent auto-revert: Save timestamp of this update
+          localStorage.setItem('lastProfileUpdate', Date.now().toString());
+
           loadData(); // Run in background
+          setShowSuccess(true);
           setActiveToast({ title: 'Success ✅', body: 'Your profile has been updated!' });
           setShowProfileSetup(false);
           setTimeout(() => setActiveToast(null), 4000);
-        } else {
+        }
+ else {
           setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
           setTimeout(() => setActiveToast(null), 5000);
         }
@@ -674,6 +729,19 @@ export default function App() {
 
   const [userCity, setUserCity] = useState<string>(localStorage.getItem('userCity') || 'Delhi');
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('userName'));
+  const [userFirstName, setUserFirstName] = useState<string>(() => {
+    const saved = localStorage.getItem('userFirstName');
+    if (saved) return saved;
+    const full = localStorage.getItem('userName') || '';
+    return full.split(/\s+/)[0] || '';
+  });
+  const [userLastName, setUserLastName] = useState<string>(() => {
+    const saved = localStorage.getItem('userLastName');
+    if (saved) return saved;
+    const full = localStorage.getItem('userName') || '';
+    return full.split(/\s+/).slice(1).join(' ') || '';
+  });
+  const [userCountryCode, setUserCountryCode] = useState<string>(localStorage.getItem('userCountryCode') || '+91');
   const [tutorId, setTutorId] = useState<string | null>(localStorage.getItem('tutorId'));
   const [userGender, setUserGender] = useState<string | null>(localStorage.getItem('userGender') || 'All');
   const [userType, setUserType] = useState<UserType | null>(localStorage.getItem('userType') as UserType);
@@ -722,7 +790,6 @@ export default function App() {
   const [userResidency, setUserResidency] = useState<string>(localStorage.getItem('userResidency') || '');
   const [userAadhar, setUserAadhar] = useState<string>(localStorage.getItem('userAadhar') || '');
   const [userSelfie, setUserSelfie] = useState<string | null>(localStorage.getItem('userSelfie'));
-  const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Calculate age from DOB
   useEffect(() => {
@@ -778,7 +845,7 @@ export default function App() {
   const [jobFilterClasses, setJobFilterClasses] = useState<string[]>([]);
   const [jobFilterGender, setJobFilterGender] = useState<string>('All');
   const [jobFilterLocalities, setJobFilterLocalities] = useState<string[]>([]);
-  const [jobCityFilter, setJobCityFilter] = useState(localStorage.getItem('userCity') || 'all');
+  const [jobCityFilter, setJobCityFilter] = useState('all');
   const [jobSearchQuery, setJobSearchQuery] = useState('');
   const [jobSortBy, setJobSortBy] = useState<'newest' | 'fee_high' | 'fee_low' | 'verified'>('newest');
   const [jobFilterMode, setJobFilterMode] = useState<string>('All'); // NEW: Mode Filter
@@ -787,7 +854,7 @@ export default function App() {
   const [tutorFilterClasses, setTutorFilterClasses] = useState<string[]>([]);
   const [tutorFilterGender, setTutorFilterGender] = useState<string>('All');
   const [tutorFilterLocalities, setTutorFilterLocalities] = useState<string[]>([]);
-  const [tutorCityFilter, setTutorCityFilter] = useState(localStorage.getItem('userCity') || 'all');
+  const [tutorCityFilter, setTutorCityFilter] = useState('all');
   const [tutorSearchQuery, setTutorSearchQuery] = useState('');
   const [tutorSortBy, setTutorSortBy] = useState<'newest' | 'fee_high' | 'fee_low' | 'verified'>('newest');
 
@@ -800,6 +867,7 @@ export default function App() {
   const [alertsInitialTab, setAlertsInitialTab] = useState<'feed' | 'support' | 'setup'>('feed');
   const [unseenAlertsCount, setUnseenAlertsCount] = useState(0);
   const [activeToast, setActiveToast] = useState<{ title: string, body: string } | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   
@@ -844,6 +912,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
   const [authStep, setAuthStep] = useState<'landing' | 'selection' | 'auth'>('auth');
   const [showPassword, setShowPassword] = useState(false);
+
   const [tutorStatus, setTutorStatus] = useState<'registered' | 'new' | null>(null);
   
   // Profile Auto-fill Logic
@@ -852,87 +921,212 @@ export default function App() {
   const [tutorFetchError, setTutorFetchError] = useState<string | null>(null);
   const [isTutorFetched, setIsTutorFetched] = useState(false);
 
-  // Auto-fill profile from tutors list when user signs in
+  // -------------------------------------------------------------
+  // NEW: Robust Auto-fill Logic using existing data
+  // -------------------------------------------------------------
   useEffect(() => {
-    // Only auto-fill if userType is 'teacher' (or not yet set)
-    if (activeUser?.email && tutors.length > 0 && userType === 'teacher') {
-      const email = activeUser.email.toLowerCase().trim();
-      const tutor = tutors.find(t => {
-        const tEmail = (t.email || t.Email || '').toString().toLowerCase().trim();
-        return tEmail === email;
-      });
+    if (!activeUser?.email || !userType) {
+      console.log('🔍 [Auto-Fill] Missing activeUser email or userType. Skipping...');
+      return;
+    }
+    
+    const lastUpdate = parseInt(localStorage.getItem(`lastProfileUpdate_${activeUser.email}`) || '0');
+    if (Date.now() - lastUpdate < 300000) {
+      console.log(`⏳ [Auto-Fill] Skipping for ${activeUser.email} (Recent update detected).`);
+      return;
+    }
 
-      if (tutor) {
-        console.log('Found matching tutor profile for:', email);
-        // Map all fields correctly from normalized tutor object
-        const name = (tutor.name || '').toString();
-        const gender = (tutor.gender || '').toString();
-        const city = (tutor.city || '').toString();
-        const classGroupArray = (tutor.class_group as string[]) || [];
-        const classGroup = classGroupArray.join(', ');
-        const tId = (tutor.tutor_id || '').toString();
-        const phone = (tutor.phone || '').toString();
-        const about = (tutor.about || '').toString();
-        const dob = (tutor.dob || '').toString();
-        const aadhar = (tutor.aadhar || '').toString();
-        const address = (tutor.address || '').toString();
-        const communication = (tutor.communication || '').toString();
-        const days = (tutor.days || '').toString();
-        const time = (tutor.time || '').toString();
-        const residency = (tutor.residency || '').toString();
-        const fee = (tutor.fee || '').toString();
-        const qualification = (tutor.qualification as string[]) || [];
-        const experience = (tutor.experience || '').toString();
-        const schoolExp = (tutor.school_teacher || '').toString();
-        const vehicle = (tutor.have_vehicle || '').toString();
-        const subjects = (tutor.subjects as string[]) || [];
-        const localities = (tutor.location || tutor.localities || []).map((l: any) => l.toString());
+    const email = activeUser.email.toLowerCase().replace(/\s+/g, '');
+    let lead: any = null;
 
-        // STRICT ADDITIVE SYNC: Only update if server has non-empty value
-        if (name && name.trim() !== '') { setUserName(toTitleCase(name)); localStorage.setItem('userName', toTitleCase(name)); }
-        if (gender && gender.trim() !== '') { setUserGender(toTitleCase(gender)); localStorage.setItem('userGender', toTitleCase(gender)); }
-        if (city && city.trim() !== '') { setUserCity(toTitleCase(city)); localStorage.setItem('userCity', toTitleCase(city)); }
-        if (phone && phone.trim() !== '') { setUserPhone(phone); localStorage.setItem('userPhone', phone); }
-        if (about && about.trim() !== '') { setAboutMe(about); localStorage.setItem('aboutMe', about); }
-        if (dob && dob.trim() !== '') { setUserDob(dob); localStorage.setItem('userDob', dob); }
-        if (qualification && qualification.length > 0) { setUserQualifications(qualification); localStorage.setItem('userQualifications', JSON.stringify(qualification)); }
-        if (experience && experience.trim() !== '') { setUserExperience(experience); localStorage.setItem('userExperience', experience); }
-        if (schoolExp && schoolExp.trim() !== '') { setIsSchoolTeacher(schoolExp); localStorage.setItem('isSchoolTeacher', schoolExp); }
-        if (vehicle && vehicle.trim() !== '') { setHasVehicle(vehicle); localStorage.setItem('hasVehicle', vehicle); }
-        if (subjects && subjects.length > 0) { setUserSubjects(subjects); localStorage.setItem('userSubjects', JSON.stringify(subjects)); }
-        if (localities && localities.length > 0) { setUserLocalities(localities); localStorage.setItem('userLocalities', JSON.stringify(localities)); }
-        if (aadhar && aadhar.trim() !== '') { setUserAadhar(aadhar); localStorage.setItem('userAadhar', aadhar); }
-        if (address && address.trim() !== '') { setUserAddress(address); localStorage.setItem('userAddress', address); }
-        if (communication && communication.trim() !== '') { setUserCommunication(communication); localStorage.setItem('userCommunication', communication); }
-        if (days && days.trim() !== '') { setUserDays(days); localStorage.setItem('userDays', days); }
-        if (time && time.trim() !== '') { setUserTime(time); localStorage.setItem('userTime', time); }
-        if (residency && residency.trim() !== '') { setUserResidency(residency); localStorage.setItem('userResidency', residency); }
-        if (fee && fee.toString().trim() !== '') { setUserFee(fee.toString()); localStorage.setItem('userFee', fee.toString()); }
+    const parseMulti = (val: any) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      try { return JSON.parse(val); } catch { return val.toString().split(',').map((s: string) => s.trim()).filter(Boolean); }
+    };
 
-        if (tId) {
-          localStorage.setItem('tutorId', tId);
-          setTutorId(tId);
-        }
+    console.log(`🚀 [SUPER-DEBUG] START Auto-Fill for Email: "${email}" (${userType})`);
+    console.log(`🚀 [SUPER-DEBUG] Total Tutors in list: ${tutors.length}`);
 
-        // Set User Type as Teacher automatically
-        setUserType('teacher');
-        localStorage.setItem('userType', 'teacher');
-        setShowOnboarding(false);
+      if (userType === 'teacher' && tutors.length > 0) {
+        // Deep Debug: Log first few tutors and check for partial matches
+        console.log(`🔍 [Deep-Debug] Checking matches for "${email}" in ${tutors.length} records...`);
         
-        if (classGroup && classGroup.trim() !== '') {
-          const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
-          const matchedGroups = groups.filter(g => classGroup.toLowerCase().includes(g.toLowerCase().replace('class ', '')));
-          if (matchedGroups.length > 0) {
-            const singleGroup = [matchedGroups[0]];
-            setUserClasses(singleGroup);
-            localStorage.setItem('userClasses', JSON.stringify(singleGroup));
+        const matches = tutors.filter(t => {
+          const tEmail = (t.email || t.Email || '').toString().toLowerCase().replace(/\s+/g, '');
+          if (tEmail === email) {
+            console.log(`🎯 [SUPER-DEBUG] EXACT MATCH FOUND: ID=${t.tutor_id || t['Tutor ID']}, Email=${tEmail}`);
+          }
+          return tEmail === email;
+        });
+        
+        if (matches.length > 0) {
+          lead = matches.sort((a, b) => parseInt(b.tutor_id || '0') - parseInt(a.tutor_id || '0'))[0];
+          console.log(`✅ [SUPER-DEBUG] PICKING LATEST MATCH: ID=${lead.tutor_id || lead['Tutor ID']}`);
+        } else {
+          console.warn(`❌ [SUPER-DEBUG] NO MATCH FOUND for "${email}" in the entire tutors list.`);
+        }
+      } else if (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0)) {
+        const combinedLeads = [...firestoreLeads, ...leads];
+        console.log(`📡 [Parent-AutoFill-Debug] Total Leads to search: ${combinedLeads.length}`);
+        
+        const userLeads = combinedLeads.filter(l => {
+          const lEmail = (l.email || (l as any).Email || (l as any).email || '').toString().toLowerCase().replace(/\s+/g, '');
+          const match = lEmail === email && email.length > 5;
+          if (match) console.log(`🎯 [Parent-AutoFill-Debug] MATCH FOUND! Order ID: ${l.order_id || l['Order ID']}`);
+          return match;
+        });
+
+        if (userLeads.length > 0) {
+          lead = userLeads.sort((a, b) => new Date(b['Updated Time'] || (b as any).updated_at || 0).getTime() - new Date(a['Updated Time'] || (a as any).updated_at || 0).getTime())[0];
+          console.log(`✅ [Auto-Fill] Picking Latest Parent Lead:`, lead);
+        } else {
+          console.warn(`❌ [Auto-Fill] No parent lead found for email: ${email}`);
+          if (combinedLeads.length > 0) {
+            console.log('🔍 [Parent-AutoFill-Debug] Sample emails in combined list:', combinedLeads.slice(0, 10).map(l => (l.email || (l as any).Email || 'MISSING')));
           }
         }
-        
-        setIsTutorFetched(true);
       }
+
+      if (lead) {
+        console.log(`🚀 [Auto-Fill-Audit] STARTING state updates for ID: ${lead.order_id || lead['Order ID']}`);
+        
+        // NEW: Bulletproof Case-Insensitive Extractor
+        const getVal = (obj: any, keys: string[], fallback: string = '') => {
+          const objKeys = Object.keys(obj);
+          for (const searchKey of keys) {
+            // 1. Try exact match
+            if (obj[searchKey] !== undefined && obj[searchKey] !== null && obj[searchKey] !== '' && obj[searchKey] !== 'undefined') {
+              console.log(`✅ [Auto-Fill-Audit] EXACT Key "${searchKey}" matched: "${obj[searchKey]}"`);
+              return obj[searchKey];
+            }
+            // 2. Try case-insensitive match
+            const foundKey = objKeys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === searchKey.toLowerCase().replace(/[^a-z0-9]/g, ''));
+            if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== '' && obj[foundKey] !== 'undefined') {
+               console.log(`✅ [Auto-Fill-Audit] FUZZY Key "${foundKey}" matched for "${searchKey}": "${obj[foundKey]}"`);
+               return obj[foundKey];
+            }
+          }
+          console.log(`❌ [Auto-Fill-Audit] FAILED to match any keys for: ${keys.join(', ')}`);
+          return fallback;
+        };
+
+        const normalizeCommaStr = (val: any) => {
+          if (!val) return '';
+          return val.toString().split(',').map((s: string) => s.trim()).filter(Boolean).join(', ');
+        };
+
+        const foundId = getVal(lead, ['order_id', 'orderId', 'Order ID', 'id', 'ID']).toString();
+        
+        const fullName = getVal(lead, ['name', 'Name', 'Full_Name', 'fullName']); 
+        const emailVal = getVal(lead, ['email', 'Email']);
+        const phone = getVal(lead, ['phone', 'Phone', 'Mobile']).toString().replace('+91', '').trim();
+        const gender = getVal(lead, ['gender', 'Gender', 'Sex']) || 'Male';
+        const city = getVal(lead, ['city', 'City', 'Preferred_City']);
+        const dob = getVal(lead, ['dob', 'DOB', 'Date_of_Birth', 'birth_date']);
+        const age = getVal(lead, ['age', 'Age']);
+        const qualification = parseMulti(getVal(lead, ['qualification', 'Qualification', 'qualifications']));
+        const experience = getVal(lead, ['experience', 'Experience']);
+        const subjects = parseMulti(getVal(lead, ['subjects', 'Subjects', 'subject', 'Subject'])); 
+        const aadhar = getVal(lead, ['aadhar', 'Aadhar', 'Aadhar_Number']);
+        const address = getVal(lead, ['address', 'Address', 'Full_Address']);
+        const communication = getVal(lead, ['communication', 'Communication']);
+        const vehicle = getVal(lead, ['have_vehicle', 'vehicle', 'Vehicle']);
+        const schoolExp = getVal(lead, ['school_teacher', 'school_exp', 'School_Teacher']);
+
+        console.log(`📊 [Auto-Fill-Audit] FINAL Extracted: Name=${fullName}, ID=${foundId}, Email=${emailVal}`);
+
+        if (fullName) {
+          const parts = fullName.trim().split(/\s+/);
+          const fName = parts[0] || '';
+          const lName = parts.slice(1).join(' ') || '';
+          setUserFirstName(fName); 
+          setUserLastName(lName);
+          localStorage.setItem('userFirstName', fName);
+          localStorage.setItem('userLastName', lName);
+          setUserName(fullName); 
+          localStorage.setItem('userName', fullName);
+        }
+
+        if (city) { setUserCity(city); localStorage.setItem('userCity', city); }
+        if (phone) { setUserPhone(phone); localStorage.setItem('userPhone', phone); }
+        if (gender) { setUserGender(gender); localStorage.setItem('userGender', gender); }
+        if (dob) { setUserDob(dob); localStorage.setItem('userDob', dob); }
+        if (age) { setUserAge(age); localStorage.setItem('userAge', age); }
+        if (experience) { setUserExperience(experience); localStorage.setItem('userExperience', experience); }
+        if (qualification.length > 0) { 
+           setUserQualifications(qualification); localStorage.setItem('userQualifications', JSON.stringify(qualification)); 
+        }
+        if (subjects.length > 0) { 
+           setUserSubjects([...subjects]); 
+           localStorage.setItem('userSubjects', JSON.stringify(subjects)); 
+        }
+        if (aadhar) { setUserAadhar(aadhar); localStorage.setItem('userAadhar', aadhar); }
+        if (address) { setUserAddress(address); localStorage.setItem('userAddress', address); }
+        if (communication) { setUserCommunication(communication); localStorage.setItem('userCommunication', communication); }
+        if (vehicle) { setHasVehicle(vehicle); localStorage.setItem('hasVehicle', vehicle); }
+        if (schoolExp) { setIsSchoolTeacher(schoolExp); localStorage.setItem('isSchoolTeacher', schoolExp); }
+
+        // Shared Fields with high-priority mappings
+        const dbClassGrp = getVal(lead, ['class_group', 'Class', 'class', 'classGroup']);
+        const dbLocs = parseMulti(getVal(lead, ['location', 'locality', 'locations', 'Locality', 'Locations']));
+        const dbDays = normalizeCommaStr(getVal(lead, ['days', 'Days', 'Available_Day_s', 'weekly_days', 'Weekly Days']));
+        const dbTime = normalizeCommaStr(getVal(lead, ['time', 'Time', 'Available_Time_s', 'preferred_time', 'Preferred Time']));
+        const dbFee = getVal(lead, ['fee', 'Fee', 'Fee_hour', 'monthly_fee', 'budget']);
+        const dbAbout = getVal(lead, ['about', 'About', 'Notes', 'requirement', 'requirement_details']);
+        const dbResidency = getVal(lead, ['residency', 'Residency', 'society', 'Block', 'block', 'society_name']);
+        const dbDuration = getVal(lead, ['duration', 'Duration', 'avg_duration']);
+        const dbMode = getVal(lead, ['mode', 'Mode', 'Mode of Teaching']);
+
+        if (foundId) { setTutorId(foundId); localStorage.setItem('tutorId', foundId); }
+        
+        if (dbLocs.length > 0) { 
+           setUserLocalities([...dbLocs]); 
+           localStorage.setItem('userLocalities', JSON.stringify(dbLocs)); 
+        }
+        if (dbDays) { setUserDays(dbDays); localStorage.setItem('userDays', dbDays); }
+        if (dbTime) { setUserTime(dbTime); localStorage.setItem('userTime', dbTime); }
+        if (dbFee) { setUserFee(dbFee); localStorage.setItem('userFee', dbFee); }
+        if (dbAbout) { setAboutMe(dbAbout); localStorage.setItem('aboutMe', dbAbout); }
+        if (dbResidency) { setUserResidency(dbResidency); localStorage.setItem('userResidency', dbResidency); }
+        if (dbDuration) { setUserDuration(dbDuration); localStorage.setItem('userDuration', dbDuration); }
+        if (dbMode) { setUserMode(dbMode); localStorage.setItem('userMode', dbMode); }
+
+        if (userType === 'teacher') {
+          if (dbClassGrp) {
+            const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII', 'Entrance Exam & Specialization'];
+            const matched = groups.find(g => dbClassGrp.includes(g));
+            if (matched) { setUserClasses([matched]); localStorage.setItem('userClasses', JSON.stringify([matched])); }
+          }
+          setIsTutorFetched(true);
+        } else {
+          // Parent logic for class/board extraction
+          let extractedClass = '';
+          if (dbClassGrp && dbClassGrp.includes('(')) {
+            extractedClass = dbClassGrp.split('(')[0].trim();
+            const board = dbClassGrp.match(/\((.*?)\)/)?.[1] || '';
+            if (board) { setUserBoard(board); localStorage.setItem('userBoard', board); }
+          } else if (dbClassGrp) {
+            extractedClass = dbClassGrp;
+          }
+          if (extractedClass) { setUserClasses([extractedClass]); localStorage.setItem('userClasses', JSON.stringify([extractedClass])); }
+        }
+        setShowOnboarding(false);
+      } else {
+       // Only clear if the data has actually loaded from the network
+       const dataLoaded = (userType === 'teacher' && tutors.length > 0) || (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0));
+       if (dataLoaded) {
+          console.warn(`❌ [Auto-Fill] Profile NOT FOUND for ${email}. Clearing ID.`);
+          setTutorId(null);
+          localStorage.removeItem('tutorId');
+          setIsTutorFetched(false);
+       } else {
+          console.log('⏳ [Auto-Fill] Waiting for network data before clearing...');
+       }
     }
-  }, [activeUser, tutors, isTutorFetched]);
+  }, [activeUser, userType, tutors, leads, firestoreLeads]);
+  // -------------------------------------------------------------
+
 
   const fetchTutorDetails = () => {
     if (!tutorIdInput.trim()) return;
@@ -952,9 +1146,22 @@ export default function App() {
         const city = (tutor['Preferred City'] || (tutor as any).preferredCity || (tutor as any).City || 'All').toString();
         const classGroup = (tutor['Preferred Class Group'] || (tutor as any).preferredClassGroup || (tutor as any).classGroup || '').toString();
 
+        if (name) {
+          const parts = name.trim().split(/\s+/);
+          const fName = parts[0] || '';
+          const lName = parts.slice(1).join(' ') || '';
+          setUserFirstName(fName); 
+          setUserLastName(lName);
+          localStorage.setItem('userFirstName', fName);
+          localStorage.setItem('userLastName', lName);
+        }
+
         setUserName(toTitleCase(name));
+        localStorage.setItem('userName', toTitleCase(name));
         setUserGender(toTitleCase(gender));
+        localStorage.setItem('userGender', toTitleCase(gender));
         setUserCity(toTitleCase(city));
+        localStorage.setItem('userCity', toTitleCase(city));
         
         // Match Class Groups - Enforce single selection
         const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII'];
@@ -1040,7 +1247,19 @@ export default function App() {
         localStorage.setItem('customUser', JSON.stringify(userData));
         setUserType(data.user.userType);
         localStorage.setItem('userType', data.user.userType);
+
+        // Force refresh: Clear any update locks and fetch fresh data from CRM
+        localStorage.removeItem('lastProfileUpdate');
+        
+        // Load data in background without blocking UI
+        setTimeout(() => {
+          loadData();
+        }, 10);
+
         playTapSound();
+        setShowOnboarding(false);
+
+        setActiveToast({ title: 'Welcome Back! 👋', body: `Signed in as ${data.user.email}` });
         setShowProfileSetup(false);
         setShowOnboarding(false);
       } else {
@@ -1116,6 +1335,8 @@ export default function App() {
         setUserType(userType || 'teacher');
         localStorage.setItem('userType', userType || 'teacher');
         playTapSound();
+        setShowSuccess(true);
+        setActiveToast({ title: 'Welcome! 🎊', body: 'Your account has been created.' });
         setShowProfileSetup(true); // Open profile setup for new users
         setShowOnboarding(false);
       } else {
@@ -1440,55 +1661,176 @@ export default function App() {
   const [selectedTutor, setSelectedTutor] = useState<TutorProfile | null>(null);
 
   const normalizeTutor = (t: any) => {
+    // Helper to get value with case-insensitive key search
+    const getSafe = (keys: string[], fallback: any = '') => {
+      const objKeys = Object.keys(t);
+      for (const searchKey of keys) {
+        // 1. Try exact match
+        if (t[searchKey] !== undefined && t[searchKey] !== null && t[searchKey] !== '' && t[searchKey] !== 'undefined') return t[searchKey];
+        // 2. Try case-insensitive fuzzy match
+        const foundKey = objKeys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === searchKey.toLowerCase().replace(/[^a-z0-9]/g, ''));
+        if (foundKey && t[foundKey] !== undefined && t[foundKey] !== null && t[foundKey] !== '' && t[foundKey] !== 'undefined') return t[foundKey];
+      }
+      return fallback;
+    };
+
     const safeParse = (str: any) => {
       if (Array.isArray(str)) return str;
       if (!str) return [];
       try {
-        // Try JSON parse first
         const parsed = JSON.parse(str);
         return Array.isArray(parsed) ? parsed : [parsed];
       } catch (e) {
-        // Fallback: Split by comma and trim
         return str.toString().split(',').map((s: string) => s.trim()).filter(Boolean);
       }
     };
 
-    return {
-      tutor_id: t.tutor_id || t['Tutor ID'] || t.id || '',
-      name: t.name || t.Name || '',
-      email: t.email || t.Email || '',
-      phone: t.phone || t.Phone || '',
-      internal_phone: t.phone || t.Phone || '',
-      gender: t.gender || t.Gender || '',
-      age: t.age || t.Age || '',
-      dob: t.dob || t.DOB || '',
-      qualification: safeParse(t.qualification || t['Qualification(s)'] || t.Qualification),
-      experience: t.experience || t.Experience || '',
-      school_teacher: t.school_teacher || t['School Exp.'] || 'No',
-      days: t.days || t['Available Days'] || t['Available Day(s)'] || t['Available days'] || t['vaialable days'] || t['available days'] || '',
-      time: t.time || t.Time || t['Preferred Time'] || t['preferred time'] || '',
-      class_group: safeParse(t.class_group || t['Preferred Class Group'] || t.Class),
-      subjects: safeParse(t.subjects || t['Preferred Subject(s)'] || t['Subject(s)']),
-      city: t.city || t.City || t['Preferred City'] || t['preferred city'] || '',
-      location: safeParse(t.location || t['Preferred Location(s)'] || t.Location || t['Teaching Localtie'] || t['Teaching Locality(ies)'] || t['Teaching Locality'] || t.Address),
-      have_vehicle: t.have_vehicle || t['Have own Vehicle'] || 'No',
-      communication: t.communication || t.Communication || t['Mode of Teaching'] || t['Mode of teaching'] || '',
-      fee: t.fee || t.Fee || t['Fee/Month'] || '',
-      aadhar: t.aadhar || t.Aadhar || t['Aadhar Number'] || t['Aadhar'] || '',
-      address: t.address || t.Address || t['Full Address'] || t['address'] || '',
-      residency: t.residency || t.Residency || t['Residency'] || t['society'] || t['block'] || '',
-      about: t.about || t.About || '',
-      status: t.status || t.Status || 'Active',
-      photo: t.photo || t.Photo || '',
-      verified: t.verified || t.Verified || 'No',
-      selfie: t.selfie || t.Selfie || '',
-      active_tuitions: parseInt(t.active_tuitions || t.Active_Tuitions || '0'),
-      monthly_earnings: parseFloat(t.monthly_earnings || t.Monthly_Earnings || '0'),
-      created_time: t.created_time || t['Record Added'] || ''
+    const normalized = {
+      tutor_id: getSafe(['tutor_id', 'Tutor ID', 'id', 'ID']),
+      name: getSafe(['name', 'Name', 'Full Name', 'fullName']),
+      email: getSafe(['email', 'Email']),
+      phone: getSafe(['phone', 'Phone', 'Mobile']),
+      internal_phone: getSafe(['phone', 'Phone', 'internal_phone']),
+      gender: getSafe(['gender', 'Gender', 'Sex', 'tutor_gender', 'Tutor_Gender']),
+      age: getSafe(['age', 'Age', 'tutor_age', 'Tutor_Age']),
+      dob: getSafe(['dob', 'DOB', 'Date of Birth', 'birth_date', 'Date_of_Birth']),
+      qualification: safeParse(getSafe(['qualification', 'Qualification(s)', 'Qualification'])),
+      experience: getSafe(['experience', 'Experience', 'Teaching Experience']),
+      school_teacher: getSafe(['school_teacher', 'School Exp.', 'school_exp'], 'No'),
+      days: getSafe(['days', 'Days', 'Available Days', 'Available Day(s)', 'weekly days', 'Weekly Day(s)', 'Weekly Days', 'weekly_days']),
+      time: getSafe(['time', 'Time', 'Preferred Time', 'preferred time', 'Available Time']),
+      class_group: safeParse(getSafe(['class_group', 'Class', 'Preferred Class Group', 'classes'])),
+      subjects: safeParse(getSafe(['subjects', 'Subjects', 'Preferred Subject(s)', 'subject', 'Subject'])),
+      city: getSafe(['city', 'City', 'Preferred City', 'preferred city']),
+      location: safeParse(getSafe(['location', 'Locality', 'Preferred Location(s)', 'Teaching Locality', 'Address'])),
+      have_vehicle: getSafe(['have_vehicle', 'Have own Vehicle', 'vehicle'], 'No'),
+      communication: getSafe(['communication', 'Communication']),
+      mode: getSafe(['mode', 'Mode', 'Mode of Teaching']),
+      fee: getSafe(['fee', 'Fee', 'Fee/Month', 'Monthly Fee', 'Fee_hour']),
+      aadhar: getSafe(['aadhar', 'Aadhar', 'Aadhar Number', 'Aadhar_Number']),
+      address: getSafe(['address', 'Address', 'Full Address', 'Full_Address']),
+      residency: getSafe(['residency', 'Residency', 'society', 'block']),
+      about: getSafe(['about', 'About', 'bio', 'Notes', 'requirement']),
+      status: getSafe(['status', 'Status'], 'Active'),
+      photo: getSafe(['photo', 'Photo', 'Profile Pic', 'userPhoto']),
+      verified: getSafe(['verified', 'Verified', 'is_verified'], 'No'),
+      selfie: getSafe(['selfie', 'Selfie']),
+      active_tuitions: parseInt(getSafe(['active_tuitions', 'Active_Tuitions', 'tuitions', 'Active Tuitions'], '0')),
+      monthly_earnings: parseFloat(getSafe(['monthly_earnings', 'Monthly_Earnings', 'earnings', 'Monthly Earnings'], '0')),
+      created_time: getSafe(['created_time', 'Record Added', 'timestamp'])
     };
+
+    return normalized;
+  };
+
+  const normalizeLead = (l: any): JobLead => {
+    // Helper to get value with case-insensitive key search
+    const getSafe = (keys: string[], fallback: string = '') => {
+      for (const k of keys) {
+        if (l[k] !== undefined && l[k] !== null && l[k] !== '' && l[k] !== 'undefined') return l[k];
+      }
+      // Case-insensitive fallback
+      const objKeys = Object.keys(l);
+      for (const searchKey of keys) {
+        const foundKey = objKeys.find(k => k.toLowerCase() === searchKey.toLowerCase());
+        if (foundKey && l[foundKey] !== undefined && l[foundKey] !== null && l[foundKey] !== '') return l[foundKey];
+      }
+      return fallback;
+    };
+
+    const orderId = getSafe(['Order ID', 'order_id', 'id', 'ID']).toString();
+    
+    const normalized: JobLead = {
+      'Order ID': orderId,
+      id: orderId,
+      order_id: orderId,
+      'Internal Remark': getSafe(['Internal Remark', 'status', 'internal_remark']),
+      'Updated Time': getSafe(['Updated Time', 'Record Added', 'updated_at', 'created_time', 'timestamp']),
+      City: getSafe(['City', 'city', 'Preferred_City']),
+      Name: getSafe(['Name', 'name', 'fullName'], 'Student Lead'),
+      'Class / Board': getSafe(['Class / Board', 'class_group', 'Class', 'class']),
+      Class: getSafe(['Class', 'class', 'class_group']),
+      Board: getSafe(['Board', 'board']),
+      Locations: getSafe(['Locations', 'locations', 'location', 'locality']),
+      Gender: getSafe(['Gender', 'gender', 'preferred_gender'], 'Any'),
+      Fee: getSafe(['Fee', 'fee', 'monthly_fee', 'budget', 'Fee_hour'], '0'),
+      Notes: getSafe(['Notes', 'notes', 'requirement', 'requirement_details']),
+      subjects: getSafe(['subjects', 'Subjects', 'Preferred Subject(s)', 'subject']),
+      residency: getSafe(['residency', 'society', 'society_name']),
+      duration: getSafe(['duration', 'Duration', 'avg_duration'], '1.5 Hours'),
+      days: getSafe(['days', 'Days', 'Available Days', 'Available Day(s)', 'weekly days', 'Weekly Day(s)', 'Weekly Days', 'weekly_days', 'Weekly_Days']),
+      time: getSafe(['time', 'Time', 'Preferred Time', 'Available Time', 'Available time', 'preferred_time']),
+      mode: getSafe(['mode', 'Mode', 'Mode of Teaching', 'Mode of teaching'], 'Home Tuition'),
+      status: getSafe(['status', 'Internal Remark', 'internal_remark'], 'Active'),
+      email: getSafe(['email', 'Email']),
+      phone: getSafe(['phone', 'Phone']),
+      address: getSafe(['address', 'Address']),
+      locality: getSafe(['locality', 'Locality', 'location', 'locations'])
+    };
+
+    // Fix Class / Board if it's just class_group
+    if (normalized['Class / Board'] && !normalized['Class / Board'].includes('(') && normalized.Board) {
+      normalized['Class / Board'] = `${normalized['Class / Board']} (${normalized.Board})`;
+    }
+    
+    // Debug logging for weekly days field identification
+    if (!normalized.days) {
+      const dayKeys = Object.keys(l).filter(k => k.toLowerCase().includes('day') || k.toLowerCase().includes('weekly'));
+      if (dayKeys.length > 0) {
+        console.log(`🔍 [Normalize-Lead-Days-Debug] Order #${orderId} missing days. Found potential keys:`, dayKeys.map(k => `${k}: "${l[k]}"`));
+      }
+    }
+
+    if (orderId === '7752') {
+      console.log('🔍 [Normalize-Lead-Debug] Order #7752 Raw:', l);
+      console.log('🔍 [Normalize-Lead-Debug] Order #7752 Normalized:', normalized);
+    }
+    
+    return normalized;
+  };
+
+  const handleApplyJob = async (job: any) => {
+    try {
+      playTapSound();
+      const currentTutorId = localStorage.getItem('tutorId');
+      const orderId = getJobId(job);
+      
+      if (!currentTutorId) {
+        setActiveToast({ title: 'Profile Needed', body: 'Please complete your profile to apply for jobs.' });
+        setShowProfileSetup(true);
+        return;
+      }
+
+      // 1. Silent Background API Call to record application
+      fetch('https://doableindia.com/app-sys/api_copy.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'apply_job',
+          order_id: orderId,
+          tutor_id: currentTutorId
+        })
+      }).catch(e => console.warn('Silent apply failed:', e));
+
+      // 2. Immediate WhatsApp Redirection
+      const whatsappMsg = `Hi, I am interested in Job Order ID: #${orderId}.
+Subjects: ${job.subjects || 'General'}
+
+Regards,
+${userName || 'Tutor'}
+Tutor ID: #${currentTutorId}
+Phone: ${userPhone}
+City: ${userCity}`;
+
+      openWhatsApp(whatsappMsg);
+      
+    } catch (error) {
+      console.error('Apply Job Error:', error);
+    }
   };
 
   const loadData = async () => {
+    console.log('🚀 [Data-Loader] STARTING Version: 2.5.0 (Parent-Fix)');
     try {
       // Cleanup old bulky localStorage cache if it exists
       if (localStorage.getItem('cachedTutors')) {
@@ -1500,7 +1842,7 @@ export default function App() {
       const cachedLeads = localStorage.getItem('cachedLeads');
       const cachedTutors = await getFromLargeStorage('cachedTutors');
       
-      if (cachedLeads) setLeads(JSON.parse(cachedLeads));
+      if (cachedLeads) setLeads(JSON.parse(cachedLeads).map(normalizeLead));
       if (cachedTutors) setTutors(cachedTutors.map(normalizeTutor));
 
       if (leads.length === 0 && tutors.length === 0 && !cachedLeads) {
@@ -1508,15 +1850,21 @@ export default function App() {
       }
       
       const isNative = Capacitor.isNativePlatform();
+      const ts = Date.now();
+      
+      // NEW: Include email for parents to fetch their specific data even if not "Searching"
+      const emailParam = (userType === 'parent' && activeUser?.email) ? `&email=${encodeURIComponent(activeUser.email.toLowerCase().replace(/\s+/g, ''))}` : '';
+      
+      const LEADS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_data.php?t=${ts}${emailParam}` : `/api/leads?t=${ts}${emailParam}`;
+      const TUTORS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_copy_data.php?force_refresh=${ts}` : `/api/tutors?t=${ts}`;
 
-      const LEADS_URL = Capacitor.isNativePlatform() ? 'https://doableindia.com/app-sys/api_data.php' : '/api/leads';
-      const TUTORS_URL = Capacitor.isNativePlatform() ? 'https://doableindia.com/app-sys/api_copy_data.php' : '/api/tutors';
+      console.log('📡 [Network] Fetching Leads from:', LEADS_URL);
 
       if (isNative) {
         // Use native fetch to bypass CORS
         const [leadsRes, tutorsRes] = await Promise.all([
           CapacitorHttp.get({ 
-            url: LEADS_URL + (activeUser?.email ? `?email=${encodeURIComponent(activeUser.email)}` : ''),
+            url: LEADS_URL,
             headers: { 'Accept': 'application/json' }
           }),
           CapacitorHttp.get({ 
@@ -1532,11 +1880,13 @@ export default function App() {
            const data = typeof leadsRes.data === 'string' ? JSON.parse(leadsRes.data) : leadsRes.data;
            console.log('📡 RAW LEADS DATA:', data);
            if (data.status === 'success') {
-             setLeads(data.data);
-             localStorage.setItem('cachedLeads', JSON.stringify(data.data));
+             const normalized = data.data.map(normalizeLead);
+             setLeads(normalized);
+             localStorage.setItem('cachedLeads', JSON.stringify(normalized));
            } else if (Array.isArray(data)) {
-             setLeads(data);
-             localStorage.setItem('cachedLeads', JSON.stringify(data));
+             const normalized = data.map(normalizeLead);
+             setLeads(normalized);
+             localStorage.setItem('cachedLeads', JSON.stringify(normalized));
            }
         }
 
@@ -1549,7 +1899,7 @@ export default function App() {
         }
       } else {
         const [leadsRes, tutorsRes] = await Promise.all([
-          fetch(LEADS_URL + (activeUser?.email ? `?email=${encodeURIComponent(activeUser.email)}` : '')),
+          fetch(LEADS_URL),
           fetch(TUTORS_URL)
         ]);
         
@@ -1568,14 +1918,20 @@ export default function App() {
         const leadsJson = leadsText ? JSON.parse(leadsText) : { status: 'error', data: [] };
         const tutorsJson = tutorsText ? JSON.parse(tutorsText) : { status: 'error', data: [] };
         
-        console.log('🌐 WEB RAW LEADS DATA:', leadsJson);
+        if (userType === 'parent') {
+          console.log('🔍 [Network-Parent-Debug] Raw API Response for Parent:', leadsJson);
+        } else {
+          console.log('🌐 WEB RAW LEADS DATA:', leadsJson);
+        }
 
         if (leadsJson.status === 'success') {
-          setLeads(leadsJson.data);
-          localStorage.setItem('cachedLeads', JSON.stringify(leadsJson.data));
+          const normalized = leadsJson.data.map(normalizeLead);
+          setLeads(normalized);
+          localStorage.setItem('cachedLeads', JSON.stringify(normalized));
         } else if (Array.isArray(leadsJson)) {
-          setLeads(leadsJson);
-          localStorage.setItem('cachedLeads', JSON.stringify(leadsJson));
+          const normalized = leadsJson.map(normalizeLead);
+          setLeads(normalized);
+          localStorage.setItem('cachedLeads', JSON.stringify(normalized));
         }
 
         if (tutorsJson.status === 'success') {
@@ -1593,10 +1949,10 @@ export default function App() {
 
   useEffect(() => {
     if (activeUser?.email) {
-      console.log('🔄 Re-loading data with user email:', activeUser.email);
+      console.log('🔄 [Auth] Triggering data refresh for:', activeUser.email, 'UserType:', userType);
       loadData();
     }
-  }, [activeUser?.email]);
+  }, [activeUser?.email, userType]);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -1610,7 +1966,7 @@ export default function App() {
     const unsubscribeLeads = onSnapshot(qLeads, (snapshot) => {
       setDbStatus('Connected');
       setIsServerData(!snapshot.metadata.fromCache);
-      const leadsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown as JobLead[];
+      const leadsData = snapshot.docs.map(doc => normalizeLead({ id: doc.id, ...doc.data() }));
       setFirestoreLeads(leadsData);
     }, (err) => {
       console.error('❌ Leads Firestore Error:', err);
@@ -1660,7 +2016,8 @@ export default function App() {
         console.log('🎉 Firebase: Login Success!', result.user.email);
         if (userType) localStorage.setItem('userType', userType);
         setShowOnboarding(false);
-        setActiveToast({ title: 'Welcome!', body: `Signed in as: ${result.user.email}` });
+        setShowSuccess(true);
+        setActiveToast({ title: 'Welcome! 👋', body: `Signed in as: ${result.user.email}` });
         setTimeout(() => setActiveToast(null), 4000);
       } else {
         console.log('🌐 Web Platform: signInWithPopup starting...');
@@ -1669,6 +2026,9 @@ export default function App() {
         console.log('🎉 Firebase: Web Login Success!', result.user.email);
         if (userType) localStorage.setItem('userType', userType);
         setShowOnboarding(false);
+        setShowSuccess(true);
+        setActiveToast({ title: 'Welcome! 👋', body: `Signed in as: ${result.user.email}` });
+        setTimeout(() => setActiveToast(null), 4000);
       }
     } catch (err: any) {
       console.error('❌ Sign-in Error:', err);
@@ -1780,10 +2140,7 @@ export default function App() {
   }, [leads, firestoreLeads]);
 
   const rawActiveTutors = useMemo(() => {
-    return tutors.filter(t => {
-      const status = (t.status || '').toString().toLowerCase();
-      return status !== 'hidden' && status !== 'blocked';
-    });
+    return tutors; // Show all tutors, no status filtering
   }, [tutors]);
 
   const finalJobs = useMemo(() => {
@@ -1797,7 +2154,12 @@ export default function App() {
       // Localities Filter
       if (jobFilterLocalities.length > 0) {
         const jobLocs = (l.Locations || (l as any).location || (l as any).locations || '').toLowerCase();
-        if (!jobFilterLocalities.some(loc => jobLocs.includes(loc.toLowerCase()))) return false;
+        const hasMatch = jobFilterLocalities.some(loc => {
+          const escapedLoc = loc.toLowerCase().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
+          return regex.test(jobLocs);
+        });
+        if (!hasMatch) return false;
       }
 
       // Classes Filter
@@ -1896,8 +2258,13 @@ export default function App() {
 
       // Localities Filter
       if (tutorFilterLocalities.length > 0) {
-        const tutorLocs = JSON.stringify(t.location || []).toLowerCase();
-        if (!tutorFilterLocalities.some(loc => tutorLocs.includes(loc.toLowerCase()))) return false;
+        const tutorLocs = (Array.isArray(t.location) ? t.location.join(', ') : (t.location || '')).toString().toLowerCase();
+        const hasMatch = tutorFilterLocalities.some(loc => {
+          const escapedLoc = loc.toLowerCase().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
+          return regex.test(tutorLocs);
+        });
+        if (!hasMatch) return false;
       }
 
       // Classes Filter
@@ -2003,43 +2370,10 @@ export default function App() {
           <div className="fixed inset-0 z-[20000] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/90 backdrop-blur-md" />
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-full max-sm:max-w-sm max-w-sm">
-              {authStep === 'landing' ? (
-                <div className="space-y-6 text-center">
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Welcome to DoAble</h2>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Start your journey with us</p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    <button 
-                      onClick={() => { playTapSound(); setAuthMode('signin'); setAuthStep('auth'); }}
-                      className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
-                        <LogIn size={24} strokeWidth={3} />
-                      </div>
-                      <div className="text-left">
-                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Sign In</h4>
-                        <p className="text-[10px] font-bold text-slate-400">Already have an account?</p>
-                      </div>
-                    </button>
-                    <button 
-                      onClick={() => { playTapSound(); setAuthMode('signup'); setAuthStep('selection'); }}
-                      className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
-                        <UserPlus size={24} strokeWidth={3} />
-                      </div>
-                      <div className="text-left">
-                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Sign Up</h4>
-                        <p className="text-[10px] font-bold text-slate-400">Create a new account</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              ) : authStep === 'selection' ? (
+              {authStep === 'selection' ? (
                 <div className="space-y-6 text-center">
                   <div className="flex justify-between items-center px-2">
-                    <button onClick={() => { playTapSound(); setAuthStep('landing'); }} className="text-slate-400 hover:text-white/50"><ChevronLeft size={20} /></button>
+                    <button onClick={() => { playTapSound(); setAuthStep('auth'); setAuthMode('signin'); }} className="text-slate-400 hover:text-white/50"><ChevronLeft size={20} /></button>
                     <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Step 1 of 2</p>
                     <div className="w-5" />
                   </div>
@@ -2076,8 +2410,8 @@ export default function App() {
                 </div>
               ) : (
                 <div className="bg-white rounded-[40px] p-8 shadow-2xl space-y-6">
-                  <div className="flex justify-between items-center">
-                    <button onClick={() => { playTapSound(); setAuthStep(authMode === 'signin' ? 'landing' : 'selection'); }} className="text-slate-300 hover:text-slate-500"><ChevronLeft size={20} /></button>
+                  <div className="flex justify-between items-center text-center">
+                    <div className="w-5" />
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">
                       {authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Create Account' : authMode === 'forgot' ? 'Forgot Password' : 'Reset Password'}
                     </h3>
@@ -2156,12 +2490,12 @@ export default function App() {
                     <div className="flex flex-col gap-3 pt-2">
                       {authMode === 'signin' && (
                         <>
-                          <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest">Forgot Password?</button>
+                          <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Forgot Password?</button>
                           <div className="h-px bg-slate-100 w-full" />
-                          <button onClick={() => { setAuthMode('signup'); setAuthError(null); setAuthStep('selection'); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
+                          <button onClick={() => { playTapSound(); setAuthMode('signup'); setAuthStep('selection'); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
                         </>
                       )}
-                      {(authMode === 'signup' || authMode === 'forgot' || authMode === 'reset') && (
+                      {(authMode === 'forgot' || authMode === 'reset') && (
                         <button onClick={() => { setAuthMode('signin'); setAuthError(null); setAuthStep('auth'); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Back to <span className="text-primary underline">Sign In</span></button>
                       )}
                     </div>
@@ -2391,7 +2725,7 @@ export default function App() {
       <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#F97316] to-[#EC4899] px-5 pb-3 flex items-center justify-between shadow-[0_10px_40px_rgba(249,115,22,0.3)] border-b border-white/10 relative overflow-hidden pt-[calc(0.6rem+var(--safe-area-top,20px))]">
         <div className="absolute -top-24 -left-20 w-48 h-48 bg-white/10 blur-3xl rounded-full" />
         <div className="flex flex-col relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
-          <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none">DoAble India <span className="text-[8px] align-top bg-white/20 px-1 rounded">v341.1</span></span>
+          <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none">DoAble India</span>
           <span className="text-[7.5px] font-black text-white/80 uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5">
             Premium Home Tuition Network <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse" /> {debugClicks > 3 && ' [DEBUG ON]'}
           </span>
@@ -2564,8 +2898,12 @@ export default function App() {
        )}
        {activeTab === 'earnings' && (
           <EarningsView 
-            tutorProfile={finalTutors.find(t => t.email?.toLowerCase().trim() === activeUser?.email?.toLowerCase().trim())}
-            allTutors={finalTutors}
+            tutorProfile={tutors.find(t => {
+              const tEmail = (t.email || '').toLowerCase().trim();
+              const aEmail = (activeUser?.email || '').toLowerCase().trim();
+              return tEmail === aEmail || (aEmail.includes(tEmail) && tEmail.length > 5);
+            })}
+            allTutors={tutors}
             userCity={userCity}
             playTapSound={playTapSound}
             onEditProfile={() => setShowProfileSetup(true)}
@@ -2648,8 +2986,15 @@ export default function App() {
                       <p className="text-[12px] font-black text-primary">#{tutorId || 'Pending'}</p>
                     </div>
                     <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Class & Board</p>
-                      <p className="text-[12px] font-black text-slate-800">{userClasses.join(', ')} ({userBoard})</p>
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                        {userClasses.includes('Entrance Exam & Specialization') ? 'Category & Exam' : 'Class & Board'}
+                      </p>
+                      <p className="text-[12px] font-black text-slate-800">
+                        {userClasses.includes('Entrance Exam & Specialization') 
+                          ? `${userClasses[0]} (${userBoard})`
+                          : `${userClasses.join(', ')} (${userBoard})`
+                        }
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2762,94 +3107,83 @@ export default function App() {
        {showProfileSetup && (
          <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4">
            <div onClick={() => setShowProfileSetup(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-           <div className="relative bg-white w-full max-w-[400px] rounded-[40px] shadow-2xl overflow-hidden flex flex-col h-[85vh] border border-white/20">
-              {/* Progress Bar */}
-              <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-50">
-                 <motion.div
-                   initial={{ width: 0 }}
-                   animate={{ width: `${(currentStep / (userType === 'teacher' ? 8 : 5)) * 100}%` }}
-                   className="h-full bg-primary"
-                 />
-              </div>
-
+           <div className="relative bg-white w-full max-w-[420px] rounded-[40px] shadow-2xl overflow-hidden flex flex-col h-[90vh] border border-white/20">
+              
               <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0 bg-white pt-8">
                  <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black">
-                     {currentStep}
+                   <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                     <Settings size={20} />
                    </div>
                    <div>
                      <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900 leading-none">
-                       Step {currentStep} of {userType === 'teacher' ? 8 : 5}
+                       Complete Your Profile
                      </h3>
-                     <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tight">
-                       {(() => {
-                         if (userType === 'teacher') {
-                           const titles = ['Identity', 'Personal', 'Bio & Comm', 'Academics', 'Professional', 'Logistics', 'Schedule', 'Settings'];
-                           return titles[currentStep - 1] || 'Settings';
-                         }
-                         const titles = ['Personal Details', 'Academics', 'Location', 'Schedule', 'Settings'];
-                         return titles[currentStep - 1] || 'Settings';
-                       })()}
+                     <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tight">
+                       Update all your details in one place
                      </p>
                    </div>
                  </div>
-                 <div className="flex items-center gap-2">
-                   {currentStep !== (userType === 'teacher' ? 8 : 5) && (
-                     <button
-                       onClick={() => { playTapSound(); setCurrentStep(userType === 'teacher' ? 8 : 5); }}
-                       className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-primary transition-all"
-                     >
-                       <Settings size={16} />
-                     </button>
-                   )}
-                   <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition-all"><X size={16} /></button>
-                 </div>
+                 <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition-all"><X size={16} /></button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                 <AnimatePresence mode="wait">
-                   <motion.div
-                     key={currentStep}
-                     initial={{ opacity: 0, x: 20 }}
-                     animate={{ opacity: 1, x: 0 }}
-                     exit={{ opacity: 0, x: -20 }}
-                     className="space-y-6"
-                   >
-                     {/* ─── SHARED STEP 1: IDENTITY ─── */}
-                     {currentStep === 1 && (
-                       <div className="space-y-4">
-                         <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                           {userType === 'teacher' ? "Let's start with your \nidentity." : "Let's get to know you! \nWhat's your name?"}
-                         </h2>
+              <div className="flex-1 overflow-y-auto p-6 space-y-10 custom-scrollbar">
+                 <div className="space-y-10 pb-10">
+                   {/* ─── SECTION 1: IDENTITY ─── */}
+                   <div className="space-y-6">
+                     <div className="flex items-center gap-2 text-primary">
+                       <LucideUser size={16} />
+                       <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Identity & Basics</h4>
+                     </div>
+                     <div className="space-y-4">
+                       <div className="grid grid-cols-2 gap-4">
                          <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Full Name</label>
-                           <div className="relative">
-                             <LucideUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="text" value={userName || ''} onChange={(e) => { setUserName(e.target.value); localStorage.setItem('userName', e.target.value); }} placeholder="e.g. Rahul Sharma" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                           </div>
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">First Name</label>
+                           <input type="text" value={userFirstName} onChange={(e) => { const val = e.target.value; setUserFirstName(val); localStorage.setItem('userFirstName', val); const full = `${val} ${userLastName}`.trim(); setUserName(full); localStorage.setItem('userName', full); }} placeholder="Rahul" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                          </div>
                          <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">WhatsApp Number</label>
-                           <div className="relative">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Last Name</label>
+                           <input type="text" value={userLastName} onChange={(e) => { const val = e.target.value; setUserLastName(val); localStorage.setItem('userLastName', val); const full = `${userFirstName} ${val}`.trim(); setUserName(full); localStorage.setItem('userName', full); }} placeholder="Sharma" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                         </div>
+                       </div>
+                       <div className="space-y-1.5">
+                         <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">WhatsApp Number</label>
+                         <div className="flex gap-2">
+                           <div className="w-24 relative">
+                             <select value={userCountryCode} onChange={(e) => { setUserCountryCode(e.target.value); localStorage.setItem('userCountryCode', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-3 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">
+                               <option value="+91">🇮🇳 +91</option>
+                               <option value="+1">🇺🇸 +1</option>
+                               <option value="+44">🇬🇧 +44</option>
+                               <option value="+971">🇦🇪 +971</option>
+                               <option value="+61">🇦🇺 +61</option>
+                               <option value="+1">🇨🇦 +1</option>
+                               <option value="+65">🇸🇬 +65</option>
+                             </select>
+                           </div>
+                           <div className="flex-1 relative">
                              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="tel" value={userPhone || ''} onChange={(e) => { setUserPhone(e.target.value); localStorage.setItem('userPhone', e.target.value); }} placeholder="e.g. 9971XXXXXX" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                           </div>
-                         </div>
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? 'Tutor Gender Preference' : 'Gender'}</label>
-                           <div className="flex flex-wrap gap-2">
-                             {(userType === 'teacher' ? ['Male', 'Female', 'Transgender'] : ['Male', 'Female', 'All']).map(g => (
-                               <button key={g} onClick={() => { playTapSound(); setUserGender(g); localStorage.setItem('userGender', g); }} className={cn("flex-1 px-4 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", userGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{g}</button>
-                             ))}
+                             <input type="tel" value={userPhone || ''} onChange={(e) => { setUserPhone(e.target.value); localStorage.setItem('userPhone', e.target.value); }} placeholder="9971XXXXXX" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                            </div>
                          </div>
                        </div>
-                     )}
+                       <div className="space-y-3">
+                         <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? 'Tutor Gender Preference' : 'Gender'}</label>
+                         <div className="flex flex-wrap gap-2">
+                           {(userType === 'teacher' ? ['Male', 'Female', 'Transgender'] : ['Male', 'Female', 'All']).map(g => (
+                             <button key={g} onClick={() => { playTapSound(); setUserGender(g); localStorage.setItem('userGender', g); }} className={cn("flex-1 px-4 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", userGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{g}</button>
+                           ))}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
 
-                     {/* ─── TUTOR STEP 2: PERSONAL ─── */}
-                     {currentStep === 2 && userType === 'teacher' && (
+                   {/* ─── SECTION 2: PERSONAL (TUTOR) or ACADEMICS (PARENT) ─── */}
+                   {userType === 'teacher' ? (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <FileText size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Personal Details</h4>
+                       </div>
                        <div className="space-y-4">
-                         <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Personal Details</h2>
                          <div className="grid grid-cols-2 gap-4">
                            <div className="space-y-1.5">
                              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Date of Birth</label>
@@ -2875,12 +3209,98 @@ export default function App() {
                            </div>
                          </div>
                        </div>
-                     )}
-
-                     {/* ─── TUTOR STEP 3: BIO & COMM ─── */}
-                     {currentStep === 3 && userType === 'teacher' && (
+                     </div>
+                   ) : (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <BookOpen size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Academic Requirements</h4>
+                       </div>
                        <div className="space-y-4">
-                         <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Bio & Communication</h2>
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Class Group</label>
+                           <div className="grid grid-cols-2 gap-2">
+                             {CLASSES_LIST.map(c => {
+                               const isGroupActive = userClasses.includes(c) || (CLASS_GROUP_MAPPING[c] || []).some(sub => userClasses.includes(sub));
+                               return (
+                                 <button key={c} onClick={() => { playTapSound(); setUserClasses([c]); localStorage.setItem('userClasses', JSON.stringify([c])); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
+                               );
+                             })}
+                           </div>
+                         </div>
+                         {(() => {
+                           const currentGroup = CLASSES_LIST.find(g => userClasses.includes(g) || (CLASS_GROUP_MAPPING[g] || []).some(s => userClasses.includes(s)));
+                           if (!currentGroup) return null;
+                           return (
+                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
+                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Specific Class</label>
+                               <div className="flex flex-wrap gap-2">
+                                 {(CLASS_GROUP_MAPPING[currentGroup] || []).map(sub => (
+                                   <button key={sub} onClick={() => { playTapSound(); setUserClasses([currentGroup, sub]); localStorage.setItem('userClasses', JSON.stringify([currentGroup, sub])); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter transition-all", userClasses.includes(sub) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{sub}</button>
+                                 ))}
+                               </div>
+                             </div>
+                           );
+                         })()}
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">
+                             {userClasses.includes('Entrance Exam & Specialization') ? 'Exam / Category' : 'Board'}
+                           </label>
+                           <div className="grid grid-cols-2 gap-2">
+                             {(userClasses.includes('Entrance Exam & Specialization') 
+                               ? (SPECIALIZED_SUB_CATEGORIES['Entrance Exam & Specialization'] || [])
+                               : ['CBSE', 'ICSE', 'State Board', 'IB/IGCSE']
+                             ).map(b => (
+                               <button key={b} onClick={() => { playTapSound(); setUserBoard(b); localStorage.setItem('userBoard', b); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
+                             ))}
+                           </div>
+                         </div>
+
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Subjects Needed</label>
+                           <div className="flex flex-wrap gap-2">
+                             {(() => {
+                               if (userClasses.includes('Entrance Exam & Specialization')) {
+                                 const subjects = SPECIALIZED_SUBJECTS[userBoard];
+                                 if (!subjects) return [];
+                                 
+                                 if (Array.isArray(subjects)) {
+                                   return subjects.map(s => (
+                                     <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                                   ));
+                                 } else {
+                                   // Grouped Subjects (Languages)
+                                   return Object.entries(subjects).map(([group, subjs]: [string, any]) => (
+                                     <div key={group} className="w-full space-y-2 mt-2">
+                                       <div className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest border-l-2 border-primary/30 pl-2">{group}</div>
+                                       <div className="flex flex-wrap gap-2">
+                                         {subjs.map((s: string) => (
+                                           <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   ));
+                                 }
+                               }
+                               const groupName = userClasses[0];
+                               return (groupName ? CLASS_SUBJECTS_DATA[groupName] || [] : []).map(s => (
+                                 <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                               ));
+                             })()}
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                   )}
+
+                   {/* ─── SECTION 3: BIO & COMM (TUTOR) or LOCATION (PARENT) ─── */}
+                   {userType === 'teacher' ? (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <Edit3 size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Bio & Communication</h4>
+                       </div>
+                       <div className="space-y-4">
                          <div className="space-y-1.5">
                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">About Me (Catchy Bio)</label>
                            <div className="relative">
@@ -2908,97 +3328,16 @@ export default function App() {
                            </div>
                          </div>
                        </div>
-                     )}
-
-                     {/* ─── PARENT STEP 2 or TUTOR STEP 4: ACADEMICS ─── */}
-                     {((currentStep === 2 && userType === 'parent') || (currentStep === 4 && userType === 'teacher')) && (
-                       <div className="space-y-4">
-                         <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                           {userType === 'teacher' ? 'Teaching Classes' : 'Academic Details'}
-                         </h2>
-                         <div className="space-y-4">
-                           <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Class Group</label>
-                             <div className="grid grid-cols-2 gap-2">
-                               {CLASSES_LIST.map(c => {
-                                 // Check if this group or any of its sub-classes are active
-                                 const isGroupActive = userClasses.includes(c) || (CLASS_GROUP_MAPPING[c] || []).some(sub => userClasses.includes(sub));
-                                 return (
-                                   <button key={c} onClick={() => { playTapSound(); setUserClasses([c]); localStorage.setItem('userClasses', JSON.stringify([c])); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
-                                 );
-                               })}
-                             </div>
-                           </div>
-                           {userType === 'parent' && (
-                             (() => {
-                               const currentGroup = CLASSES_LIST.find(g => userClasses.includes(g) || (CLASS_GROUP_MAPPING[g] || []).some(s => userClasses.includes(s)));
-                               if (!currentGroup) return null;
-                               return (
-                                 <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Specific Class</label>
-                                   <div className="flex flex-wrap gap-2">
-                                     {(CLASS_GROUP_MAPPING[currentGroup] || []).map(sub => (
-                                       <button key={sub} onClick={() => { playTapSound(); setUserClasses([currentGroup, sub]); localStorage.setItem('userClasses', JSON.stringify([currentGroup, sub])); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter transition-all", userClasses.includes(sub) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{sub}</button>
-                                     ))}
-                                   </div>
-                                 </div>
-                               );
-                             })()
-                           )}
-                           <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Board</label>
-                             <div className="grid grid-cols-2 gap-2">
-                               {['CBSE', 'ICSE', 'State Board', 'IB/IGCSE'].map(b => (
-                                 <button key={b} onClick={() => { playTapSound(); setUserBoard(b); localStorage.setItem('userBoard', b); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
-                               ))}
-                             </div>
-                           </div>
-                           <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Subjects {userType === 'teacher' ? 'Teaching' : 'Needed'}</label>
-                             <div className="flex flex-wrap gap-2">
-                               {(() => {
-                                 const groupName = userClasses[0];
-                                 return (groupName ? CLASS_SUBJECTS_DATA[groupName] || [] : []);
-                               })().map(s => (
-                                 <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
-                               ))}
-                             </div>
-                           </div>
-                         </div>
+                     </div>
+                   ) : (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <MapPin size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Location & Mode</h4>
                        </div>
-                     )}
-
-                     {/* ─── TUTOR STEP 5: PROFESSIONAL ─── */}
-                     {currentStep === 5 && userType === 'teacher' && (
                        <div className="space-y-4">
-                         <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Professional Details</h2>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Qualifications (Select Multiple)</label>
-                           <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-2 bg-slate-50 rounded-2xl border border-slate-100 custom-scrollbar">
-                             {TUTOR_QUALIFICATIONS_LIST.map(q => (
-                               <button key={q} onClick={() => { playTapSound(); const next = userQualifications.includes(q) ? userQualifications.filter(v => v !== q) : [...userQualifications, q]; setUserQualifications(next); localStorage.setItem('userQualifications', JSON.stringify(next)); }} className={cn("px-3 py-2 rounded-xl border-2 font-bold text-[9px] uppercase transition-all", userQualifications.includes(q) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{q}</button>
-                             ))}
-                           </div>
-                         </div>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Teaching Experience</label>
-                           <div className="grid grid-cols-1 gap-2">
-                             {TUTOR_EXPERIENCE_LIST.map(exp => (
-                               <button key={exp} onClick={() => { playTapSound(); setUserExperience(exp); localStorage.setItem('userExperience', exp); }} className={cn("w-full py-3 px-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest text-left transition-all", userExperience === exp ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{exp}</button>
-                             ))}
-                           </div>
-                         </div>
-                       </div>
-                     )}
-
-                     {/* ─── PARENT STEP 3 or TUTOR STEP 6: LOCATION ─── */}
-                     {((currentStep === 3 && userType === 'parent') || (currentStep === 6 && userType === 'teacher')) && (
-                       <div className="space-y-4">
-                         <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                           {userType === 'teacher' ? 'Where you teach' : 'Where you learn'}
-                         </h2>
                          <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of {userType === 'teacher' ? 'Teaching' : 'Learning'}</label>
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of Learning</label>
                            <div className="flex gap-2">
                              {['Home Tuition', 'Online Class'].map(m => (
                                <button key={m} onClick={() => { playTapSound(); setUserMode(m); localStorage.setItem('userMode', m); }} className={cn("flex-1 py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center gap-1", userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}><span>{m === 'Home Tuition' ? '🏠' : '💻'}</span><span>{m}</span></button>
@@ -3012,40 +3351,97 @@ export default function App() {
                                <select value={userCity} onChange={(e) => { setUserCity(e.target.value); localStorage.setItem('userCity', e.target.value); setUserLocalities([]); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">{CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
                              </div>
                              <div className="space-y-1.5">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Locality {userType === 'teacher' && '(Select Multiple)'}</label>
-                               {userType === 'teacher' ? (
-                                 <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-2 bg-slate-50 rounded-2xl border border-slate-100 custom-scrollbar">{(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => (
-                                   <button key={l} onClick={() => { playTapSound(); const next = userLocalities.includes(l) ? userLocalities.filter(v => v !== l) : [...userLocalities, l]; setUserLocalities(next); localStorage.setItem('userLocalities', JSON.stringify(next)); }} className={cn("px-3 py-2 rounded-xl border-2 font-bold text-[10px] uppercase transition-all", userLocalities.includes(l) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{l}</button>
-                                 ))}</div>
-                               ) : (
-                                 <select value={userLocalities[0] || ''} onChange={(e) => { setUserLocalities([e.target.value]); localStorage.setItem('userLocalities', JSON.stringify([e.target.value])); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"><option value="">Select Locality</option>{(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => <option key={l} value={l}>{l}</option>)}</select>
-                               )}
+                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Locality</label>
+                               <select value={userLocalities[0] || ''} onChange={(e) => { setUserLocalities([e.target.value]); localStorage.setItem('userLocalities', JSON.stringify([e.target.value])); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"><option value="">Select Locality</option>{(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => <option key={l} value={l}>{l}</option>)}</select>
                              </div>
-                             {userType === 'parent' && (
-                               <div className="space-y-1.5">
-                                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Society / Block</label>
-                                 <div className="relative"><MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} /><input type="text" value={userResidency || ''} onChange={(e) => { setUserResidency(e.target.value); localStorage.setItem('userResidency', e.target.value); }} placeholder="e.g. DLF Phase 3" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" /></div>
-                               </div>
-                             )}
-                             {userType === 'teacher' && (
-                               <div className="space-y-3">
-                                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Own Vehicle?</label>
-                                 <div className="flex gap-2">
-                                   {['Yes', 'No'].map(v => (
-                                     <button key={v} onClick={() => { playTapSound(); setHasVehicle(v); localStorage.setItem('hasVehicle', v); }} className={cn("flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", hasVehicle === v ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{v}</button>
-                                   ))}
-                                 </div>
-                               </div>
-                             )}
+                             <div className="space-y-1.5">
+                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Society / Block</label>
+                               <div className="relative"><MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} /><input type="text" value={userResidency || ''} onChange={(e) => { setUserResidency(e.target.value); localStorage.setItem('userResidency', e.target.value); }} placeholder="e.g. DLF Phase 3" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" /></div>
+                             </div>
                            </div>
                          )}
                        </div>
-                     )}
+                     </div>
+                   )}
 
-                     {/* ─── PARENT STEP 4 or TUTOR STEP 7: SCHEDULE & FEE ─── */}
-                     {((currentStep === 4 && userType === 'parent') || (currentStep === 7 && userType === 'teacher')) && (
+                   {/* ─── SECTION 4: ACADEMICS (TUTOR) or SCHEDULE (PARENT) ─── */}
+                   {userType === 'teacher' ? (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <BookOpen size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Academic Expertise</h4>
+                       </div>
                        <div className="space-y-4">
-                         <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Schedule & Fee</h2>
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Teaching Classes</label>
+                           <div className="grid grid-cols-2 gap-2">
+                             {CLASSES_LIST.map(c => {
+                               const isGroupActive = userClasses.includes(c) || (CLASS_GROUP_MAPPING[c] || []).some(sub => userClasses.includes(sub));
+                               return (
+                                 <button key={c} onClick={() => { playTapSound(); setUserClasses([c]); localStorage.setItem('userClasses', JSON.stringify([c])); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
+                               );
+                             })}
+                           </div>
+                         </div>
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">
+                             {userClasses.includes('Entrance Exam & Specialization') ? 'Exam / Category' : 'Board'}
+                           </label>
+                           <div className="grid grid-cols-2 gap-2">
+                             {(userClasses.includes('Entrance Exam & Specialization') 
+                               ? (SPECIALIZED_SUB_CATEGORIES['Entrance Exam & Specialization'] || [])
+                               : ['CBSE', 'ICSE', 'State Board', 'IB/IGCSE']
+                             ).map(b => (
+                               <button key={b} onClick={() => { playTapSound(); setUserBoard(b); localStorage.setItem('userBoard', b); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
+                             ))}
+                           </div>
+                         </div>
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Subjects Teaching</label>
+                           <div className="flex flex-wrap gap-2">
+                             {(() => {
+                               if (userClasses.includes('Entrance Exam & Specialization')) {
+                                 const subjects = SPECIALIZED_SUBJECTS[userBoard];
+                                 if (!subjects) return [];
+                                 
+                                 if (Array.isArray(subjects)) {
+                                   return subjects.map(s => (
+                                     <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                                   ));
+                                 } else {
+                                   // Grouped Subjects (Languages)
+                                   return Object.entries(subjects).map(([group, subjs]: [string, any]) => (
+                                     <div key={group} className="w-full space-y-2 mt-2">
+                                       <div className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest border-l-2 border-primary/30 pl-2">{group}</div>
+                                       <div className="flex flex-wrap gap-2">
+                                         {subjs.map((s: string) => (
+                                           <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   ));
+                                 }
+                               }
+
+                               const allSubjects: string[] = [];
+                               userClasses.forEach(c => {
+                                 (CLASS_SUBJECTS_DATA[c] || []).forEach(s => { if (!allSubjects.includes(s)) allSubjects.push(s); });
+                               });
+                               return (allSubjects.length > 0 ? allSubjects : (userClasses[0] ? CLASS_SUBJECTS_DATA[userClasses[0]] || [] : [])).map(s => (
+                                 <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                               ));
+                             })()}
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <Clock size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Schedule & Duration</h4>
+                       </div>
+                       <div className="space-y-4">
                          <div className="space-y-3">
                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Days</label>
                            <div className="flex flex-wrap gap-2">
@@ -3062,38 +3458,146 @@ export default function App() {
                              ))}
                            </div>
                          </div>
-                         {userType === 'teacher' ? (
-                           <div className="space-y-3">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Fee Charges (Per Hour)</label>
-                             <div className="grid grid-cols-1 gap-2">
-                               {TUTOR_FEE_LIST.map(f => (
-                                 <button key={f} onClick={() => { playTapSound(); setUserFee(f); localStorage.setItem('userFee', f); }} className={cn("w-full py-3 px-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest text-left transition-all", userFee === f ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{f}</button>
-                               ))}
-                             </div>
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Session Duration</label>
+                           <select value={userDuration} onChange={(e) => { setUserDuration(e.target.value); localStorage.setItem('userDuration', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"><option value="1 Hour">1 Hour</option><option value="1.5 Hours">1.5 Hours</option><option value="2 Hours">2 Hours</option><option value="2.5 Hours">2.5 Hours</option></select>
+                         </div>
+                       </div>
+                     </div>
+                   )}
+
+                   {/* ─── SECTION 5: PROFESSIONAL (TUTOR) ─── */}
+                   {userType === 'teacher' && (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <GraduationCap size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Professional Details</h4>
+                       </div>
+                       <div className="space-y-4">
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Qualifications</label>
+                           <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-2 bg-slate-50 rounded-2xl border border-slate-100 custom-scrollbar">
+                             {TUTOR_QUALIFICATIONS_LIST.map(q => (
+                               <button key={q} onClick={() => { playTapSound(); const next = userQualifications.includes(q) ? userQualifications.filter(v => v !== q) : [...userQualifications, q]; setUserQualifications(next); localStorage.setItem('userQualifications', JSON.stringify(next)); }} className={cn("px-3 py-2 rounded-xl border-2 font-bold text-[9px] uppercase transition-all", userQualifications.includes(q) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{q}</button>
+                             ))}
                            </div>
-                         ) : (
-                           <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Session Duration</label>
-                             <select value={userDuration} onChange={(e) => { setUserDuration(e.target.value); localStorage.setItem('userDuration', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"><option value="1 Hour">1 Hour</option><option value="1.5 Hours">1.5 Hours</option><option value="2 Hours">2 Hours</option><option value="2.5 Hours">2.5 Hours</option></select>
+                         </div>
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Teaching Experience</label>
+                           <div className="grid grid-cols-1 gap-2">
+                             {TUTOR_EXPERIENCE_LIST.map(exp => (
+                               <button key={exp} onClick={() => { playTapSound(); setUserExperience(exp); localStorage.setItem('userExperience', exp); }} className={cn("w-full py-3 px-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest text-left transition-all", userExperience === exp ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{exp}</button>
+                             ))}
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                   )}
+
+                   {/* ─── SECTION 6: LOCATION & LOGISTICS (TUTOR) ─── */}
+                   {userType === 'teacher' && (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <MapPin size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Location & Logistics</h4>
+                       </div>
+                       <div className="space-y-4">
+                         <div className="space-y-3">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of Teaching</label>
+                           <div className="flex gap-2">
+                             {['Home Tuition', 'Online Class'].map(m => (
+                               <button key={m} onClick={() => { playTapSound(); setUserMode(m); localStorage.setItem('userMode', m); }} className={cn("flex-1 py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center gap-1", userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}><span>{m === 'Home Tuition' ? '🏠' : '💻'}</span><span>{m}</span></button>
+                             ))}
+                           </div>
+                         </div>
+                         {userMode !== 'Online Class' && (
+                           <div className="space-y-4">
+                             <div className="space-y-1.5">
+                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">City</label>
+                               <select value={userCity} onChange={(e) => { setUserCity(e.target.value); localStorage.setItem('userCity', e.target.value); setUserLocalities([]); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">{CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                             </div>
+                             <div className="space-y-1.5">
+                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Localities (Select Multiple)</label>
+                               <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-2 bg-slate-50 rounded-2xl border border-slate-100 custom-scrollbar">{(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => (
+                                 <button key={l} onClick={() => { playTapSound(); const next = userLocalities.includes(l) ? userLocalities.filter(v => v !== l) : [...userLocalities, l]; setUserLocalities(next); localStorage.setItem('userLocalities', JSON.stringify(next)); }} className={cn("px-3 py-2 rounded-xl border-2 font-bold text-[10px] uppercase transition-all", userLocalities.includes(l) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{l}</button>
+                               ))}</div>
+                             </div>
+                             <div className="space-y-3">
+                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Own Vehicle?</label>
+                               <div className="flex gap-2">
+                                 {['Yes', 'No'].map(v => (
+                                   <button key={v} onClick={() => { playTapSound(); setHasVehicle(v); localStorage.setItem('hasVehicle', v); }} className={cn("flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", hasVehicle === v ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{v}</button>
+                                 ))}
+                               </div>
+                             </div>
                            </div>
                          )}
                        </div>
-                     )}
+                     </div>
+                   )}
 
-                     {/* ─── TUTOR STEP 8: SELFIE VERIFICATION ─── */}
-                     {currentStep === 8 && userType === 'teacher' && (
-                       <div className="space-y-6">
-                         <div className="space-y-1.5">
-                           <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Selfie Verification</h2>
-                           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-                             Please upload a clear face image, professional image
-                           </p>
+                   {/* ─── SECTION 7: SCHEDULE & FEE (TUTOR) ─── */}
+                   {userType === 'teacher' && (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <Clock size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Schedule & Fee</h4>
+                       </div>
+                       <div className="space-y-4">
+                         <div className="space-y-3">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Days</label>
+                           <div className="flex flex-wrap gap-2">
+                             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                               <button key={day} onClick={() => { playTapSound(); const currentDays = userDays ? userDays.split(', ') : []; const next = currentDays.includes(day) ? currentDays.filter(v => v !== day) : [...currentDays, day]; setUserDays(next.join(', ')); localStorage.setItem('userDays', next.join(', ')); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tight transition-all", (userDays ? userDays.split(', ') : []).includes(day) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{day}</button>
+                             ))}
+                           </div>
                          </div>
+                         <div className="space-y-3">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Time</label>
+                           <div className="grid grid-cols-3 gap-2 max-h-[180px] overflow-y-auto p-1 custom-scrollbar">
+                             {TIME_LIST.map(time => (
+                               <button key={time} onClick={() => { playTapSound(); const currentTimes = userTime ? userTime.split(', ') : []; const next = currentTimes.includes(time) ? currentTimes.filter(v => v !== time) : [...currentTimes, time]; setUserTime(next.join(', ')); localStorage.setItem('userTime', next.join(', ')); }} className={cn("py-2 px-1 rounded-lg border font-bold text-[9px] text-center transition-all", (userTime ? userTime.split(', ') : []).includes(time) ? "border-primary bg-primary/10 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{time}</button>
+                             ))}
+                           </div>
+                         </div>
+                         <div className="space-y-3">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Fee Charges (Per Hour)</label>
+                           <div className="grid grid-cols-1 gap-2">
+                             {TUTOR_FEE_LIST.map(f => (
+                               <button key={f} onClick={() => { playTapSound(); setUserFee(f); localStorage.setItem('userFee', f); }} className={cn("w-full py-3 px-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest text-left transition-all", userFee === f ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{f}</button>
+                             ))}
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                   )}
 
+                   {/* Save Button Inside Content */}
+                   <div className="pt-10 pb-6 border-t border-slate-50">
+                      <button 
+                        onClick={handleUpdateProfile}
+                        disabled={isUpdatingProfile}
+                        className={cn(
+                          "w-full h-16 rounded-[24px] text-white font-black text-[13px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2",
+                          isUpdatingProfile ? "bg-slate-400 cursor-not-allowed" : "bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/20"
+                        )}
+                      >
+                        {isUpdatingProfile ? <Loader2 size={24} className="animate-spin" /> : <>Save All Details <Check size={20} strokeWidth={3} /></>}
+                      </button>
+                   </div>
+
+                   {/* ─── SECTION 8: SELFIE (TUTOR) ─── */}
+                   {userType === 'teacher' && (
+                     <div className="space-y-6 pt-6 border-t border-slate-50">
+                       <div className="flex items-center gap-2 text-primary">
+                         <Camera size={16} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Profile Pic</h4>
+                       </div>
+                       <div className="space-y-4">
                          <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200 gap-4">
                             {userSelfie ? (
                               <div className="relative group">
-                                <img src={userSelfie} alt="Selfie" className="w-48 h-48 rounded-[32px] object-cover border-4 border-white shadow-2xl" />
+                                <img src={userSelfie} alt="Profile" className="w-48 h-48 rounded-[32px] object-cover border-4 border-white shadow-2xl" />
                                 <button 
                                   onClick={() => { setUserSelfie(null); localStorage.removeItem('userSelfie'); }}
                                   className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90"
@@ -3114,93 +3618,59 @@ export default function App() {
                               </div>
                             )}
                          </div>
-
                          <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 flex items-start gap-4">
                             <ShieldCheck size={20} className="text-amber-500 shrink-0 mt-0.5" />
                             <p className="text-[10px] font-bold text-amber-800 leading-snug">
-                              Your selfie is used to verify your identity. It will be shown to parents as part of your <span className="font-black underline">Verified Profile</span>.
+                              Please upload a <span className="font-black">Professional Passport Photo</span>. Do not upload side faces, cropped photos, or casual selfies. A clear front-facing photo helps in getting more leads.
                             </p>
                          </div>
                        </div>
-                     )}
+                     </div>
+                   )}
 
-                     {/* ─── PARENT STEP 5 or TUTOR STEP 9: SETTINGS ─── */}
-                     {((currentStep === 5 && userType === 'parent') || (currentStep === 9 && userType === 'teacher')) && (
-                       <div className="space-y-6">
-                         <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Account Settings</h2>
-                         {userType === 'parent' && (
-                           <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Student/Need Details</label>
-                             <textarea value={aboutMe} onChange={(e) => { setAboutMe(e.target.value); localStorage.setItem('aboutMe', e.target.value); }} placeholder="Tell us more about the requirement..." rows={3} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all resize-none" />
-                           </div>
-                         )}
-                         <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex items-center gap-4">
-                           <div className="relative">{profilePhoto ? <img src={profilePhoto} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" /> : <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-white shadow-md"><LucideUser size={24} /></div>}</div>
-                           <div className="min-w-0 flex-1">
-                             <div className="text-[12px] font-black text-slate-900 truncate">{userName || (userType === 'teacher' ? 'Tutor' : 'Parent')}</div>
-                             <div className="text-[10px] font-bold text-slate-400 truncate">{activeUser?.email}</div>
-                             <div className="text-[9px] font-black text-primary uppercase tracking-widest mt-0.5">{userType === 'parent' ? 'Order ID' : 'Tutor ID'}: #{tutorId || 'Pending'}</div>
-                           </div>
+                   {/* ─── SECTION 9: ACCOUNT SETTINGS ─── */}
+                   <div className="space-y-6 pt-6 border-t border-slate-50">
+                     <div className="flex items-center gap-2 text-primary">
+                       <Settings size={16} />
+                       <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Account & Settings</h4>
+                     </div>
+                     <div className="space-y-6">
+                       {userType === 'parent' && (
+                         <div className="space-y-1.5">
+                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Student/Need Details</label>
+                           <textarea value={aboutMe} onChange={(e) => { setAboutMe(e.target.value); localStorage.setItem('aboutMe', e.target.value); }} placeholder="Tell us more about the requirement..." rows={3} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all resize-none" />
                          </div>
-                         <button onClick={handleLogout} className="w-full bg-rose-50 text-rose-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all"><LogOut size={16} /> Sign Out</button>
-                         <div className="pt-6 border-t border-slate-100/50">
-                           <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><AlertCircle size={12} /> Danger Zone</p>
-                           <button onClick={handleDeleteProfile} disabled={isDeletingProfile} className="w-full bg-rose-500 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-rose-200">{isDeletingProfile ? <Loader2 size={16} className="animate-spin" /> : <><Trash2 size={16} /> Delete Profile</>}</button>
+                       )}
+                       <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex items-center gap-4">
+                         <div className="relative">{profilePhoto ? <img src={profilePhoto} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" /> : <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-white shadow-md"><LucideUser size={24} /></div>}</div>
+                         <div className="min-w-0 flex-1">
+                           <div className="text-[12px] font-black text-slate-900 truncate">{userName || (userType === 'teacher' ? 'Tutor' : 'Parent')}</div>
+                           <div className="text-[10px] font-bold text-slate-400 truncate">{activeUser?.email}</div>
+                           <div className="text-[9px] font-black text-primary uppercase tracking-widest mt-0.5">{userType === 'parent' ? 'Order ID' : 'Tutor ID'}: #{tutorId || 'Pending'}</div>
                          </div>
                        </div>
-                     )}
-                   </motion.div>
-                 </AnimatePresence>
+                       <div className="pt-6 border-t border-slate-100/50">
+                         <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><AlertCircle size={12} /> Danger Zone</p>
+                         <button onClick={handleDeleteProfile} disabled={isDeletingProfile} className="w-full bg-rose-500 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-rose-200">{isDeletingProfile ? <Loader2 size={16} className="animate-spin" /> : <><Trash2 size={16} /> Delete My Profile</>}</button>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
               </div>
 
               <div className="p-6 border-t border-slate-50 bg-white flex items-center gap-3 shrink-0">
-                 {currentStep > 1 && (
-                   <button 
-                     onClick={() => { playTapSound(); setCurrentStep(prev => prev - 1); }}
-                     className="w-14 h-14 rounded-2xl border-2 border-slate-100 flex items-center justify-center text-slate-400 active:scale-95 transition-all"
-                   >
-                     <ChevronRight size={24} className="rotate-180" />
-                   </button>
-                 )}
-                 
-                 {(() => {
-                   const totalSteps = userType === 'teacher' ? 9 : 5;
-                   if (currentStep < totalSteps) {
-                     return (
-                       <button 
-                         onClick={() => { playTapSound(); setCurrentStep(prev => prev + 1); }}
-                         disabled={isUpdatingProfile}
-                         className={cn(
-                           "flex-1 h-14 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2",
-                           isUpdatingProfile ? "bg-slate-400 cursor-not-allowed" : "bg-primary"
-                         )}
-                       >
-                         {isUpdatingProfile ? <Loader2 size={20} className="animate-spin" /> : <>Next Step <ChevronRight size={18} strokeWidth={3} /></>}
-                       </button>
-                     );
-                   } else {
-                     return (
-                       <div className="flex-1 flex gap-3">
-                         <button 
-                           onClick={handleUpdateProfile}
-                           disabled={isUpdatingProfile}
-                           className={cn(
-                             "flex-[1.5] h-14 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2",
-                             isUpdatingProfile ? "bg-slate-400 cursor-not-allowed" : "bg-emerald-500"
-                           )}
-                         >
-                           {isUpdatingProfile ? <Loader2 size={20} className="animate-spin" /> : <>Complete Setup <Check size={18} strokeWidth={3} /></>}
-                         </button>
-                         <button 
-                           onClick={() => setShowProfileSetup(false)}
-                           className="flex-1 h-14 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
-                         >
-                           Close
-                         </button>
-                       </div>
-                     );
-                   }
-                 })()}
+                 <button 
+                   onClick={handleLogout}
+                   className="flex-1 h-14 rounded-2xl bg-rose-50 text-rose-600 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all border border-rose-100 flex items-center justify-center gap-2"
+                 >
+                   <LogOut size={16} /> Sign Out
+                 </button>
+                 <button 
+                   onClick={() => setShowProfileSetup(false)}
+                   className="flex-[1.5] h-14 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+                 >
+                   Close Setup
+                 </button>
               </div>
            </div>
          </div>
@@ -3209,6 +3679,12 @@ export default function App() {
       <AnimatePresence>
         {selectedJob && (
           <div className="fixed inset-0 z-[18000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            {(() => {
+              if (selectedJob['Order ID'] === '7752' || (selectedJob as any).order_id === '7752' || (selectedJob as any).id === '7752') {
+                console.log('🚨 [CRITICAL-DEBUG] Job #7752 Detail View Object:', JSON.stringify(selectedJob, null, 2));
+              }
+              return null;
+            })()}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedJob(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
             <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
                {/* Premium Header */}
@@ -3235,32 +3711,32 @@ export default function App() {
                     <div className="relative z-10 space-y-4">
                       <div className="space-y-1">
                         <div className="bg-white/10 w-fit px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-primary-foreground border border-white/5">
-                          {selectedJob.Class || selectedJob['Class / Board'] || 'Premium Class'}
+                          {selectedJob.Class || selectedJob['Class / Board'] || (selectedJob as any).class_group || 'Premium Class'}
                         </div>
                         <h4 className="text-[16px] font-[1000] text-white leading-snug tracking-tight">
-                          {selectedJob.subjects || selectedJob['Preferred Subject(s)'] || 'General Subjects'}
+                          {selectedJob.subjects || selectedJob['Preferred Subject(s)'] || (selectedJob as any).subject || 'General Subjects'}
                         </h4>
                       </div>
-                      <div className="flex justify-between items-end pt-2">
-                        <div className="flex flex-col gap-0.5 min-w-0 flex-1 pr-4">
-                          <div className="flex items-center gap-1.5 text-emerald-400 text-[9.5px] font-[1000] tracking-tight uppercase">
-                            <MapPin size={10} strokeWidth={3} /> {selectedJob.City || (selectedJob as any).city || 'India'}
+                      <div className="flex justify-between items-start pt-3 gap-4">
+                        <div className="flex flex-col gap-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-black tracking-tight uppercase">
+                            <MapPin size={11} strokeWidth={3} /> {selectedJob.City || (selectedJob as any).city || 'India'}
                           </div>
-                          <div className="text-slate-300 text-[8.5px] font-bold line-clamp-1 leading-tight">
+                          <div className="text-slate-300 text-[11px] font-medium leading-relaxed">
                             {cleanValue(selectedJob.residency || (selectedJob as any).residency || '', '') ? `${selectedJob.residency || (selectedJob as any).residency}, ` : ''}{cleanValue(selectedJob.Locations || (selectedJob as any).locations || (selectedJob as any).location || (selectedJob as any).locality || '', 'All Areas')}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
                           {(() => {
-                            const rawFee = selectedJob.Fee || (selectedJob as any).fee || (selectedJob as any).budget || selectedJob['Fee/Month'] || (selectedJob as any).monthly_fee || '';
+                            const rawFee = selectedJob.Fee || (selectedJob as any).fee || (selectedJob as any).budget || selectedJob['Fee/Month'] || (selectedJob as any).monthly_fee || (selectedJob as any).Fee_hour || '';
                             const isNumeric = /[0-9]/.test(rawFee.toString());
                             return (
-                              <>
-                                <div className="text-[24px] font-black text-emerald-400 leading-none">
+                              <div className="flex flex-col items-end">
+                                <div className="text-[22px] font-black text-emerald-400 leading-none">
                                   {isNumeric ? `₹${formatCurrency(rawFee)}` : rawFee || '₹0'}
                                 </div>
-                                <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Monthly Budget</span>
-                              </>
+                                <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-1">Monthly Budget</span>
+                              </div>
                             );
                           })()}
                         </div>
@@ -3270,12 +3746,12 @@ export default function App() {
 
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-3">
-                    <DetailItem icon={<LucideUser size={12} className="text-indigo-500" />} label="Tutor Gender" value={selectedJob.Gender || (selectedJob as any).gender || 'Any Preference'} />
-                    <DetailItem icon={<Clock size={12} className="text-rose-500" />} label="Preferred Time" value={selectedJob.time || (selectedJob as any).Time || (selectedJob as any)['Preferred Time'] || 'Flexible'} />
-                    <DetailItem icon={<Calendar size={12} className="text-amber-500" />} label="Weekly Days" value={selectedJob.days || (selectedJob as any).Days || (selectedJob as any)['Available Days'] || 'N/A'} />
-                    <DetailItem icon={<Navigation size={12} className="text-blue-500" />} label="Teaching Mode" value={(selectedJob as any).Mode || (selectedJob as any).mode || (selectedJob as any)['Mode of Teaching'] || 'Home Tuition'} />
-                    <DetailItem icon={<Zap size={12} className="text-emerald-500" />} label="Avg. Duration" value={selectedJob.duration || (selectedJob as any).Duration || '1.5 Hours'} />
-                    <DetailItem icon={<BadgeCheck size={12} className="text-purple-500" />} label="Lead Status" value={selectedJob['Internal Remark'] || selectedJob.status || (selectedJob as any)['status'] || 'Active'} />
+                    <DetailItem icon={<LucideUser size={12} className="text-indigo-500" />} label="Tutor Gender" value={selectedJob.Gender || (selectedJob as any).gender || (selectedJob as any).preferred_gender || 'Any Preference'} />
+                    <DetailItem icon={<Clock size={12} className="text-rose-500" />} label="Preferred Time" value={selectedJob.time || (selectedJob as any).preferred_time || 'Flexible'} />
+                    <DetailItem icon={<Calendar size={12} className="text-amber-500" />} label="Weekly Days" value={selectedJob.days || (selectedJob as any).weekly_days || (selectedJob as any).Days || 'N/A'} />
+                    <DetailItem icon={<Navigation size={12} className="text-blue-500" />} label="Teaching Mode" value={selectedJob.mode || (selectedJob as any).Mode || 'Home Tuition'} />
+                    <DetailItem icon={<Zap size={12} className="text-emerald-500" />} label="Avg. Duration" value={selectedJob.duration || (selectedJob as any).Duration || (selectedJob as any).avg_duration || '1.5 Hours'} />
+                    <DetailItem icon={<BadgeCheck size={12} className="text-purple-500" />} label="Lead Status" value={selectedJob.status || (selectedJob as any).internal_remark || 'Active'} />
                   </div>
 
                   {/* Requirements Section */}
@@ -3300,7 +3776,7 @@ export default function App() {
                {/* Action Footer */}
                <div className="p-6 pt-2 border-t border-slate-50 bg-white shrink-0">
                   <button 
-                    onClick={() => { playTapSound(); openWhatsApp(`Hi, I am interested in Job Order ID: #${getJobId(selectedJob)}. Subjects: ${selectedJob.subjects || 'General'}. Please share details.`); }}
+                    onClick={() => handleApplyJob(selectedJob)}
                     className="w-full bg-[#191445] text-white h-16 rounded-[24px] font-black text-[13px] uppercase tracking-[0.2em] shadow-2xl shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-3"
                   >
                     Apply for this Job <ArrowRight size={20} strokeWidth={3} />
@@ -3313,6 +3789,7 @@ export default function App() {
 
         {selectedTutor && (
           <div className="fixed inset-0 z-[18000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            {console.log('👤 [Tutor-Modal-Debug] Selected Tutor Data:', selectedTutor)}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedTutor(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
             <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
                <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0 bg-slate-50/50">
@@ -3343,19 +3820,38 @@ export default function App() {
                     </div>
                     <div className="space-y-1">
                       <h4 className="text-[20px] font-[1000] text-slate-900 tracking-tight leading-tight">{toTitleCase(selectedTutor.name)}</h4>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{getTutorId(selectedTutor)}</span>
-                        <div className="w-1 h-1 bg-slate-200 rounded-full" />
-                        <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{selectedTutor.experience} Experience</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{getTutorId(selectedTutor)}</span>
+                          <div className="w-1 h-1 bg-slate-200 rounded-full" />
+                          <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{selectedTutor.experience} Experience</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-tight">
+                           <span className="flex items-center gap-1"><LucideUser size={10} className="text-slate-400" /> {selectedTutor.gender || 'Any'}</span>
+                           <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                           <span className="flex items-center gap-1"><TrendingUp size={10} className="text-slate-400" /> {selectedTutor.age ? `${selectedTutor.age} Yrs` : 'N/A'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <DetailItem icon={<GraduationCap size={12} />} label="Qualification" value={selectedTutor.qualification[0] || 'Graduate'} />
+                    <div className="col-span-2">
+                       <DetailItem icon={<GraduationCap size={12} />} label="Qualification" value={selectedTutor.qualification.join(', ') || 'Graduate'} />
+                    </div>
                     <DetailItem icon={<MapPin size={12} />} label="City" value={selectedTutor.city} />
-                    <DetailItem icon={<BookOpen size={12} />} label="Classes" value={selectedTutor.class_group[0] || 'All Classes'} />
-                    <DetailItem icon={<TrendingUp size={12} />} label="Expectation" value={`₹${formatCurrency(selectedTutor.fee)}`} />
+                    <div className="col-span-2">
+                       <DetailItem icon={<BookOpen size={12} />} label="Classes" value={selectedTutor.class_group.join(', ') || 'All Classes'} />
+                    </div>
+                    <DetailItem 
+                      icon={<TrendingUp size={12} />} 
+                      label="Expectation" 
+                      value={( /[0-9]/.test((selectedTutor.fee || '').toString()) ? `₹${formatCurrency(selectedTutor.fee || '0')}` : (selectedTutor.fee || '₹0') ) + '/hr'} 
+                    />
+                    <DetailItem icon={<Navigation size={12} />} label="Teaching Mode" value={selectedTutor.mode || 'Home Tuition'} />
+                    <DetailItem icon={<Calendar size={12} />} label="Available Days" value={selectedTutor.days || 'All Days'} />
+                    <DetailItem icon={<Clock size={12} />} label="Preferred Time" value={selectedTutor.time || 'Flexible'} />
+                    <DetailItem icon={<Smartphone size={12} />} label="Own Vehicle" value={selectedTutor.have_vehicle || 'No'} />
                   </div>
 
                   <div className="space-y-3">
@@ -3369,8 +3865,12 @@ export default function App() {
 
                   <div className="bg-slate-50 rounded-[28px] p-5 border border-slate-100 space-y-2">
                     <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5"><FileText size={10} /> About Tutor</h5>
-                    <p className="text-[12px] font-bold text-slate-600 leading-relaxed italic line-clamp-4">
-                      "{selectedTutor.about || `Passionate educator with ${selectedTutor.experience} of teaching experience in ${selectedTutor.city}.`}"
+                    <p className="text-[13px] font-[600] text-slate-700 leading-relaxed whitespace-normal break-words">
+                      {(() => {
+                        const aboutText = selectedTutor.about || `Passionate educator with ${selectedTutor.experience} of teaching experience in ${selectedTutor.city}.`;
+                        const lastDot = aboutText.lastIndexOf('.');
+                        return lastDot !== -1 ? aboutText.substring(0, lastDot + 1) : aboutText;
+                      })()}
                     </p>
                   </div>
                </div>
@@ -3508,7 +4008,93 @@ export default function App() {
 
         <NavButton active={activeTab === 'support'} onClick={() => { playTapSound(); setActiveTab('support'); window.scrollTo(0,0); }} icon={<MessageSquare className="w-[18px] h-[18px]" />} label="Support" activeColor="text-white" activeBg="bg-[#347475]" inactiveColor="text-[#347475]" inactiveBg="bg-[#347475]/5" />
       </nav>
+      
+      <SuccessPop show={showSuccess} onComplete={() => setShowSuccess(false)} />
+      <FloatingToast toast={activeToast} onClear={() => setActiveToast(null)} />
     </div>
+  );
+}
+
+function SuccessPop({ show, onComplete }: { show: boolean, onComplete: () => void }) {
+  useEffect(() => {
+    if (show) {
+      const timer = setTimeout(onComplete, 2200);
+      return () => clearTimeout(timer);
+    }
+  }, [show, onComplete]);
+
+  return (
+    <AnimatePresence>
+      {show && (
+        <div className="fixed inset-0 z-[30000] flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onComplete}
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+          />
+          <motion.div 
+            initial={{ scale: 0.5, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 1.1, opacity: 0, y: -20 }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            className="relative bg-white p-10 rounded-[50px] shadow-2xl flex flex-col items-center gap-6 max-w-xs w-full border-4 border-emerald-50"
+          >
+            <motion.div 
+              initial={{ scale: 0, rotate: -45 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ delay: 0.1, type: "spring", damping: 12 }}
+              className="w-20 h-20 bg-emerald-500 rounded-[28px] flex items-center justify-center text-white shadow-xl shadow-emerald-200"
+            >
+              <Check size={40} strokeWidth={4} />
+            </motion.div>
+            <div className="text-center space-y-1.5">
+              <h3 className="text-2xl font-[1000] text-slate-900 uppercase tracking-tighter">Done!</h3>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-relaxed">Everything looks <br/>great</p>
+            </div>
+            <motion.button 
+              whileTap={{ scale: 0.95 }}
+              onClick={onComplete}
+              className="mt-2 bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest"
+            >
+              Great!
+            </motion.button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function FloatingToast({ toast, onClear }: { toast: { title: string, body: string } | null, onClear: () => void }) {
+  return (
+    <AnimatePresence>
+      {toast && (
+        <motion.div 
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          className="fixed bottom-24 left-4 right-4 z-[25000] flex justify-center pointer-events-none"
+        >
+          <div className="bg-slate-900 text-white p-4 rounded-3xl shadow-2xl flex items-center gap-4 max-w-sm w-full pointer-events-auto border border-white/10 backdrop-blur-md">
+            <div className={cn(
+              "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0",
+              toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') ? "bg-rose-500/20 text-rose-500" : "bg-emerald-500/20 text-emerald-500"
+            )}>
+              {toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-[11px] font-black uppercase tracking-widest leading-none">{toast.title}</h4>
+              <p className="text-[10px] font-bold text-slate-400 truncate mt-1.5">{toast.body}</p>
+            </div>
+            <button onClick={onClear} className="p-2 text-slate-600 hover:text-white transition-colors">
+              <X size={16} strokeWidth={3} />
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -3528,12 +4114,12 @@ function NavButton({ active, onClick, icon, label, activeColor, activeBg, inacti
 
 function DetailItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex flex-col gap-1.5 shadow-sm">
+    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex flex-col gap-1.5 shadow-sm h-full">
       <div className="flex items-center gap-1.5 text-slate-400">
         {icon}
         <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
       </div>
-      <span className="text-[11px] font-[900] text-slate-800 tracking-tight leading-tight line-clamp-1">{value}</span>
+      <span className="text-[11px] font-[900] text-slate-800 tracking-tight leading-relaxed whitespace-normal break-words">{value}</span>
     </div>
   );
 }

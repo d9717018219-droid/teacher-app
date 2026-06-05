@@ -28,7 +28,7 @@ import {
   Palette
 } from 'lucide-react';
 import { TutorProfile } from '../types';
-import { cn, toTitleCase } from '../utils';
+import { cn, toTitleCase, formatCurrency } from '../utils';
 
 interface TutorCardProps {
   tutor: TutorProfile;
@@ -112,7 +112,8 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
   const classGroupStr = classGroupArr.join(', ') || 'N/A';
   
   const { icon, bg } = getSubjectStyles(subjectsStr);
-  const { fee, sessions, mrp, discount } = calculatePricing(exp, classGroupArr);
+  const rawFee = tutor.fee || '0';
+  const displayFee = /[0-9]/.test(rawFee.toString()) ? `₹${formatCurrency(rawFee)}` : rawFee;
 
   return (
     <div 
@@ -202,16 +203,10 @@ export const TutorCard: React.FC<TutorCardProps> = React.memo(({
       <div className="flex items-center justify-between mt-0.5 pt-2 border-t border-slate-100">
          <div className="flex flex-col">
             <div className="flex items-baseline gap-1">
-               <span className="text-[17px] font-extrabold text-slate-900 leading-none">₹{fee.toLocaleString()}</span>
-               <span className="text-[10px] text-slate-400 line-through font-medium">₹{mrp.toLocaleString()}</span>
-               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">/mo</span>
+               <span className="text-[17px] font-extrabold text-slate-900 leading-none">{displayFee}</span>
+               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">/hr</span>
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-               <span className="text-[9px] font-black text-green-600 flex items-center gap-0.5">
-                  {discount}% OFF
-               </span>
-               <span className="text-[8px] font-bold text-slate-400">• {sessions} SESS</span>
-            </div>
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Tutor Expectation</p>
          </div>
 
          <div className="flex items-center gap-1.5">

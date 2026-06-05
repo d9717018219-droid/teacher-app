@@ -1,5 +1,7 @@
 export interface JobLead {
   'Order ID': string;
+  id?: string;
+  order_id?: string;
   'Internal Remark': string | null;
   'Updated Time': string;
   'Record Added'?: string;
@@ -17,12 +19,19 @@ export interface JobLead {
   duration?: string;
   days?: string;
   time?: string;
+  mode?: string;
+  status?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  locality?: string;
 }
 
 export interface TutorProfile {
   tutor_id: string;
   name: string;
   email: string;
+  phone: string;
   internal_phone: string;
   gender: string;
   age: string;
@@ -38,12 +47,14 @@ export interface TutorProfile {
   location: string[];
   have_vehicle: string;
   communication: string;
+  mode: string;
   fee: string;
   about: string;
   status: string;
   photo: string;
   verified: string;
   created_time: string;
+  selfie?: string;
   
   // Legacy fields (optional)
   id?: string;

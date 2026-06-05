@@ -147,7 +147,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const getJobCountForLocality = (loc: string) => {
     const searchLoc = (loc || '').toLowerCase().trim();
-    return (allJobs || []).filter(l => (l.Locations || (l as any).location || '').toLowerCase().includes(searchLoc)).length;
+    if (!searchLoc) return 0;
+    
+    // Use word boundaries (\b) for exact matching.
+    // This matches "Sector 1" even if followed by " - Noida" or ",", but NOT "Sector 150".
+    const escapedLoc = searchLoc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
+
+    return (allJobs || []).filter(l => {
+      const jobLocs = (l.Locations || (l as any).location || '').toString().toLowerCase();
+      return regex.test(jobLocs);
+    }).length;
   };
 
   const getJobCountForMode = (mode: string) => {
@@ -566,11 +576,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <Venus size={24} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <div className="text-[14px] font-[900] text-rose-950 tracking-tight leading-tight uppercase tracking-widest font-black">Female Jobs</div>
+                    <div className="text-[13px] font-[900] text-rose-950 tracking-tight leading-tight font-black">For Female Teachers</div>
                     <div className="flex items-center gap-1.5 mt-1">
                       <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
                       <span className="text-[9px] font-black text-rose-600/60 uppercase tracking-widest">
-                        {femaleJobCount}+ Records
+                        {femaleJobCount}+ Jobs
                       </span>
                     </div>
                   </div>
@@ -586,11 +596,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <Mars size={24} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <div className="text-[14px] font-[900] text-blue-950 tracking-tight leading-tight uppercase tracking-widest font-black">Male Jobs</div>
+                    <div className="text-[13px] font-[900] text-blue-950 tracking-tight leading-tight font-black">For Male Teachers</div>
                     <div className="flex items-center gap-1.5 mt-1">
                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
                       <span className="text-[9px] font-black text-blue-600/60 uppercase tracking-widest">
-                        {maleJobCount}+ Records
+                        {maleJobCount}+ Jobs
                       </span>
                     </div>
                   </div>
