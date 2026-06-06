@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser, Sparkles, BookOpen, GraduationCap, CheckCircle, LogOut, Settings, Edit3, Save, Bell, ChevronRight, Share2, Filter, X, MessageSquare, ExternalLink, Zap, ArrowRight, Navigation, Check, Sun, Cloud, Moon, Briefcase, BookText, ChevronDown, CreditCard, Heart, Volume2, Play, Info, Clock, MessageCircle, Calendar, Globe, ShieldCheck, TrendingUp, Hash, AlertCircle, Mail, Lock, Camera, Phone, Plus, Trash2, BadgeCheck, LogIn, UserPlus, ChevronLeft, Eye, EyeOff, Smartphone } from 'lucide-react';
 import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc, getDocsFromServer, enableNetwork } from 'firebase/firestore';
-import { db, auth, auth as firebaseAuth } from './firebase';
+import { db, auth, auth as firebaseAuth, getFirebaseApiKey } from './firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
@@ -488,7 +488,12 @@ export default function App() {
           created_time: new Date().toISOString().split('T')[0]
         };
 
-        console.log(`Syncing profile to ${url} with clean schema (omitting photo for stability)...`, profileData);
+        console.log(`🚀 [Profile-Sync] Sending Data for ID ${currentTutorId}:`, {
+           ...profileData,
+           photo: profileData.photo ? `${profileData.photo.substring(0, 30)}...` : 'NONE',
+           selfie: profileData.selfie ? `${profileData.selfie.substring(0, 30)}...` : 'NONE'
+        });
+        
         let data;
         if (isNative) {
           try {
@@ -561,7 +566,7 @@ export default function App() {
         }
       }
       else if (userType === 'parent') {
-        const url = Capacitor.isNativePlatform() ? 'https://doableindia.com/app-sys/api.php' : '/api/profile/parent/update';
+        const url = 'https://doableindia.com/app-sys/api_copy.php';
         
         let currentParentId = localStorage.getItem('tutorId') || ''; // Reusing tutorId key for parent unique ID
         
@@ -1533,10 +1538,24 @@ export default function App() {
 
   useEffect(() => {
     setAlertsLoading(true);
+    let isMounted = true;
+    let fallbackTimeout: any = null;
     
     // 1. Primary Real-time Sync
     const q = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
+    
+    // Safety: If Firestore doesn't return anything in 6 seconds, try REST fallback
+    fallbackTimeout = setTimeout(() => {
+      if (isMounted && alertsLoading && alerts.length === 0) {
+        console.warn('⏱️ Firestore Alerts timeout - Triggering REST Fallback');
+        initializeAlertsFallback();
+      }
+    }, 6000);
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (fallbackTimeout) clearTimeout(fallbackTimeout);
+      if (!isMounted) return;
+
       const data = snapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data(),
@@ -1549,6 +1568,7 @@ export default function App() {
       setAlertsLoading(false);
       setIsServerData(true);
     }, (err) => {
+      if (fallbackTimeout) clearTimeout(fallbackTimeout);
       console.error('Snapshot Error, falling back to REST:', err);
       // 2. Fallback REST Sync (if Firestore listener fails due to network/perms)
       initializeAlertsFallback();
@@ -1556,13 +1576,14 @@ export default function App() {
 
     const initializeAlertsFallback = async () => {
       try {
-        const API_KEY = "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s";
+        const API_KEY = getFirebaseApiKey();
         const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=50&key=${API_KEY}`;
         
+        console.log('📡 Fetching alerts via REST Fallback...');
         const response = await fetch(REST_URL);
         const data = await response.json();
         
-        if (data.documents) {
+        if (data.documents && isMounted) {
           const initialData = data.documents.map((doc: any) => {
             const parts = doc.name.split('/');
             const fields = doc.fields || {};
@@ -1584,13 +1605,19 @@ export default function App() {
           setAlertsLoading(false);
         }
       } catch (e: any) {
-        console.error('Fallback Error:', e);
-        setAlertsLoading(false);
+        if (isMounted) {
+          console.error('Fallback Error:', e);
+          setAlertsLoading(false);
+        }
       }
     };
 
-    return () => unsubscribe();
-  }, [userCity]); // Re-subscribe if userCity changes for filtering logic within listener if needed
+    return () => {
+      isMounted = false;
+      if (fallbackTimeout) clearTimeout(fallbackTimeout);
+      unsubscribe();
+    };
+  }, [userCity]);
 
   const [debugClicks, setDebugClicks] = useState(0);
   const [fcmToken, setFcmToken] = useState<string>(localStorage.getItem('fcmToken') || 'Initializing...');
@@ -3236,7 +3263,20 @@ City: ${userCity}`;
                                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Specific Class</label>
                                <div className="flex flex-wrap gap-2">
                                  {(CLASS_GROUP_MAPPING[currentGroup] || []).map(sub => (
-                                   <button key={sub} onClick={() => { playTapSound(); setUserClasses([currentGroup, sub]); localStorage.setItem('userClasses', JSON.stringify([currentGroup, sub])); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter transition-all", userClasses.includes(sub) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{sub}</button>
+                                   <button 
+                                     key={sub} 
+                                     onClick={() => { 
+                                       playTapSound(); 
+                                       const next = userClasses.includes(sub) 
+                                         ? userClasses.filter(c => c !== sub) 
+                                         : [...userClasses.filter(c => CLASSES_LIST.includes(c)), sub]; 
+                                       setUserClasses(next); 
+                                       localStorage.setItem('userClasses', JSON.stringify(next)); 
+                                     }} 
+                                     className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter transition-all", userClasses.includes(sub) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}
+                                   >
+                                     {sub}
+                                   </button>
                                  ))}
                                </div>
                              </div>
@@ -3852,6 +3892,9 @@ City: ${userCity}`;
                     <DetailItem icon={<Calendar size={12} />} label="Available Days" value={selectedTutor.days || 'All Days'} />
                     <DetailItem icon={<Clock size={12} />} label="Preferred Time" value={selectedTutor.time || 'Flexible'} />
                     <DetailItem icon={<Smartphone size={12} />} label="Own Vehicle" value={selectedTutor.have_vehicle || 'No'} />
+                    <div className="col-span-2">
+                       <DetailItem icon={<MapPin size={12} />} label="Preferred Locations" value={selectedTutor.location.join(', ') || 'All Areas'} />
+                    </div>
                   </div>
 
                   <div className="space-y-3">

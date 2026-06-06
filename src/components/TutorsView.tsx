@@ -55,13 +55,13 @@ export const TutorsView: React.FC<TutorsViewProps> = ({
       <div className="flex flex-col gap-2.5 sticky top-[64px] z-50 bg-white/70 backdrop-blur-md py-2 -mx-5 px-5 no-line sticky-fix border-b border-slate-100/50">
          <div className="flex items-center gap-2">
             <div className="flex-1 relative group">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#191445] transition-colors" size={11} />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#191445] transition-colors" size={14} />
               <input 
                 type="text" 
                 placeholder="Search Name or Tutor ID..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-slate-100 rounded-xl h-9 pl-8 pr-6 text-[7px] placeholder:text-[7px] font-bold focus:outline-none focus:border-primary transition-all shadow-sm"
+                className="w-full bg-white border border-slate-100 rounded-xl h-10 pl-10 pr-8 text-[11px] placeholder:text-[10px] font-bold focus:outline-none focus:border-primary transition-all shadow-sm"
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">

@@ -563,7 +563,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <section className="px-4 space-y-2.5">
             <div className="flex items-center gap-2 px-1 text-left">
               <div className="w-1 h-5 bg-indigo-600 rounded-full" />
-              <h3 className="text-[13px] font-[1000] text-[#0F172A] tracking-tight uppercase tracking-wider">Jobs by Gender</h3>
+              <h3 className="text-[14px] font-bold text-[#0F172A] tracking-tight">Jobs by Gender</h3>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div 
@@ -576,7 +576,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <Venus size={24} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <div className="text-[13px] font-[900] text-rose-950 tracking-tight leading-tight font-black">For Female Teachers</div>
+                    <div className="text-[13px] font-[900] text-rose-950 tracking-tight leading-tight font-black">Female Teachers</div>
                     <div className="flex items-center gap-1.5 mt-1">
                       <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
                       <span className="text-[9px] font-black text-rose-600/60 uppercase tracking-widest">
@@ -596,7 +596,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <Mars size={24} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <div className="text-[13px] font-[900] text-blue-950 tracking-tight leading-tight font-black">For Male Teachers</div>
+                    <div className="text-[13px] font-[900] text-blue-950 tracking-tight leading-tight font-black">Male Teachers</div>
                     <div className="flex items-center gap-1.5 mt-1">
                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
                       <span className="text-[9px] font-black text-blue-600/60 uppercase tracking-widest">
@@ -614,7 +614,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <div className="flex justify-between items-center px-1 text-left">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-4 bg-indigo-500 rounded-full" />
-                <h3 className="text-[13px] font-[1000] text-[#0F172A] tracking-tight uppercase tracking-wider">Jobs by Class Group</h3>
+                <h3 className="text-[14px] font-bold text-[#0F172A] tracking-tight">Jobs by Class Group</h3>
               </div>
               <button onClick={() => setActiveTab('jobs')} className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">
                 All Grades
@@ -658,7 +658,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <div className="flex justify-between items-center px-1 text-left">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-4 bg-purple-500 rounded-full" />
-                <h3 className="text-[13px] font-[1000] text-[#0F172A] tracking-tight uppercase tracking-wider">Jobs by Mode of Teaching</h3>
+                <h3 className="text-[14px] font-bold text-[#0F172A] tracking-tight">Jobs by Mode of Teaching</h3>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -694,7 +694,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <div className="flex items-center justify-between px-1 text-left">
               <div className="flex items-center gap-2">
                 <div className={cn("w-1 h-5 rounded-full", userCity && userCity !== 'All' ? "bg-emerald-500" : "bg-rose-500")} />
-                <h3 className="text-[15px] font-[1000] text-[#0F172A] tracking-tight uppercase tracking-widest">
+                <h3 className="text-[14px] font-bold text-[#0F172A] tracking-tight">
                   {userCity && userCity !== 'All' ? `Jobs in ${userCity}` : 'Popular Cities'}
                 </h3>
               </div>
@@ -721,25 +721,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </div>
                   </div>
                 ))
-              )}
-            </div>
-          </section>
-
-          {/* Latest Jobs (Featured) */}
-          <section className="px-4 space-y-3 pb-12 text-left">
-            <div className="flex justify-between items-center px-1 pt-4">
-              <h3 className="text-[16px] font-[1000] text-[#0F172A] tracking-tight uppercase tracking-widest">Premium Leads</h3>
-              <button onClick={() => setActiveTab('jobs')} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Explore All</button>
-            </div>
-            <div className="space-y-3">
-              {featuredJobs.length > 0 ? (
-                featuredJobs.map((job, idx) => (
-                  <motion.div key={getJobId(job)} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }}>
-                    <JobCard job={job} onClick={onJobClick} isShortlisted={shortlistedIds.includes(getJobId(job))} onShortlistToggle={onShortlistToggle} />
-                  </motion.div>
-                ))
-              ) : (
-                 <div className="py-10 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest bg-white rounded-[32px] border border-dashed border-slate-200">Updating Signals...</div>
               )}
             </div>
           </section>

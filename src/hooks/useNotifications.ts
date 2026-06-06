@@ -8,7 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { db, auth, getFirebaseApiKey } from '../firebase';
 import {
   getWebFCMToken,
   initForegroundMessaging,
@@ -89,7 +89,7 @@ async function saveTokenToFirestore(
     console.log('📝 Attempting to save token (REST Bypass):', sanitizedId);
     
     // Build 265: Use REST API to save token since SDK is hanging
-    const API_KEY = "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s";
+    const API_KEY = getFirebaseApiKey();
     const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/fcm_tokens/${sanitizedId}?key=${API_KEY}`;
     
     // Format for Firestore REST write

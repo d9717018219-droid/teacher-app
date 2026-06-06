@@ -361,6 +361,8 @@ const AlertsView: React.FC<AlertsViewProps> = ({
     const uLocs = (userLocalities || []).map(l => l.toLowerCase().trim());
 
     return (items || []).filter(a => {
+      if (showAllDebug) return true; // Show everything in debug/global mode
+
       const aData = a as any;
       const targetCity = (a.city || aData.City || 'All').toString().toLowerCase().trim();
       if (targetCity !== 'all' && userCityLower !== targetCity) return false;
