@@ -437,15 +437,6 @@ export default function App() {
           currentTutorId = '';
         }
 
-        // Auto-assign new ID if missing (23000+ range)
-        if (!currentTutorId) {
-          // Generate a unique 5-digit ID based on timestamp to avoid collisions
-          const uniqueId = Math.floor(10000 + Math.random() * 90000);
-          currentTutorId = uniqueId.toString();
-          localStorage.setItem('tutorId', currentTutorId);
-          setTutorId(currentTutorId);
-        }
-
         const fullPhone = (userCountryCode + userPhone).replace(/\s+/g, '');
 
         const profileData: any = {
@@ -2825,7 +2816,7 @@ City: ${userCity}`;
           setDebugClicks(prev => prev + 1); 
           if (debugClicks > 3) {
             window.alert(
-              `🔍 DIAGNOSTIC LOG (Build 359)\n\n` +
+              `🔍 DIAGNOSTIC LOG (Build 360)\n\n` +
               `📡 DB Status: ${dbStatus}\n` +
               `💬 FCM Token: ${fcmToken?.substring(0, 20)}...\n` +
               `👤 Role: ${userType}\n` +
