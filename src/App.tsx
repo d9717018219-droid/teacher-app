@@ -2825,7 +2825,7 @@ City: ${userCity}`;
           setDebugClicks(prev => prev + 1); 
           if (debugClicks > 3) {
             window.alert(
-              `🔍 DIAGNOSTIC LOG (Build 354)\n\n` +
+              `🔍 DIAGNOSTIC LOG (Build 359)\n\n` +
               `📡 DB Status: ${dbStatus}\n` +
               `💬 FCM Token: ${fcmToken?.substring(0, 20)}...\n` +
               `👤 Role: ${userType}\n` +
