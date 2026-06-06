@@ -7,6 +7,7 @@ import {
   Crown,
   Flame,
   User,
+  Camera,
   ShieldCheck,
   GraduationCap,
   BookOpen,
@@ -43,12 +44,13 @@ interface EarningsViewProps {
   tutorProfile?: TutorProfile | null;
   allTutors?: TutorProfile[];
   userCity?: string | null;
+  profilePhoto?: string | null;
   playTapSound: () => void;
   onEditProfile: () => void;
   onRequestApproval: () => void;
 }
 
-export const EarningsView: React.FC<EarningsViewProps> = ({ tutorProfile, allTutors = [], userCity, playTapSound, onEditProfile, onRequestApproval }) => {
+export const EarningsView: React.FC<EarningsViewProps> = ({ tutorProfile, allTutors = [], userCity, profilePhoto, playTapSound, onEditProfile, onRequestApproval }) => {
   
   // DEBUG LOG
   React.useEffect(() => {
@@ -190,110 +192,117 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ tutorProfile, allTut
         </div>
       </div>
       
-      {/* SECTION 1: MY PROFESSIONAL IDENTITY (Instagram Style) */}
+      {/* SECTION 1: MY PROFESSIONAL IDENTITY (Premium LinkedIn Style) */}
       <div className="space-y-6">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#FF6B6B] to-[#FFD93D] flex items-center justify-center text-white shadow-lg shadow-orange-100 border border-white overflow-hidden">
+             <div className="w-10 h-10 rounded-2xl bg-[#0077B5] flex items-center justify-center text-white shadow-lg shadow-blue-100 border border-white">
                 <User size={20} strokeWidth={2.5} />
              </div>
              <div className="flex flex-col">
-                <h3 className="text-[16px] font-[1000] text-slate-900 uppercase tracking-tight leading-none">My Identity</h3>
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Social Profile</span>
+                <h3 className="text-[16px] font-[1000] text-slate-900 uppercase tracking-tight leading-none">Professional Identity</h3>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Professional Network</span>
              </div>
           </div>
           <div className="flex flex-col items-end">
-             <div className="bg-slate-100 px-3 py-1 rounded-full flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
-                <span className="text-[9px] font-black text-slate-600 uppercase tracking-tight">{tutorProfile?.city || 'India'}</span>
+             <div className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100 flex items-center gap-1.5 shadow-sm">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-tight">Verified Expert</span>
              </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-[40px] p-6 shadow-2xl shadow-slate-200/50 border border-slate-100 relative overflow-hidden">
-           {/* Instagram Header Layout */}
-           <div className="flex items-center gap-8 mb-6">
-              {/* Profile Pic with "Story" Ring */}
-              <div className="relative shrink-0">
-                 <div className="w-24 h-24 rounded-full p-[3px] bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]">
-                    <div className="w-full h-full rounded-full border-[3px] border-white bg-slate-100 overflow-hidden flex items-center justify-center text-slate-300">
-                       {tutorProfile.photo ? (
-                         <img src={tutorProfile.photo} className="w-full h-full object-cover" alt="Profile" />
-                       ) : (
-                         <User size={40} strokeWidth={1.5} />
-                       )}
-                    </div>
-                 </div>
-                 <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-1 rounded-full border-2 border-white shadow-lg">
-                    <Check size={10} strokeWidth={4} />
-                 </div>
-              </div>
-
-              {/* Metrics */}
-              <div className="flex-1 flex justify-between pr-2">
-                 <div className="text-center space-y-0.5">
-                    <p className="text-[16px] font-black text-slate-900">{filledFieldsCount}</p>
-                    <p className="text-[10px] font-bold text-slate-400">Strength</p>
-                 </div>
-                 <div className="text-center space-y-0.5">
-                    <p className="text-[16px] font-black text-slate-900">{activeTuitions}</p>
-                    <p className="text-[10px] font-bold text-slate-400">Classes</p>
-                 </div>
-                 <div className="text-center space-y-0.5">
-                    <p className="text-[16px] font-black text-slate-900">4.9</p>
-                    <p className="text-[10px] font-bold text-slate-400">Rating</p>
-                 </div>
+        <div className="bg-white rounded-[32px] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative pb-8">
+           {/* Professional Banner */}
+           <div className="h-28 bg-gradient-to-r from-[#1E293B] to-[#0F172A] relative">
+              <div className="absolute inset-0 opacity-10">
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-3xl -mr-16 -mt-16" />
               </div>
            </div>
 
-           {/* Name & Bio Area */}
-           <div className="space-y-4 text-left">
-              <div className="space-y-0.5">
-                 <h4 className="text-[15px] font-[1000] text-slate-900 flex items-center gap-1.5">
-                   {toTitleCase(tutorProfile?.name || '') || 'Verified Tutor'}
-                   <BadgeCheck size={16} className="text-blue-500" fill="currentColor" />
-                 </h4>
-                 <p className="text-[13px] font-bold text-slate-400">Professional Educator</p>
-              </div>
-
-              <div className="space-y-1">
-                 <p className="text-[13px] font-bold text-slate-600 leading-tight">
-                    🎓 {Array.isArray(tutorProfile?.qualification) ? tutorProfile.qualification.join(', ') : (tutorProfile?.qualification || 'Expert')}
-                 </p>
-                 <p className="text-[13px] font-bold text-slate-600">
-                    💼 {tutorProfile?.experience || 'Fresh'} Experience
-                 </p>
-                 <p className="text-[13px] font-bold text-slate-600">
-                    💰 ₹{formatCurrency(tutorProfile?.fee || '0')}/hr Expert Fee
-                 </p>
-                 <p className="text-[13px] font-medium text-slate-500 mt-2 line-clamp-3">
-                    {tutorProfile?.about || 'Professional tutor dedicated to delivering high-quality education and concept-based learning.'}
-                 </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2 pt-2">
-                 <button onClick={() => { playTapSound(); onEditProfile(); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-[11px] uppercase tracking-wider active:scale-95 transition-all shadow-lg shadow-slate-200">Edit Profile</button>
-                 <button onClick={() => { playTapSound(); onRequestApproval(); }} className="flex-1 bg-slate-100 text-slate-900 py-3 rounded-xl font-black text-[11px] uppercase tracking-wider active:scale-95 transition-all">Go Live</button>
-              </div>
-           </div>
-
-           {/* Highlights Grid (The "Academic" Tabs) */}
-           <div className="mt-8 border-t border-slate-50 pt-8">
-              <div className="grid grid-cols-2 gap-3">
-                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 space-y-2">
-                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-indigo-500 shadow-sm">
-                       <BookOpen size={14} />
-                    </div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Main Group</p>
-                    <p className="text-[11px] font-black text-slate-800 leading-tight break-words">{Array.isArray(tutorProfile?.class_group) ? tutorProfile.class_group[0] : (tutorProfile?.class_group || 'All Classes')}</p>
+           {/* Profile Content */}
+           <div className="px-6 relative">
+              {/* Profile Picture Overlap */}
+              <div className="relative -mt-14 mb-5">
+                 <div className="w-28 h-28 rounded-full border-4 border-white bg-slate-100 overflow-hidden shadow-2xl flex items-center justify-center text-slate-300">
+                    {(profilePhoto || tutorProfile.photo) ? (
+                      <img src={profilePhoto || tutorProfile.photo || ''} className="w-full h-full object-cover" alt="Profile" />
+                    ) : (
+                      <User size={48} strokeWidth={1.5} />
+                    )}
                  </div>
-                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 space-y-2">
-                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-emerald-500 shadow-sm">
-                       <Target size={14} />
+                 <div className="absolute bottom-1 right-1 bg-blue-600 text-white p-1.5 rounded-full border-2 border-white shadow-lg">
+                    <BadgeCheck size={14} strokeWidth={3} fill="currentColor" />
+                 </div>
+              </div>
+
+              {/* Identity Details */}
+              <div className="space-y-6">
+                 <div className="space-y-1">
+                    <h4 className="text-[24px] font-[1000] text-slate-900 tracking-tight leading-none">
+                      {toTitleCase(tutorProfile?.name || '') || 'Verified Tutor'}
+                    </h4>
+                    <p className="text-[15px] font-bold text-slate-700 mt-1">Professional Educator • Subject Matter Expert</p>
+                    <div className="flex items-center gap-2 text-[12px] font-bold text-slate-400 mt-2">
+                       <span className="flex items-center gap-1"><MapPin size={12} /> {tutorProfile?.city || 'India'}</span>
+                       <span className="text-[#0077B5] font-black">•</span>
+                       <span className="text-[#0077B5] font-black">Contact Info</span>
                     </div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Top Subject</p>
-                    <p className="text-[11px] font-black text-slate-800 leading-tight break-words">{Array.isArray(tutorProfile?.subjects) ? tutorProfile.subjects[0] : (tutorProfile?.subjects || 'Expert')}</p>
+                 </div>
+
+                 {/* Action Buttons */}
+                 <div className="flex gap-2">
+                    <button onClick={() => { playTapSound(); onEditProfile(); }} className="flex-[1.5] bg-[#0077B5] text-white h-11 rounded-full font-black text-[10px] uppercase tracking-wider active:scale-95 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2">
+                       Open to Opportunities
+                    </button>
+                    <button onClick={() => { playTapSound(); onRequestApproval(); }} className="flex-1 border-2 border-[#0077B5] text-[#0077B5] h-11 rounded-full font-black text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center">
+                       Go Live
+                    </button>
+                 </div>
+
+                 {/* Experience & Education Section */}
+                 <div className="space-y-5 pt-2">
+                    <div className="flex items-start gap-4">
+                       <div className="w-11 h-11 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 shrink-0">
+                          <GraduationCap size={22} />
+                       </div>
+                       <div className="space-y-1 min-w-0">
+                          <p className="text-[13px] font-black text-slate-900 truncate">
+                             {Array.isArray(tutorProfile?.qualification) ? tutorProfile.qualification.join(', ') : (tutorProfile?.qualification || 'Education Detail')}
+                          </p>
+                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Academic Excellence</p>
+                       </div>
+                    </div>
+                    <div className="flex items-start gap-4">
+                       <div className="w-11 h-11 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 shrink-0">
+                          <Briefcase size={22} />
+                       </div>
+                       <div className="space-y-1 min-w-0">
+                          <p className="text-[13px] font-black text-slate-900 truncate">
+                             {tutorProfile?.experience || '0'} Years Experience
+                          </p>
+                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Professional Journey</p>
+                       </div>
+                    </div>
+                    <div className="flex items-start gap-4">
+                       <div className="w-11 h-11 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 shrink-0">
+                          <Target size={22} />
+                       </div>
+                       <div className="space-y-1 min-w-0">
+                          <p className="text-[13px] font-black text-slate-900 truncate">
+                             ₹{formatCurrency(tutorProfile?.fee || '0')}/hr Expert Fee
+                          </p>
+                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Service Valuation</p>
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* About Section */}
+                 <div className="pt-4 border-t border-slate-50">
+                    <h5 className="text-[14px] font-black text-slate-900 mb-2">About</h5>
+                    <p className="text-[13px] font-medium text-slate-600 leading-relaxed line-clamp-4">
+                       {tutorProfile?.about || 'Professional educator committed to student success through personalized learning and clear concept building.'}
+                    </p>
                  </div>
               </div>
            </div>

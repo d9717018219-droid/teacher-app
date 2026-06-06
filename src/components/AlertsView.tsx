@@ -60,7 +60,7 @@ function playTapSound() {
   } catch {}
 }
 
-const DetailItem: React.FC<{ emoji: string; label: string; text: string }> = ({ emoji, label, text }) => {
+const DetailItem = React.memo(({ emoji, label, text }: { emoji: string; label: string; text: string }) => {
   if (!text) return null;
   return (
     <div className="bg-white rounded-[16px] p-3 border border-slate-100 shadow-sm flex items-center gap-3 transition-all hover:border-slate-200">
@@ -73,37 +73,46 @@ const DetailItem: React.FC<{ emoji: string; label: string; text: string }> = ({ 
       </div>
     </div>
   );
-};
+});
 
-const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, onHide }) => {
+const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () => void }) => {
   const msg = (alert.message || (alert as any).Message || '').toString();
   
   // ─── ROBUST MAPPING LOGIC ───
   // Order ID: Handles "Order ID: 123", "#123", "ID 123", etc.
-  const orderIdMatch = msg.match(/(?:Order ID|ID|#)\D*(\d+)/i);
+  const orderIdMatch = msg.match(/(?:Order ID|ID|#)\s*:?\s*#?(\d+)/i);
   const orderId = orderIdMatch ? orderIdMatch[1] : '';
   
-  // Class & Subjects: Handles "📚 10th - Math", "📚 Class 10: Math", etc.
-  const classPart = msg.match(/(?:📚|Class:?)\s*([^-–:\n]+)/i)?.[1]?.trim() || '';
-  const subjectsPart = msg.match(/[–:\n-]\s*([^\n]+)/)?.[1]?.trim() || '';
-  const classInfo = subjectsPart ? `${classPart} – ${subjectsPart}` : classPart;
+  // Class & Subjects: Find the line starting with 📚 or Class:
+  const classLineMatch = msg.match(/(?:📚|Class:?)\s*([^\n🆔📍⏰💰👉⏳🌐]+)/i);
+  let classInfo = '';
+  if (classLineMatch) {
+    const fullLine = classLineMatch[1];
+    const parts = fullLine.split(/[–:-]/);
+    const cp = parts[0]?.trim() || '';
+    const sp = parts.slice(1).join(' – ')?.trim() || '';
+    classInfo = sp ? `${cp} – ${sp}` : cp;
+  }
   
   // Gender: Handles emojis and "Tutor Required"
-  const genderMatch = msg.match(/(?:👩|👩‍🏫|👨‍🏫|👤|Gender:?)\s*([^\n]+?)\s*(?:Tutor Required|Teacher Required|$)/i);
-  const genderInfo = (genderMatch && genderMatch[1]) ? genderMatch[1].trim() : (msg.match(/([^\n]+?)\s*Tutor Required/i)?.[1]?.trim() || 'Any');
+  const genderMatch = msg.match(/(?:👩‍🏫|👨‍🏫|👩|👤|Gender:?)\s*([^\n|]+)/i);
+  let genderInfo = (genderMatch && genderMatch[1]) ? genderMatch[1].trim() : 'Any';
+  // Clean up "Tutor Preferred/Required" suffix
+  genderInfo = genderInfo.replace(/\s*(?:Tutor|Teacher)?\s*(?:Preferred|Required|Needed).*$/i, '').trim();
+  if (!genderInfo || genderInfo.toLowerCase() === 'any') genderInfo = 'Any';
 
   // Location: Handles "📍 Area", "Location: Area"
-  const locationInfo = msg.match(/(?:📍|Location:?)\s*([^\n]+)/i)?.[1]?.trim() || '';
+  const locationInfo = msg.match(/(?:📍|Location:?)\s*([^\n🆔⏰💰👉⏳🌐]+)/i)?.[1]?.trim() || '';
   
   // Schedule: Handles "⏰ Time", "Schedule: Time"
-  const scheduleInfo = msg.match(/(?:⏰|Schedule:?|Time:?)\s*([^\n]+)/i)?.[1]?.trim() || '';
+  const scheduleInfo = msg.match(/(?:⏰|Schedule:?|Time:?)\s*([^\n🆔📍💰👉⏳🌐]+)/i)?.[1]?.trim() || '';
   
   // Fee: Handles "💰 25000", "Fee: 25,000"
   const feeMatch = msg.match(/(?:💰|Fee:?)\D*([0-9,]+)/i);
   const feeInfo = feeMatch ? feeMatch[1] : '';
 
   // Expiry Date
-  const lastDateStr = msg.match(/(?:Last Date|Expiry|Deadline):?\s*([^\n]+)/i)?.[1]?.trim() || '';
+  const lastDateStr = msg.match(/(?:Last Date|Expiry|Deadline|Apply before|Apply by):?\s*([^\n🆔📍⏰💰👉🌐]+)/i)?.[1]?.trim() || '';
 
   // ─── EXPIRY LOGIC ───
   const [isExpired, setIsExpired] = useState(false);
@@ -279,7 +288,7 @@ const JobAlertCard: React.FC<{ alert: Alert; onHide: () => void }> = ({ alert, o
       </div>
     </motion.div>
   );
-};
+});
 
 /**
  * Utility to parse *bold* text in messages

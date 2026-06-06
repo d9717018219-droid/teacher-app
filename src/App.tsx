@@ -198,7 +198,7 @@ export default function App() {
 
       if (responseOk) {
         setActiveToast({ title: 'Status Updated', body: 'Your need is now hidden.' });
-        setTimeout(() => setActiveToast(null), 4000);
+
       }
     } catch (error) {
       console.error('Error hiding need:', error);
@@ -307,7 +307,7 @@ export default function App() {
         loadData();
         setActiveToast({ title: 'Requirement Posted! 🚀', body: 'Tutors can now see your requirement.' });
         setShowConfirmPost(false);
-        setTimeout(() => setActiveToast(null), 5000);
+
       }
     } catch (error) {
       console.error('Error posting requirement:', error);
@@ -345,7 +345,7 @@ export default function App() {
 
     setUserType(null);
     setShowOnboarding(true);
-    setAuthStep('landing');
+    setAuthStep('auth');
     setUserName(null);
     setUserGender('All');
     setUserCity('All');
@@ -557,12 +557,11 @@ export default function App() {
 
           loadData();
           setShowSuccess(true);
-          setActiveToast({ title: 'Success ✅', body: 'Profile updated successfully!' });
           setShowProfileSetup(false);
-          setTimeout(() => setActiveToast(null), 4000);
+  
         } else {
           setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
-          setTimeout(() => setActiveToast(null), 5000);
+  
         }
       }
       else if (userType === 'parent') {
@@ -715,13 +714,12 @@ export default function App() {
 
           loadData(); // Run in background
           setShowSuccess(true);
-          setActiveToast({ title: 'Success ✅', body: 'Your profile has been updated!' });
           setShowProfileSetup(false);
-          setTimeout(() => setActiveToast(null), 4000);
+  
         }
  else {
           setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
-          setTimeout(() => setActiveToast(null), 5000);
+  
         }
       }
     } catch (error: any) {
@@ -824,6 +822,10 @@ export default function App() {
         const base64String = reader.result as string;
         setUserSelfie(base64String);
         localStorage.setItem('userSelfie', base64String);
+        
+        // Also update profilePhoto to ensure it shows up in Account Settings preview
+        setProfilePhoto(base64String);
+        localStorage.setItem('userPhoto', base64String);
       };
       reader.readAsDataURL(file);
     }
@@ -915,7 +917,8 @@ export default function App() {
     }
   }, [activeUser, showOnboarding, userType]);
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
-  const [authStep, setAuthStep] = useState<'landing' | 'selection' | 'auth'>('auth');
+  const [authStep, setAuthStep] = useState<'selection' | 'auth'>('auth');
+  const [isSkipping, setIsSkipping] = useState(false);
   const [emailChecked, setEmailChecked] = useState(false);
   const [isEmailExist, setEmailExist] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -933,13 +936,13 @@ export default function App() {
   // -------------------------------------------------------------
   useEffect(() => {
     if (!activeUser?.email || !userType) {
-      console.log('🔍 [Auto-Fill] Missing activeUser email or userType. Skipping...');
+       // console.log('🔍 [Auto-Fill] Missing activeUser email or userType. Skipping...');
       return;
     }
     
     const lastUpdate = parseInt(localStorage.getItem(`lastProfileUpdate_${activeUser.email}`) || '0');
     if (Date.now() - lastUpdate < 300000) {
-      console.log(`⏳ [Auto-Fill] Skipping for ${activeUser.email} (Recent update detected).`);
+       // console.log(`⏳ [Auto-Fill] Skipping for ${activeUser.email} (Recent update detected).`);
       return;
     }
 
@@ -986,9 +989,9 @@ export default function App() {
 
         if (userLeads.length > 0) {
           lead = userLeads.sort((a, b) => new Date(b['Updated Time'] || (b as any).updated_at || 0).getTime() - new Date(a['Updated Time'] || (a as any).updated_at || 0).getTime())[0];
-          console.log(`✅ [Auto-Fill] Picking Latest Parent Lead:`, lead);
+           // console.log(`✅ [Auto-Fill] Picking Latest Parent Lead:`, lead);
         } else {
-          console.warn(`❌ [Auto-Fill] No parent lead found for email: ${email}`);
+           // console.warn(`❌ [Auto-Fill] No parent lead found for email: ${email}`);
           if (combinedLeads.length > 0) {
             console.log('🔍 [Parent-AutoFill-Debug] Sample emails in combined list:', combinedLeads.slice(0, 10).map(l => (l.email || (l as any).Email || 'MISSING')));
           }
@@ -1123,12 +1126,12 @@ export default function App() {
        // Only clear if the data has actually loaded from the network
        const dataLoaded = (userType === 'teacher' && tutors.length > 0) || (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0));
        if (dataLoaded) {
-          console.warn(`❌ [Auto-Fill] Profile NOT FOUND for ${email}. Clearing ID.`);
+           // console.warn(`❌ [Auto-Fill] Profile NOT FOUND for ${email}. Clearing ID.`);
           setTutorId(null);
           localStorage.removeItem('tutorId');
           setIsTutorFetched(false);
        } else {
-          console.log('⏳ [Auto-Fill] Waiting for network data before clearing...');
+           // console.log('⏳ [Auto-Fill] Waiting for network data before clearing...');
        }
     }
   }, [activeUser, userType, tutors, leads, firestoreLeads]);
@@ -1206,19 +1209,19 @@ export default function App() {
     setAuthError(null);
     try {
       const isNative = Capacitor.isNativePlatform();
-      // Using api_copy.php for strict email existence check via database
-      const url = isNative ? 'https://doableindia.com/app-sys/api_copy.php' : '/api/auth/check';
+      // Use absolute URL to avoid 404 on local dev and ensure connectivity
+      const url = 'https://doableindia.com/app-sys/api_copy.php';
       
       const payload = { 
         action: 'get',
         email, 
-        userType: userType || 'teacher'
+        userType: userType || 'teacher' // Default to teacher if not selected
       };
 
       let responseData;
       if (isNative) {
         const response = await CapacitorHttp.post({
-          url: url,
+          url,
           headers: { 'Content-Type': 'application/json' },
           data: payload
         });
@@ -1232,20 +1235,27 @@ export default function App() {
         responseData = await response.json();
       }
 
-      // Logic: If api_copy.php returns status success, user exists in CRM tables
-      if (responseData.status === 'success') {
+      // Record Found -> Proceed to Password
+      // We check for responseData.data because the live server might return success 
+      // but without data (it just created a blank profile).
+      if (responseData.status === 'success' && responseData.data) {
         setEmailChecked(true);
         setEmailExist(true);
+        // Sync user type from server record
+        if (responseData.data.user_type) {
+           setUserType(responseData.data.user_type === 'parent' ? 'parent' : 'teacher');
+        }
       } else {
-        // User not found in database -> Go to Signup
+        // Record NOT Found or Blank Profile created -> Go to Signup Selection
         playTapSound();
         setAuthMode('signup');
         setAuthStep('selection');
-        setActiveToast({ title: 'New User? ✨', body: 'Please create an account to join DoAble.' });
+        setActiveToast({ title: 'New to DoAble? ✨', body: 'Please select your role to create an account.' });
       }
     } catch (err) {
       console.error('Email Check Error:', err);
-      setAuthError('Connection error. Please try again.');
+      // If server is unreachable, we allow them to proceed as a fallback or show a clear error
+      setAuthError('Unable to connect to server. Please try again.');
     } finally {
       setIsAuthLoading(false);
     }
@@ -1601,7 +1611,7 @@ export default function App() {
     // Safety: If Firestore doesn't return anything in 6 seconds, try REST fallback
     fallbackTimeout = setTimeout(() => {
       if (isMounted && alertsLoading && alerts.length === 0) {
-        console.warn('⏱️ Firestore Alerts timeout - Triggering REST Fallback');
+         // console.warn('⏱️ Firestore Alerts timeout - Triggering REST Fallback');
         initializeAlertsFallback();
       }
     }, 6000);
@@ -1633,7 +1643,7 @@ export default function App() {
         const API_KEY = getFirebaseApiKey();
         const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=50&key=${API_KEY}`;
         
-        console.log('📡 Fetching alerts via REST Fallback...');
+         // console.log('📡 Fetching alerts via REST Fallback...');
         const response = await fetch(REST_URL);
         const data = await response.json();
         
@@ -1701,7 +1711,7 @@ export default function App() {
       const body = payload.notification?.body || payload.data?.body || 'A new update is available in the network.';
 
       setActiveToast({ title, body });
-      setTimeout(() => setActiveToast(null), 6000);
+
       playBlackberrySound();
     };
 
@@ -1858,7 +1868,7 @@ export default function App() {
     if (!normalized.days) {
       const dayKeys = Object.keys(l).filter(k => k.toLowerCase().includes('day') || k.toLowerCase().includes('weekly'));
       if (dayKeys.length > 0) {
-        console.log(`🔍 [Normalize-Lead-Days-Debug] Order #${orderId} missing days. Found potential keys:`, dayKeys.map(k => `${k}: "${l[k]}"`));
+         // console.log(`🔍 [Normalize-Lead-Days-Debug] Order #${orderId} missing days. Found potential keys:`, dayKeys.map(k => `${k}: "${l[k]}"`));
       }
     }
 
@@ -1911,7 +1921,7 @@ City: ${userCity}`;
   };
 
   const loadData = async () => {
-    console.log('🚀 [Data-Loader] STARTING Version: 2.5.0 (Parent-Fix)');
+     // console.log('🚀 [Data-Loader] STARTING Version: 2.5.0 (Parent-Fix)');
     try {
       // Cleanup old bulky localStorage cache if it exists
       if (localStorage.getItem('cachedTutors')) {
@@ -1939,7 +1949,7 @@ City: ${userCity}`;
       const LEADS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_data.php?t=${ts}${emailParam}` : `/api/leads?t=${ts}${emailParam}`;
       const TUTORS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_copy_data.php?force_refresh=${ts}` : `/api/tutors?t=${ts}`;
 
-      console.log('📡 [Network] Fetching Leads from:', LEADS_URL);
+       // console.log('📡 [Network] Fetching Leads from:', LEADS_URL);
 
       if (isNative) {
         // Use native fetch to bypass CORS
@@ -2002,7 +2012,7 @@ City: ${userCity}`;
         if (userType === 'parent') {
           console.log('🔍 [Network-Parent-Debug] Raw API Response for Parent:', leadsJson);
         } else {
-          console.log('🌐 WEB RAW LEADS DATA:', leadsJson);
+           // console.log('🌐 WEB RAW LEADS DATA:', leadsJson);
         }
 
         if (leadsJson.status === 'success') {
@@ -2087,7 +2097,7 @@ City: ${userCity}`;
         if (!user.authentication.idToken) {
           console.error('❌ No idToken in user.authentication');
           setActiveToast({ title: 'Sign-in Error', body: 'idToken missing from Google response.' });
-          setTimeout(() => setActiveToast(null), 6000);
+    
           return;
         }
 
@@ -2099,7 +2109,7 @@ City: ${userCity}`;
         setShowOnboarding(false);
         setShowSuccess(true);
         setActiveToast({ title: 'Welcome! 👋', body: `Signed in as: ${result.user.email}` });
-        setTimeout(() => setActiveToast(null), 4000);
+
       } else {
         console.log('🌐 Web Platform: signInWithPopup starting...');
         const provider = new GoogleAuthProvider();
@@ -2109,7 +2119,7 @@ City: ${userCity}`;
         setShowOnboarding(false);
         setShowSuccess(true);
         setActiveToast({ title: 'Welcome! 👋', body: `Signed in as: ${result.user.email}` });
-        setTimeout(() => setActiveToast(null), 4000);
+
       }
     } catch (err: any) {
       console.error('❌ Sign-in Error:', err);
@@ -2122,7 +2132,7 @@ City: ${userCity}`;
       }
       
       setActiveToast({ title: 'Sign-in Failed', body: errorMsg });
-      setTimeout(() => setActiveToast(null), 6000);
+
       
       if (errorMsg.includes('10:') || errorMsg.includes('DEVELOPER_ERROR')) {
         console.warn('DEBUG HINT: This is usually a SHA-1 or Client ID mismatch in Firebase/Google Console.');
@@ -2449,13 +2459,13 @@ City: ${userCity}`;
       <AnimatePresence>
         {showOnboarding && (
           <div className="fixed inset-0 z-[20000] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/90 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/95" />
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-full max-sm:max-w-sm max-w-sm">
               {authStep === 'selection' ? (
                 <div className="space-y-6 text-center">
                   <div className="flex justify-between items-center px-2">
-                    <button onClick={() => { playTapSound(); setAuthStep('auth'); setAuthMode('signin'); }} className="text-slate-400 hover:text-white/50"><ChevronLeft size={20} /></button>
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Step 1 of 2</p>
+                    <button onClick={() => { playTapSound(); setAuthStep('auth'); }} className="text-slate-400 hover:text-white/50"><ChevronLeft size={20} /></button>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{isSkipping ? 'Quick Setup' : 'Step 1 of 2'}</p>
                     <div className="w-5" />
                   </div>
                   <div className="space-y-2">
@@ -2464,7 +2474,17 @@ City: ${userCity}`;
                   </div>
                   <div className="grid grid-cols-1 gap-4">
                     <button 
-                      onClick={() => { playTapSound(); setUserType('parent'); localStorage.setItem('userType', 'parent'); setAuthStep('auth'); }}
+                      onClick={() => { 
+                        playTapSound(); 
+                        setUserType('parent'); 
+                        localStorage.setItem('userType', 'parent'); 
+                        if (isSkipping) {
+                          setShowOnboarding(false);
+                          setIsSkipping(false);
+                        } else {
+                          setAuthStep('auth'); 
+                        }
+                      }}
                       className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
                     >
                       <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
@@ -2476,7 +2496,17 @@ City: ${userCity}`;
                       </div>
                     </button>
                     <button 
-                      onClick={() => { playTapSound(); setUserType('teacher'); localStorage.setItem('userType', 'teacher'); setAuthStep('auth'); }}
+                      onClick={() => { 
+                        playTapSound(); 
+                        setUserType('teacher'); 
+                        localStorage.setItem('userType', 'teacher'); 
+                        if (isSkipping) {
+                          setShowOnboarding(false);
+                          setIsSkipping(false);
+                        } else {
+                          setAuthStep('auth'); 
+                        }
+                      }}
                       className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
                     >
                       <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
@@ -2496,7 +2526,12 @@ City: ${userCity}`;
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">
                       {authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Create Account' : authMode === 'forgot' ? 'Forgot Password' : 'Reset Password'}
                     </h3>
-                    <div className="w-5" />
+                    <button 
+                      onClick={() => { playTapSound(); setIsSkipping(true); setAuthStep('selection'); }}
+                      className="text-[10px] font-black text-primary hover:text-primary/70 uppercase tracking-widest flex items-center gap-0.5"
+                    >
+                      Skip <ChevronRight size={14} strokeWidth={3} />
+                    </button>
                   </div>
 
                   <div className="space-y-4">
@@ -2835,12 +2870,12 @@ City: ${userCity}`;
         <div className="absolute -top-24 -left-20 w-48 h-48 bg-white/10 blur-3xl rounded-full" />
         <div className="flex flex-col relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
           <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none">DoAble India</span>
-          <span className="text-[7.5px] font-black text-white/80 uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5">
-            Premium Home Tuition Network <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse" /> {debugClicks > 3 && ' [DEBUG ON]'}
+          <span className="text-[8px] font-black text-white/90 tracking-wide mt-1 flex items-center gap-1.5">
+            India's Leading Tuitions Network <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse" /> {debugClicks > 3 && ' [DEBUG ON]'}
           </span>
         </div>
         <div className="flex items-center gap-3 relative z-10">
-             <div className="flex items-center gap-1.5 bg-white/5 backdrop-blur-xl p-0.5 rounded-2xl border border-white/10">
+             <div className="flex items-center gap-1.5 bg-white/10 p-0.5 rounded-2xl border border-white/10">
                 <button
                   onClick={() => { playTapSound(); if (!activeUser) { setAuthMode('signin'); setAuthStep('auth'); setShowOnboarding(true); } else { setShowProfileSetup(true); } }}
                   className="p-1.5 text-white hover:text-white transition-all active:scale-90 flex items-center gap-2 relative"
@@ -3014,6 +3049,7 @@ City: ${userCity}`;
             })}
             allTutors={tutors}
             userCity={userCity}
+            profilePhoto={profilePhoto}
             playTapSound={playTapSound}
             onEditProfile={() => setShowProfileSetup(true)}
             onRequestApproval={() => {
@@ -3694,19 +3730,7 @@ City: ${userCity}`;
                      </div>
                    )}
 
-                   {/* Save Button Inside Content */}
-                   <div className="pt-10 pb-6 border-t border-slate-50">
-                      <button 
-                        onClick={handleUpdateProfile}
-                        disabled={isUpdatingProfile}
-                        className={cn(
-                          "w-full h-16 rounded-[24px] text-white font-black text-[13px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2",
-                          isUpdatingProfile ? "bg-slate-400 cursor-not-allowed" : "bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/20"
-                        )}
-                      >
-                        {isUpdatingProfile ? <Loader2 size={24} className="animate-spin" /> : <>Save All Details <Check size={20} strokeWidth={3} /></>}
-                      </button>
-                   </div>
+
 
                    {/* ─── SECTION 8: SELFIE (TUTOR) ─── */}
                    {userType === 'teacher' && (
@@ -3783,15 +3807,16 @@ City: ${userCity}`;
               <div className="p-6 border-t border-slate-50 bg-white flex items-center gap-3 shrink-0">
                  <button 
                    onClick={handleLogout}
-                   className="flex-1 h-14 rounded-2xl bg-rose-50 text-rose-600 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all border border-rose-100 flex items-center justify-center gap-2"
+                   className="flex-1 h-14 rounded-2xl bg-pink-500 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-pink-200 flex items-center justify-center gap-2"
                  >
                    <LogOut size={16} /> Sign Out
                  </button>
                  <button 
-                   onClick={() => setShowProfileSetup(false)}
-                   className="flex-[1.5] h-14 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+                   onClick={() => { playTapSound(); handleUpdateProfile(); }}
+                   disabled={isUpdatingProfile}
+                   className="flex-[1.5] h-14 rounded-2xl bg-sky-400 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-sky-100 flex items-center justify-center gap-2"
                  >
-                   Close Setup
+                   {isUpdatingProfile ? <Loader2 size={16} className="animate-spin" /> : <>Save Details <Check size={16} strokeWidth={3} /></>}
                  </button>
               </div>
            </div>
@@ -4143,7 +4168,7 @@ City: ${userCity}`;
 function SuccessPop({ show, onComplete }: { show: boolean, onComplete: () => void }) {
   useEffect(() => {
     if (show) {
-      const timer = setTimeout(onComplete, 2200);
+      const timer = setTimeout(onComplete, 1500);
       return () => clearTimeout(timer);
     }
   }, [show, onComplete]);
@@ -4151,40 +4176,20 @@ function SuccessPop({ show, onComplete }: { show: boolean, onComplete: () => voi
   return (
     <AnimatePresence>
       {show && (
-        <div className="fixed inset-0 z-[30000] flex items-center justify-center p-6">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onComplete}
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-          />
-          <motion.div 
-            initial={{ scale: 0.5, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 1.1, opacity: 0, y: -20 }}
-            transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="relative bg-white p-10 rounded-[50px] shadow-2xl flex flex-col items-center gap-6 max-w-xs w-full border-4 border-emerald-50"
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[30000] flex justify-center pointer-events-none w-full max-w-[400px] px-4">
+          <motion.div
+            initial={{ y: -50, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: -50, opacity: 0, scale: 0.9 }}
+            className="bg-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-4 border border-emerald-100 pointer-events-auto w-full"
           >
-            <motion.div 
-              initial={{ scale: 0, rotate: -45 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.1, type: "spring", damping: 12 }}
-              className="w-20 h-20 bg-emerald-500 rounded-[28px] flex items-center justify-center text-white shadow-xl shadow-emerald-200"
-            >
-              <Check size={40} strokeWidth={4} />
-            </motion.div>
-            <div className="text-center space-y-1.5">
-              <h3 className="text-2xl font-[1000] text-slate-900 uppercase tracking-tighter">Done!</h3>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-relaxed">Everything looks <br/>great</p>
+            <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+              <Check size={20} strokeWidth={4} />
             </div>
-            <motion.button 
-              whileTap={{ scale: 0.95 }}
-              onClick={onComplete}
-              className="mt-2 bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest"
-            >
-              Great!
-            </motion.button>
+            <div className="pr-2">
+              <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-tighter">Success ✅</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Changes saved successfully</p>
+            </div>
           </motion.div>
         </div>
       )}
@@ -4193,31 +4198,35 @@ function SuccessPop({ show, onComplete }: { show: boolean, onComplete: () => voi
 }
 
 function FloatingToast({ toast, onClear }: { toast: { title: string, body: string } | null, onClear: () => void }) {
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(onClear, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast, onClear]);
+
   return (
     <AnimatePresence>
       {toast && (
-        <motion.div 
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
-          className="fixed bottom-24 left-4 right-4 z-[25000] flex justify-center pointer-events-none"
-        >
-          <div className="bg-slate-900 text-white p-4 rounded-3xl shadow-2xl flex items-center gap-4 max-w-sm w-full pointer-events-auto border border-white/10 backdrop-blur-md">
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[25000] flex justify-center pointer-events-none w-full max-w-[400px] px-4">
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="bg-slate-900 text-white p-4 rounded-3xl shadow-2xl flex items-center gap-4 w-full pointer-events-auto border border-white/10"
+          >
             <div className={cn(
               "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0",
               toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') ? "bg-rose-500/20 text-rose-500" : "bg-emerald-500/20 text-emerald-500"
             )}>
               {toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-4">
               <h4 className="text-[11px] font-black uppercase tracking-widest leading-none">{toast.title}</h4>
               <p className="text-[10px] font-bold text-slate-400 truncate mt-1.5">{toast.body}</p>
             </div>
-            <button onClick={onClear} className="p-2 text-slate-600 hover:text-white transition-colors">
-              <X size={16} strokeWidth={3} />
-            </button>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

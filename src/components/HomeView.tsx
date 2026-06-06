@@ -75,7 +75,7 @@ const CLASS_GROUP_MAPPING: Record<string, string[]> = {
   'Language': ['Languages', 'IELTS', 'French', 'German', 'Spanish', 'Spoken English']
 };
 
-export const HomeView: React.FC<HomeViewProps> = ({
+export const HomeView = React.memo(({
   userName,
   userType,
   userCity,
@@ -102,8 +102,52 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onClassClick,
   onLocalityClick,
   onGenderClick
-}) => {
+}: HomeViewProps) => {
   const [currentBanner, setCurrentBanner] = React.useState(0);
+
+  // Pre-calculate counts to avoid expensive filtering inside loops
+  const counts = React.useMemo(() => {
+    const jobCounts: Record<string, number> = {};
+    const tutorCounts: Record<string, number> = {};
+    
+    // Class Counts
+    Object.keys(CLASS_GROUP_MAPPING).forEach(group => {
+      const mapped = CLASS_GROUP_MAPPING[group];
+      jobCounts[`job_class_${group}`] = allJobs.filter(l => {
+        const jc = (l.Class || l['Class / Board'] || (l as any).class_group || '').toLowerCase();
+        return jc.includes(group.toLowerCase()) || (mapped && mapped.some(m => jc.includes(m.toLowerCase())));
+      }).length;
+      
+      tutorCounts[`tutor_class_${group}`] = allTutors.filter(t => {
+        const classes = Array.isArray(t.class_group) ? t.class_group : [];
+        return classes.some(c => (c || '').toLowerCase().includes(group.toLowerCase()));
+      }).length;
+    });
+
+    // Mode Counts
+    ['Home Tuition', 'Online Class'].forEach(mode => {
+      const m = mode.toLowerCase().trim();
+      jobCounts[`job_mode_${mode}`] = allJobs.filter(l => {
+        const jm = (l.Mode || (l as any).mode || (l as any)['Mode of Teaching'] || (l as any)['Mode of teaching'] || '').toLowerCase().trim();
+        if (jm.includes('any') || jm.includes('both')) return true;
+        if (m.includes('online')) return jm.includes('online');
+        if (m.includes('home')) return jm.includes('home') || jm.includes('offline') || jm === '';
+        return jm.includes(m);
+      }).length;
+    });
+
+    // Locality Counts (only for current city to keep it fast)
+    localities.forEach(loc => {
+      const searchLoc = loc.toLowerCase().trim();
+      const escapedLoc = searchLoc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
+      
+      jobCounts[`job_loc_${loc}`] = allJobs.filter(l => regex.test((l.Locations || (l as any).location || '').toString().toLowerCase())).length;
+      tutorCounts[`tutor_loc_${loc}`] = allTutors.filter(t => (Array.isArray(t.location) ? t.location.join(', ') : (t.location || '').toString()).toLowerCase().includes(searchLoc)).length;
+    });
+
+    return { jobCounts, tutorCounts };
+  }, [allJobs, allTutors, localities]);
 
   // Dynamic Count Calculations (Tutors)
   const femaleExpertCount = React.useMemo(() => 
@@ -134,66 +178,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
       return hasMale || isAny;
     }).length, 
   [allJobs]);
-
-  const getJobCountForClass = (group: string) => {
-    return (allJobs || []).filter(l => {
-        const jobClass = (l.Class || l['Class / Board'] || (l as any).class_group || '').toLowerCase();
-        if (jobClass.includes(group.toLowerCase())) return true;
-        const mapped = CLASS_GROUP_MAPPING[group];
-        if (mapped && mapped.some(m => jobClass.includes(m.toLowerCase()))) return true;
-        return false;
-    }).length;
-  };
-
-  const getJobCountForLocality = (loc: string) => {
-    const searchLoc = (loc || '').toLowerCase().trim();
-    if (!searchLoc) return 0;
-    
-    // Use word boundaries (\b) for exact matching.
-    // This matches "Sector 1" even if followed by " - Noida" or ",", but NOT "Sector 150".
-    const escapedLoc = searchLoc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
-
-    return (allJobs || []).filter(l => {
-      const jobLocs = (l.Locations || (l as any).location || '').toString().toLowerCase();
-      return regex.test(jobLocs);
-    }).length;
-  };
-
-  const getJobCountForMode = (mode: string) => {
-    const m = mode.toLowerCase().trim();
-    return (allJobs || []).filter(l => {
-      const jobMode = (l.Mode || (l as any).mode || (l as any)['Mode of Teaching'] || (l as any)['Mode of teaching'] || '').toLowerCase().trim();
-      const isOnline = jobMode.includes('online');
-      const isHome = jobMode.includes('home') || jobMode.includes('offline') || jobMode === '';
-      const isAny = jobMode.includes('any') || jobMode.includes('both');
-      
-      if (isAny) return true;
-      if (m.includes('online')) return isOnline;
-      if (m.includes('home')) return isHome;
-      return jobMode.includes(m);
-    }).length;
-  };
-
-  const getTutorCountForClass = (group: string) => {
-    return (allTutors || []).filter(t => {
-      const classes = Array.isArray(t.class_group) ? t.class_group : [];
-      return classes.some(c => (c || '').toLowerCase().includes(group.toLowerCase()));
-    }).length;
-  };
-
-  const getTutorCountForLocality = (loc: string) => {
-    const searchLoc = (loc || '').toLowerCase().trim();
-    if (!searchLoc) return 0;
-    
-    return allTutors.filter(t => {
-      const tutorLocs = Array.isArray(t.location) 
-        ? t.location.join(', ').toLowerCase() 
-        : (t.location || '').toString().toLowerCase();
-        
-      return tutorLocs.includes(searchLoc);
-    }).length;
-  };
 
   const banners = [
     {
@@ -451,7 +435,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 { label: 'NEET/JEE', sub: 'Entrance', match: 'Competitive', color: 'bg-rose-500', bg: 'bg-rose-50/30', border: 'border-rose-100' },
                 { label: 'Languages', sub: 'IELTS/French', match: 'Language', color: 'bg-purple-500', bg: 'bg-rose-50/30', border: 'border-purple-100' }
               ].map((group, i) => {
-                const count = getTutorCountForClass(group.match);
+                const count = counts.tutorCounts[`tutor_class_${group.match}`] || 0;
                 return (
                   <div 
                     key={i}
@@ -463,7 +447,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         setActiveTab('tutors');
                       }
                     }}
-                    className={cn("p-2 rounded-[16px] border flex flex-col items-center text-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm relative overflow-hidden backdrop-blur-md", group.bg, group.border)}
+                    className={cn("p-2 rounded-[16px] border flex flex-col items-center text-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm relative overflow-hidden", group.bg, group.border)}
                   >
                     <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm", group.color)}>
                       <LayoutGrid size={14} strokeWidth={3} />
@@ -503,7 +487,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <div className="grid grid-cols-2 gap-2 text-left">
               {userCity && userCity !== 'All' && (localities || []).length > 0 ? (
                 (localities || []).map((loc, i) => {
-                  const count = getTutorCountForLocality(loc);
+                  const count = counts.tutorCounts[`tutor_loc_${loc}`] || 0;
                   return (
                     <div 
                       key={i}
@@ -630,12 +614,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 { label: 'NEET/JEE', sub: 'Entrance', match: 'Competitive', color: 'bg-rose-500', bg: 'bg-rose-50/30', border: 'border-rose-100', icon: <Zap size={14} strokeWidth={3} /> },
                 { label: 'Language', sub: 'IELTS/FR', match: 'Language', color: 'bg-purple-500', bg: 'bg-rose-50/30', border: 'border-purple-100', icon: <Globe size={14} strokeWidth={3} /> }
               ].map((group, i) => {
-                const count = getJobCountForClass(group.match);
+                const count = counts.jobCounts[`job_class_${group.match}`] || 0;
                 return (
                   <div 
                     key={i}
                     onClick={() => { playTapSound(); onClassClick?.(group.match); }}
-                    className={cn("p-2 rounded-[16px] border flex flex-col items-center text-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm relative overflow-hidden backdrop-blur-md", group.bg, group.border)}
+                    className={cn("p-2 rounded-[16px] border flex flex-col items-center text-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm relative overflow-hidden", group.bg, group.border)}
                   >
                     <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm", group.color)}>
                       {group.icon}
@@ -670,7 +654,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                  <div className="flex flex-col items-center gap-0.5">
                    <span className="text-[12px] font-[1000] tracking-tight text-slate-900 text-rose-600">Home Tuition</span>
                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">
-                     {getJobCountForMode('Home Tuition')}+ Jobs
+                     {counts.jobCounts[`job_mode_Home Tuition`] || 0}+ Jobs
                    </span>
                  </div>
                </div>
@@ -682,7 +666,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                  <div className="flex flex-col items-center gap-0.5">
                    <span className="text-[12px] font-[1000] tracking-tight text-slate-900 text-indigo-600">Online Class</span>
                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600">
-                     {getJobCountForMode('Online Class')}+ Jobs
+                     {counts.jobCounts[`job_mode_Online Class`] || 0}+ Jobs
                    </span>
                  </div>
                </div>
@@ -702,12 +686,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
             <div className="grid grid-cols-2 gap-2 text-left">
               {userCity && userCity !== 'All' ? (
-                [...localities].sort((a, b) => getJobCountForLocality(b) - getJobCountForLocality(a)).map((loc, i) => (
+                [...localities].sort((a, b) => (counts.jobCounts[`job_loc_${b}`] || 0) - (counts.jobCounts[`job_loc_${a}`] || 0)).map((loc, i) => (
                   <div key={i} onClick={() => onLocalityClick?.(loc)} className="bg-white border border-slate-100 rounded-[16px] p-2 flex items-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer hover:border-emerald-200">
                     <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0"><MapPin size={13} strokeWidth={3} /></div>
                     <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
                       <span className="text-[9px] font-[1000] text-slate-800 truncate leading-tight block">{loc}</span>
-                      <span className="text-[7.5px] font-black text-emerald-600/70 uppercase truncate">{getJobCountForLocality(loc)}+ Jobs</span>
+                      <span className="text-[7.5px] font-black text-emerald-600/70 uppercase truncate">{counts.jobCounts[`job_loc_${loc}`] || 0}+ Jobs</span>
                     </div>
                   </div>
                 ))
@@ -728,7 +712,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default HomeView;
 
