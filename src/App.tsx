@@ -2868,11 +2868,14 @@ City: ${userCity}`;
 
       <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#F97316] to-[#EC4899] px-5 pb-3 flex items-center justify-between shadow-[0_10px_40px_rgba(249,115,22,0.3)] border-b border-white/10 relative overflow-hidden pt-[calc(0.6rem+var(--safe-area-top,20px))]">
         <div className="absolute -top-24 -left-20 w-48 h-48 bg-white/10 blur-3xl rounded-full" />
-        <div className="flex flex-col relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
-          <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none">DoAble India</span>
-          <span className="text-[8px] font-black text-white/90 tracking-wide mt-1 flex items-center gap-1.5">
-            India's Leading Tuitions Network <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse" /> {debugClicks > 3 && ' [DEBUG ON]'}
-          </span>
+        <div className="flex items-center gap-3 relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
+          <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl shadow-lg border border-white/20 object-cover" />
+          <div className="flex flex-col">
+            <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none">DoAble India</span>
+            <span className="text-[8px] font-black text-white/90 tracking-wide mt-1 flex items-center gap-1.5">
+              India's Leading Tuitions Network <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse" /> {debugClicks > 3 && ' [DEBUG ON]'}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-3 relative z-10">
              <div className="flex items-center gap-1.5 bg-white/10 p-0.5 rounded-2xl border border-white/10">
