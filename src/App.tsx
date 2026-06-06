@@ -1263,90 +1263,7 @@ export default function App() {
     }
   };
 
-  const handleEmailSignIn = async () => {
-    if (!email || !password) {
-      setAuthError('Please enter both email and password.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/signin';
-      
-      let data;
-      if (isNative) {
-        const payload = { 
-          action: 'signin',
-          email, 
-          password,
-          userType: userType || 'teacher'
-        };
-
-        const response = await CapacitorHttp.post({
-          url: url,
-          headers: {
-            'Content-Type': 'application/json'
-          },          data: payload
-        });
-        
-        console.log('📡 Auth Response:', url, response.status, JSON.stringify(response.data));
-
-        if (response.status >= 500) {
-           setAuthError(`Server Error (${response.status}).`);
-           setIsAuthLoading(false);
-           return;
-        }
-
-        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      } else {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },          body: JSON.stringify({ 
-            action: 'signin', 
-            email, 
-            password,
-            userType: userType || 'teacher'
-          })
-        });
-        data = await response.json();
-      }
-      
-      if (data.status === 'success') {
-        const userData = { email: data.user.email, userType: data.user.userType, uid: data.user.id };
-        setCustomUser(userData);
-        localStorage.setItem('customUser', JSON.stringify(userData));
-        setUserType(data.user.userType);
-        localStorage.setItem('userType', data.user.userType);
-
-        // Force refresh: Clear any update locks and fetch fresh data from CRM
-        localStorage.removeItem('lastProfileUpdate');
-        
-        // Load data in background without blocking UI
-        setTimeout(() => {
-          loadData();
-        }, 10);
-
-        playTapSound();
-        setShowOnboarding(false);
-
-        setActiveToast({ title: 'Welcome Back! 👋', body: `Signed in as ${data.user.email}` });
-        setShowProfileSetup(false);
-        setShowOnboarding(false);
-      } else {
-        setAuthError(data.message || 'Invalid email or password.');
-      }
-    } catch (error: any) {
-      console.error('Sign In Error:', error);
-      setAuthError('Connection error. Please try again.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleEmailSignUp = async () => {
+  const handleAuth = async () => {
     if (!email || !password) {
       setAuthError('Please enter both email and password.');
       return;
@@ -1359,64 +1276,58 @@ export default function App() {
     setAuthError(null);
     try {
       const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/signup';
-
+      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/login';
+      
       let data;
-      if (isNative) {
-        const payload = { 
-          action: 'signup',
-          email, 
-          password, 
-          userType: userType || 'teacher' 
-        };
+      const payload = { 
+        action: 'login', // Server automatically handles signup if user doesn't exist
+        email, 
+        password,
+        userType: userType || 'teacher'
+      };
 
+      if (isNative) {
         const response = await CapacitorHttp.post({
           url: url,
-          headers: {
-            'Content-Type': 'application/json'
-          },          data: payload
+          headers: { 'Content-Type': 'application/json' },
+          data: payload
         });
-        
         console.log('📡 Auth Response:', url, response.status, JSON.stringify(response.data));
-
-        if (response.status >= 500) {
-           setAuthError(`Server Error (${response.status}).`);
-           setIsAuthLoading(false);
-           return;
-        }
-
         data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
       } else {
         const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },          body: JSON.stringify({ 
-            action: 'signup', 
-            email, 
-            password, 
-            userType: userType || 'teacher' 
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
         data = await response.json();
       }
-
+      
       if (data.status === 'success') {
-        const userData = { email: email, userType: userType || 'teacher', uid: data.userId };
+        const userData = { email: data.user?.email || email, userType: data.user?.userType || userType || 'teacher', uid: data.user?.id || data.userId };
         setCustomUser(userData);
         localStorage.setItem('customUser', JSON.stringify(userData));
-        setUserType(userType || 'teacher');
-        localStorage.setItem('userType', userType || 'teacher');
+        setUserType(userData.userType);
+        localStorage.setItem('userType', userData.userType);
+
+        // Force refresh: Clear any update locks and fetch fresh data from CRM
+        localStorage.removeItem('lastProfileUpdate');
+        setTimeout(() => { loadData(); }, 10);
+
         playTapSound();
-        setShowSuccess(true);
-        setActiveToast({ title: 'Welcome! 🎊', body: 'Your account has been created.' });
-        setShowProfileSetup(true); // Open profile setup for new users
         setShowOnboarding(false);
+        setActiveToast({ title: 'Welcome! ✨', body: data.message || `Logged in as ${userData.email}` });
+        
+        if (data.isNew || data.message?.toLowerCase().includes('created')) {
+           setShowProfileSetup(true);
+        } else {
+           setShowProfileSetup(false);
+        }
       } else {
-        setAuthError(data.message || 'Failed to sign up.');
+        setAuthError(data.message || 'Authentication failed.');
       }
     } catch (error: any) {
-      console.error('Sign Up Error:', error);
+      console.error('Auth Error:', error);
       setAuthError('Connection error. Please try again.');
     } finally {
       setIsAuthLoading(false);
@@ -2563,28 +2474,24 @@ City: ${userCity}`;
                             <input 
                               type="email" 
                               value={email} 
-                              onChange={(e) => { setEmail(e.target.value); setEmailChecked(false); }} 
+                              onChange={(e) => { setEmail(e.target.value); }} 
                               placeholder="name@example.com" 
-                              className={cn("w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all", emailChecked && authMode === 'signin' && "opacity-50")} 
-                              readOnly={emailChecked && authMode === 'signin'}
+                              className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all"
                             />
-                            {emailChecked && authMode === 'signin' && (
-                              <button onClick={() => { setEmailChecked(false); setPassword(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-primary uppercase tracking-widest">Change</button>
-                            )}
                           </div>
                         </div>
 
-                        {((authMode === 'signin' && emailChecked) || authMode === 'signup') && authMode !== 'forgot' && (
-                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-1.5 overflow-hidden">
+                        {authMode !== 'forgot' && (
+                          <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Password</label>
                             <div className="relative">
                               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" autoFocus />
+                              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                                 {showPassword ? <Eye size={18} strokeWidth={2.5} /> : <EyeOff size={18} strokeWidth={2.5} />}
                               </button>
                             </div>
-                          </motion.div>
+                          </div>
                         )}
                       </>
                     ) : (
@@ -2626,20 +2533,18 @@ City: ${userCity}`;
 
                     <button 
                       onClick={
-                        authMode === 'signin' 
-                          ? (emailChecked ? handleEmailSignIn : handleEmailProceed) 
-                          : authMode === 'signup' 
-                            ? handleEmailSignUp 
-                            : authMode === 'forgot' 
-                              ? handleForgotPassword 
-                              : handleResetPassword
+                        authMode === 'signin' || authMode === 'signup'
+                          ? handleAuth 
+                          : authMode === 'forgot' 
+                            ? handleForgotPassword 
+                            : handleResetPassword
                       }
                       disabled={isAuthLoading}
                       className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                       {isAuthLoading ? <Loader2 size={16} className="animate-spin" /> : (
                         authMode === 'signin' 
-                          ? (emailChecked ? 'Sign In' : 'Proceed') 
+                          ? 'Sign In' 
                           : authMode === 'signup' 
                             ? 'Sign Up' 
                             : authMode === 'forgot' 
@@ -2651,12 +2556,13 @@ City: ${userCity}`;
                     <div className="flex flex-col gap-3 pt-2">
                       {authMode === 'signin' && (
                         <>
-                          {emailChecked && (
-                            <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Forgot Password?</button>
-                          )}
+                          <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Forgot Password?</button>
                           <div className="h-px bg-slate-100 w-full" />
-                          <button onClick={() => { playTapSound(); setAuthMode('signup'); setAuthStep('selection'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
+                          <button onClick={() => { playTapSound(); setAuthMode('signup'); setAuthStep('selection'); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
                         </>
+                      )}
+                      {authMode === 'signup' && (
+                         <button onClick={() => { playTapSound(); setAuthMode('signin'); setAuthStep('auth'); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">Already have an account? <span className="text-primary underline">Sign In</span></button>
                       )}
                       {(authMode === 'forgot' || authMode === 'reset') && (
                         <button onClick={() => { setAuthMode('signin'); setAuthError(null); setAuthStep('auth'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Back to <span className="text-primary underline">Sign In</span></button>
