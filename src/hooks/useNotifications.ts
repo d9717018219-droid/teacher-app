@@ -82,7 +82,7 @@ async function saveTokenToFirestore(
       gender: gender || 'Any',
       targetClass: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All',
       targetUserType: userType || 'all',
-      appVersion: '345.1.2',
+      appVersion: '345.1.3',
       lastSeen: timestamp
     };
 

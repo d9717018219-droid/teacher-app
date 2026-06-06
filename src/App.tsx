@@ -1705,6 +1705,9 @@ export default function App() {
     const handleForegroundPush = (e: any) => {
       console.log('🔔 Foreground Notification Event:', e.detail);
       setUnseenAlertsCount(prev => prev + 1);
+      
+      // Build 348: Force refresh alerts from server when notification arrives
+      fetchAlertsFromServer();
 
       const payload = e.detail;
       const title = payload.notification?.title || payload.data?.title || 'New Alert 📢';
@@ -1718,9 +1721,18 @@ export default function App() {
     window.addEventListener('fcmTokenUpdated', handleTokenUpdate);
     window.addEventListener('firebaseNotification', handleForegroundPush);
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('🔄 App foregrounded - refreshing alerts...');
+        fetchAlertsFromServer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       window.removeEventListener('fcmTokenUpdated', handleTokenUpdate);
       window.removeEventListener('firebaseNotification', handleForegroundPush);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [userCity]);
 

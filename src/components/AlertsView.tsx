@@ -454,6 +454,17 @@ const AlertsView: React.FC<AlertsViewProps> = ({
             <Bell size={12} /> Live Alerts ({filteredAlerts.length})
           </div>
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => {
+                if (window.confirm('This will clear local cache and reload the app to fix sync issues. Proceed?')) {
+                  forceResetFirestore();
+                }
+              }}
+              className="bg-slate-100 text-slate-400 p-2 rounded-xl active:scale-95 transition-all"
+              title="Reset Cache"
+            >
+              <Zap size={14} />
+            </button>
             {onRefresh && (
               <button onClick={() => { playTapSound(); onRefresh(); }} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-md">Refresh</button>
             )}
