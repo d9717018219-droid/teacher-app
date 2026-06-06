@@ -26,7 +26,13 @@ const firebaseConfig = Capacitor.getPlatform() === 'ios' ? iosConfig : webConfig
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Build 351: Disable local cache persistence to avoid stale alerts on iOS
+// Using memory-only cache ensures we don't read from an old offline disk cache.
+import { initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+export const db = initializeFirestore(app, {
+  localCache: { kind: 'memory' }
+});
 
 // Helper to get current API Key for REST fallbacks
 export const getFirebaseApiKey = () => firebaseConfig.apiKey;

@@ -1608,6 +1608,9 @@ export default function App() {
     // 1. Primary Real-time Sync
     const q = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
     
+    // Build 351: Force initial server fetch to ensure we aren't showing cached data
+    fetchAlertsFromServer();
+
     // Safety: If Firestore doesn't return anything in 6 seconds, try REST fallback
     fallbackTimeout = setTimeout(() => {
       if (isMounted && alertsLoading && alerts.length === 0) {
