@@ -1278,31 +1278,40 @@ export default function App() {
       const isNative = Capacitor.isNativePlatform();
       const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/login';
       
-      let data;
-      const payload = { 
-        action: 'login', // Server automatically handles signup if user doesn't exist
-        email, 
-        password,
-        userType: userType || 'teacher'
+      const tryAction = async (actionType: 'signin' | 'signup') => {
+        const payload = { 
+          action: actionType,
+          email, 
+          password,
+          userType: userType || 'teacher'
+        };
+
+        if (isNative) {
+          const response = await CapacitorHttp.post({
+            url: url,
+            headers: { 'Content-Type': 'application/json' },
+            data: payload
+          });
+          return typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+        } else {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          return await response.json();
+        }
       };
 
-      if (isNative) {
-        const response = await CapacitorHttp.post({
-          url: url,
-          headers: { 'Content-Type': 'application/json' },
-          data: payload
-        });
-        console.log('📡 Auth Response:', url, response.status, JSON.stringify(response.data));
-        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      } else {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        data = await response.json();
-      }
+      // 1. Try to Sign In
+      let data = await tryAction('signin');
       
+      // 2. If email not found, try to Sign Up automatically
+      if (data.status === 'error' && (data.message?.toLowerCase().includes('not found') || data.message?.toLowerCase().includes('sign up first'))) {
+        console.log('📝 Email not found, attempting auto-signup...');
+        data = await tryAction('signup');
+      }
+
       if (data.status === 'success') {
         const userData = { email: data.user?.email || email, userType: data.user?.userType || userType || 'teacher', uid: data.user?.id || data.userId };
         setCustomUser(userData);
