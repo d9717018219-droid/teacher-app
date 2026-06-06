@@ -14,7 +14,7 @@ const config: CapacitorConfig = {
       forceCodeForRefreshToken: true,
     },
     PushNotifications: {
-      presentationOptions: ["badge", "sound"],
+      presentationOptions: ["badge", "sound", "alert"],
     },
     CapacitorHttp: {
       enabled: false,

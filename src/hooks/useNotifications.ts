@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { FCM } from '@capacitor-community/fcm';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, getFirebaseApiKey } from '../firebase';
 import {
@@ -81,7 +82,7 @@ async function saveTokenToFirestore(
       gender: gender || 'Any',
       targetClass: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All',
       targetUserType: userType || 'all',
-      appVersion: '1.13.0',
+      appVersion: '345.1.1',
       lastSeen: timestamp
     };
 
@@ -146,8 +147,21 @@ async function setupCapacitorPushNotifications(
       await PushNotifications.addListener(
         'registration',
         async (token) => {
-          const fcmToken = token.value;
+          let fcmToken = token.value;
           console.log('🚀 RAW TOKEN RECEIVED:', fcmToken);
+          
+          // Build 346: Force FCM Token on iOS
+          if (Capacitor.getPlatform() === 'ios') {
+            try {
+              const fcmRes = await FCM.getToken();
+              if (fcmRes.token) {
+                fcmToken = fcmRes.token;
+                console.log('✅ FCM TOKEN (iOS):', fcmToken);
+              }
+            } catch (e) {
+              console.error('❌ FCM GetToken Error:', e);
+            }
+          }
           
           if (fcmToken && fcmToken.length > 10) {
             console.log('✅ Valid Token Format');
