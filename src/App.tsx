@@ -916,6 +916,8 @@ export default function App() {
   }, [activeUser, showOnboarding, userType]);
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
   const [authStep, setAuthStep] = useState<'landing' | 'selection' | 'auth'>('auth');
+  const [emailChecked, setEmailChecked] = useState(false);
+  const [isEmailExist, setEmailExist] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const [tutorStatus, setTutorStatus] = useState<'registered' | 'new' | null>(null);
@@ -994,7 +996,7 @@ export default function App() {
       }
 
       if (lead) {
-        console.log(`🚀 [Auto-Fill-Audit] STARTING state updates for ID: ${lead.order_id || lead['Order ID']}`);
+        // console.log(`🚀 [Auto-Fill-Audit] STARTING state updates for ID: ${lead.order_id || lead['Order ID']}`);
         
         // NEW: Bulletproof Case-Insensitive Extractor
         const getVal = (obj: any, keys: string[], fallback: string = '') => {
@@ -1002,17 +1004,17 @@ export default function App() {
           for (const searchKey of keys) {
             // 1. Try exact match
             if (obj[searchKey] !== undefined && obj[searchKey] !== null && obj[searchKey] !== '' && obj[searchKey] !== 'undefined') {
-              console.log(`✅ [Auto-Fill-Audit] EXACT Key "${searchKey}" matched: "${obj[searchKey]}"`);
+              // console.log(`✅ [Auto-Fill-Audit] EXACT Key "${searchKey}" matched: "${obj[searchKey]}"`);
               return obj[searchKey];
             }
             // 2. Try case-insensitive match
             const foundKey = objKeys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === searchKey.toLowerCase().replace(/[^a-z0-9]/g, ''));
             if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== '' && obj[foundKey] !== 'undefined') {
-               console.log(`✅ [Auto-Fill-Audit] FUZZY Key "${foundKey}" matched for "${searchKey}": "${obj[foundKey]}"`);
+               // console.log(`✅ [Auto-Fill-Audit] FUZZY Key "${foundKey}" matched for "${searchKey}": "${obj[foundKey]}"`);
                return obj[foundKey];
             }
           }
-          console.log(`❌ [Auto-Fill-Audit] FAILED to match any keys for: ${keys.join(', ')}`);
+          // console.log(`❌ [Auto-Fill-Audit] FAILED to match any keys for: ${keys.join(', ')}`);
           return fallback;
         };
 
@@ -1039,7 +1041,7 @@ export default function App() {
         const vehicle = getVal(lead, ['have_vehicle', 'vehicle', 'Vehicle']);
         const schoolExp = getVal(lead, ['school_teacher', 'school_exp', 'School_Teacher']);
 
-        console.log(`📊 [Auto-Fill-Audit] FINAL Extracted: Name=${fullName}, ID=${foundId}, Email=${emailVal}`);
+        // console.log(`📊 [Auto-Fill-Audit] FINAL Extracted: Name=${fullName}, ID=${foundId}, Email=${emailVal}`);
 
         if (fullName) {
           const parts = fullName.trim().split(/\s+/);
@@ -1193,6 +1195,60 @@ export default function App() {
       }
       setIsFetchingTutor(false);
     }, 800);
+  };
+
+  const handleEmailProceed = async () => {
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      setAuthError('Please enter a valid email address.');
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      // Using api_copy.php for strict email existence check via database
+      const url = isNative ? 'https://doableindia.com/app-sys/api_copy.php' : '/api/auth/check';
+      
+      const payload = { 
+        action: 'get',
+        email, 
+        userType: userType || 'teacher'
+      };
+
+      let responseData;
+      if (isNative) {
+        const response = await CapacitorHttp.post({
+          url: url,
+          headers: { 'Content-Type': 'application/json' },
+          data: payload
+        });
+        responseData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      } else {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        responseData = await response.json();
+      }
+
+      // Logic: If api_copy.php returns status success, user exists in CRM tables
+      if (responseData.status === 'success') {
+        setEmailChecked(true);
+        setEmailExist(true);
+      } else {
+        // User not found in database -> Go to Signup
+        playTapSound();
+        setAuthMode('signup');
+        setAuthStep('selection');
+        setActiveToast({ title: 'New User? ✨', body: 'Please create an account to join DoAble.' });
+      }
+    } catch (err) {
+      console.error('Email Check Error:', err);
+      setAuthError('Connection error. Please try again.');
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
   const handleEmailSignIn = async () => {
@@ -1528,8 +1584,6 @@ export default function App() {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Alert[];
       setAlerts(data);
       setAlertsLoading(false);
-      if (data.length === 0) console.log('No alerts found on SERVER.');
-      else console.log(`Loaded ${data.length} alerts from SERVER.`);
     } catch (e: any) {
       console.error('Server Fetch Error: ' + e.message);
       setAlertsLoading(false);
@@ -1563,7 +1617,7 @@ export default function App() {
         timestamp: (doc.data() as any).timestamp?.toDate?.() || new Date((doc.data() as any).timestamp || Date.now())
       })) as Alert[];
       
-      console.log(`SYNC_SUCCESS: ${data.length} alerts.`);
+      // console.log(`SYNC_SUCCESS: ${data.length} alerts.`);
       setAlerts(data);
       setAlertsLoading(false);
       setIsServerData(true);
@@ -2452,21 +2506,31 @@ City: ${userCity}`;
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Email Address</label>
                           <div className="relative">
                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                            <input 
+                              type="email" 
+                              value={email} 
+                              onChange={(e) => { setEmail(e.target.value); setEmailChecked(false); }} 
+                              placeholder="name@example.com" 
+                              className={cn("w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all", emailChecked && authMode === 'signin' && "opacity-50")} 
+                              readOnly={emailChecked && authMode === 'signin'}
+                            />
+                            {emailChecked && authMode === 'signin' && (
+                              <button onClick={() => { setEmailChecked(false); setPassword(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-primary uppercase tracking-widest">Change</button>
+                            )}
                           </div>
                         </div>
 
-                        {authMode !== 'forgot' && (
-                          <div className="space-y-1.5">
+                        {((authMode === 'signin' && emailChecked) || authMode === 'signup') && authMode !== 'forgot' && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-1.5 overflow-hidden">
                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Password</label>
                             <div className="relative">
                               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" autoFocus />
                               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                                 {showPassword ? <Eye size={18} strokeWidth={2.5} /> : <EyeOff size={18} strokeWidth={2.5} />}
                               </button>
                             </div>
-                          </div>
+                          </motion.div>
                         )}
                       </>
                     ) : (
@@ -2507,23 +2571,41 @@ City: ${userCity}`;
                     {authError && <div className="text-rose-500 text-[10px] font-bold px-1 flex items-center gap-1.5"><AlertCircle size={12} /> {authError}</div>}
 
                     <button 
-                      onClick={authMode === 'signin' ? handleEmailSignIn : authMode === 'signup' ? handleEmailSignUp : authMode === 'forgot' ? handleForgotPassword : handleResetPassword}
+                      onClick={
+                        authMode === 'signin' 
+                          ? (emailChecked ? handleEmailSignIn : handleEmailProceed) 
+                          : authMode === 'signup' 
+                            ? handleEmailSignUp 
+                            : authMode === 'forgot' 
+                              ? handleForgotPassword 
+                              : handleResetPassword
+                      }
                       disabled={isAuthLoading}
                       className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
-                      {isAuthLoading ? <Loader2 size={16} className="animate-spin" /> : (authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Sign Up' : authMode === 'forgot' ? 'Send PIN' : 'Verify & Reset')}
+                      {isAuthLoading ? <Loader2 size={16} className="animate-spin" /> : (
+                        authMode === 'signin' 
+                          ? (emailChecked ? 'Sign In' : 'Proceed') 
+                          : authMode === 'signup' 
+                            ? 'Sign Up' 
+                            : authMode === 'forgot' 
+                              ? 'Send PIN' 
+                              : 'Verify & Reset'
+                      )}
                     </button>
 
                     <div className="flex flex-col gap-3 pt-2">
                       {authMode === 'signin' && (
                         <>
-                          <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Forgot Password?</button>
+                          {emailChecked && (
+                            <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Forgot Password?</button>
+                          )}
                           <div className="h-px bg-slate-100 w-full" />
-                          <button onClick={() => { playTapSound(); setAuthMode('signup'); setAuthStep('selection'); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
+                          <button onClick={() => { playTapSound(); setAuthMode('signup'); setAuthStep('selection'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
                         </>
                       )}
                       {(authMode === 'forgot' || authMode === 'reset') && (
-                        <button onClick={() => { setAuthMode('signin'); setAuthError(null); setAuthStep('auth'); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Back to <span className="text-primary underline">Sign In</span></button>
+                        <button onClick={() => { setAuthMode('signin'); setAuthError(null); setAuthStep('auth'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Back to <span className="text-primary underline">Sign In</span></button>
                       )}
                     </div>
                   </div>
