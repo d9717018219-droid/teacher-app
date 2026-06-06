@@ -1727,6 +1727,8 @@ export default function App() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         console.log('🔄 App foregrounded - refreshing alerts...');
+        // Build 354: Force Firestore reconnect on foreground
+        enableNetwork(db).catch(() => {});
         fetchAlertsFromServer();
       }
     };
@@ -1737,7 +1739,7 @@ export default function App() {
       window.removeEventListener('firebaseNotification', handleForegroundPush);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [userCity]);
+  }, [userCity, userType, userGender, fcmToken, dbStatus, alerts.length]);
 
   const testAlertSound = async () => {
     try {
@@ -2883,7 +2885,22 @@ City: ${userCity}`;
 
       <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#F97316] to-[#EC4899] px-5 pb-3 flex items-center justify-between shadow-[0_10px_40px_rgba(249,115,22,0.3)] border-b border-white/10 relative overflow-hidden pt-[calc(0.6rem+var(--safe-area-top,20px))]">
         <div className="absolute -top-24 -left-20 w-48 h-48 bg-white/10 blur-3xl rounded-full" />
-        <div className="flex flex-col relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
+        <div className="flex flex-col relative z-10" onClick={() => { 
+          setDebugClicks(prev => prev + 1); 
+          if (debugClicks > 3) {
+            window.alert(
+              `🔍 DIAGNOSTIC LOG (Build 354)\n\n` +
+              `📡 DB Status: ${dbStatus}\n` +
+              `💬 FCM Token: ${fcmToken?.substring(0, 20)}...\n` +
+              `👤 Role: ${userType}\n` +
+              `📍 City: ${userCity}\n` +
+              `👫 Gender: ${userGender}\n` +
+              `📚 Classes: ${userClasses?.join(', ')}\n` +
+              `🔔 Total Alerts: ${alerts.length}\n` +
+              `📧 User: ${activeUser?.email}`
+            );
+          }
+        }}>
           <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none">DoAble India</span>
           <span className="text-[8px] font-black text-white/90 tracking-wide mt-1 flex items-center gap-1.5">
             India's Leading Tuitions Network <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse" /> {debugClicks > 3 && ' [DEBUG ON]'}
