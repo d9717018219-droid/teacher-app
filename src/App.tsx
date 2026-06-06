@@ -490,12 +490,19 @@ export default function App() {
           created_time: new Date().toISOString().split('T')[0]
         };
 
-        console.log(`🚀 [Profile-Sync] Sending Data for ID ${currentTutorId}:`, {
-           ...profileData,
-           photo: profileData.photo ? `${profileData.photo.substring(0, 30)}...` : 'NONE',
-           selfie: profileData.selfie ? `${profileData.selfie.substring(0, 30)}...` : 'NONE'
-        });
+        console.log(`🚀 [Profile-Sync] Sending Data for ID ${currentTutorId}:`, profileData);
         
+        // Build 357: Show diagnostic alert for debugging missing fields
+        if (debugClicks > 3) {
+          window.alert('DIAGNOSTIC: Sending to CRM\n' + JSON.stringify({
+            city: profileData.city,
+            gender: profileData.gender,
+            classes: profileData.class_group,
+            subjects: profileData.subjects,
+            phone: profileData.phone
+          }, null, 2));
+        }
+
         let data;
         if (isNative) {
           try {
@@ -644,6 +651,18 @@ export default function App() {
         };
 
         console.log(`Syncing parent profile to ${url}...`, parentData);
+        
+        // Build 357: Diagnostic alert for parents
+        if (debugClicks > 3) {
+          window.alert('DIAGNOSTIC (Parent): Sending to CRM\n' + JSON.stringify({
+            city: parentData.city,
+            locality: parentData.locality,
+            class: parentData.Class,
+            subjects: parentData.Subjects,
+            phone: parentData.phone
+          }, null, 2));
+        }
+
         let data;
         if (isNative) {
           const response = await CapacitorHttp.post({
