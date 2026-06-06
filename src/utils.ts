@@ -144,14 +144,15 @@ export function calculateProfileCompletion(userData: any, userType: 'parent' | '
   
   // Role-specific fields
   const teacherSpecific = ['dob', 'age', 'qualification', 'experience', 'communication', 'days', 'time', 'about', 'aadhar', 'address'];
-  // board, residency and about are optional for parents, so they are not included here to prevent blocking 100%
-  const parentSpecific = ['days', 'time', 'duration'];
+  const parentSpecific = ['days', 'time', 'duration', 'city', 'localities'];
 
-  // Conditional fields (Only required for Home Tuition)
+  // Conditional fields (Only required for Home Tuition - Teachers)
   const isOnline = (userData.mode || '').toString().toLowerCase().includes('online');
-  const locationFields = isOnline ? [] : ['city', 'localities'];
+  const teacherLocationFields = isOnline ? [] : ['city', 'localities'];
 
-  const fieldsToCheck = [...commonFields, ...locationFields, ...(userType === 'teacher' ? teacherSpecific : parentSpecific)];
+  const fieldsToCheck = userType === 'teacher' 
+    ? [...commonFields, ...teacherLocationFields, ...teacherSpecific]
+    : [...commonFields, ...parentSpecific];
   
   const totalFields = fieldsToCheck.length;
 

@@ -446,6 +446,8 @@ export default function App() {
           setTutorId(currentTutorId);
         }
 
+        const fullPhone = (userCountryCode + userPhone).replace(/\s+/g, '');
+
         const profileData: any = {
           action: 'upsert',
           tutor_id: currentTutorId,
@@ -453,7 +455,7 @@ export default function App() {
           last_name: userLastName,
           name: `${userFirstName} ${userLastName}`.trim() || userName || 'Tutor',
           email: activeUser.email,
-          phone: userPhone,
+          phone: fullPhone,
           gender: userGender,
           age: userAge,
           dob: userDob,
