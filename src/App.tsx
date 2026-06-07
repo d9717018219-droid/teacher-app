@@ -34,7 +34,7 @@ import {
   TUTOR_QUALIFICATIONS_LIST,
   TUTOR_EXPERIENCE_LIST,
   TUTOR_FEE_LIST
-} from './constants';
+} from './utils/constants';
 
 // ─── Dynamic Font Scaling ──────────────────────────────────────────
 function getDynamicFontSize(text: string, baseSize: number = 14): string {
@@ -878,7 +878,7 @@ export default function App() {
   const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   
-  const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('userType'));
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('customUser'));
 
   // Auto-open profile setup for new users or incomplete profiles
   useEffect(() => {
@@ -916,8 +916,8 @@ export default function App() {
       }
     }
   }, [activeUser, showOnboarding, userType]);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
-  const [authStep, setAuthStep] = useState<'selection' | 'auth'>('auth');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signup');
+  const [authStep, setAuthStep] = useState<'selection' | 'auth'>('selection');
   const [isSkipping, setIsSkipping] = useState(false);
   const [emailChecked, setEmailChecked] = useState(false);
   const [isEmailExist, setEmailExist] = useState(false);
@@ -1357,6 +1357,29 @@ export default function App() {
     setAuthError(null);
     try {
       const isNative = Capacitor.isNativePlatform();
+
+      // Check if email already exists
+      const checkUrl = 'https://doableindia.com/app-sys/api_copy.php';
+      const checkPayload = { action: 'get', email, userType: userType || 'teacher' };
+      
+      let checkData;
+      if (isNative) {
+        const checkRes = await CapacitorHttp.post({ url: checkUrl, headers: { 'Content-Type': 'application/json' }, data: checkPayload });
+        checkData = typeof checkRes.data === 'string' ? JSON.parse(checkRes.data) : checkRes.data;
+      } else {
+        const checkRes = await fetch(checkUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checkPayload) });
+        checkData = await checkRes.json();
+      }
+
+      if (checkData.status === 'success' && checkData.data) {
+        playTapSound();
+        setAuthMode('signin');
+        setEmailChecked(true);
+        setActiveToast({ title: 'Already Registered 👋', body: 'This email is already registered. Please sign in.' });
+        setIsAuthLoading(false);
+        return;
+      }
+
       const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/signup';
 
       let data;
@@ -2465,7 +2488,7 @@ City: ${userCity}`;
                 <div className="space-y-6 text-center">
                   <div className="flex justify-between items-center px-2">
                     <button onClick={() => { playTapSound(); setAuthStep('auth'); }} className="text-slate-400 hover:text-white/50"><ChevronLeft size={20} /></button>
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{isSkipping ? 'Quick Setup' : 'Step 1 of 2'}</p>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Step 1 of 2</p>
                     <div className="w-5" />
                   </div>
                   <div className="space-y-2">
@@ -2478,12 +2501,7 @@ City: ${userCity}`;
                         playTapSound(); 
                         setUserType('parent'); 
                         localStorage.setItem('userType', 'parent'); 
-                        if (isSkipping) {
-                          setShowOnboarding(false);
-                          setIsSkipping(false);
-                        } else {
-                          setAuthStep('auth'); 
-                        }
+                        setAuthStep('auth'); 
                       }}
                       className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
                     >
@@ -2500,12 +2518,7 @@ City: ${userCity}`;
                         playTapSound(); 
                         setUserType('teacher'); 
                         localStorage.setItem('userType', 'teacher'); 
-                        if (isSkipping) {
-                          setShowOnboarding(false);
-                          setIsSkipping(false);
-                        } else {
-                          setAuthStep('auth'); 
-                        }
+                        setAuthStep('auth'); 
                       }}
                       className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
                     >
@@ -2521,17 +2534,10 @@ City: ${userCity}`;
                 </div>
               ) : (
                 <div className="bg-white rounded-[40px] p-8 shadow-2xl space-y-6">
-                  <div className="flex justify-between items-center text-center">
-                    <div className="w-5" />
+                  <div className="flex justify-center items-center text-center relative h-6">
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">
                       {authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Create Account' : authMode === 'forgot' ? 'Forgot Password' : 'Reset Password'}
                     </h3>
-                    <button 
-                      onClick={() => { playTapSound(); setIsSkipping(true); setAuthStep('selection'); }}
-                      className="text-[10px] font-black text-primary hover:text-primary/70 uppercase tracking-widest flex items-center gap-0.5"
-                    >
-                      Skip <ChevronRight size={14} strokeWidth={3} />
-                    </button>
                   </div>
 
                   <div className="space-y-4">
@@ -2637,6 +2643,12 @@ City: ${userCity}`;
                           )}
                           <div className="h-px bg-slate-100 w-full" />
                           <button onClick={() => { playTapSound(); setAuthMode('signup'); setAuthStep('selection'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
+                        </>
+                      )}
+                      {authMode === 'signup' && (
+                        <>
+                          <div className="h-px bg-slate-100 w-full" />
+                          <button onClick={() => { playTapSound(); setAuthMode('signin'); setAuthStep('selection'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">Already Registered user? <span className="text-primary underline">Sign In</span></button>
                         </>
                       )}
                       {(authMode === 'forgot' || authMode === 'reset') && (
@@ -2866,10 +2878,12 @@ City: ${userCity}`;
         )}
       </AnimatePresence>
 
-      <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#F97316] to-[#EC4899] px-5 pb-3 flex items-center justify-between shadow-[0_10px_40px_rgba(249,115,22,0.3)] border-b border-white/10 relative overflow-hidden pt-[calc(0.6rem+var(--safe-area-top,20px))]">
+      {/* Main App UI - Only visible when authenticated */}
+      {activeUser && !showOnboarding && (
+        <>
+          <header className="sticky top-0 z-[100] bg-gradient-to-r from-[#F97316] to-[#EC4899] px-5 pb-3 flex items-center justify-between shadow-[0_10px_40px_rgba(249,115,22,0.3)] border-b border-white/10 relative overflow-hidden pt-[calc(0.6rem+var(--safe-area-top,20px))]">
         <div className="absolute -top-24 -left-20 w-48 h-48 bg-white/10 blur-3xl rounded-full" />
         <div className="flex items-center gap-3 relative z-10" onClick={() => { setDebugClicks(prev => prev + 1); if (debugClicks > 3) window.alert('FCM: ' + fcmToken + '\nDB: ' + dbStatus); }}>
-          <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl shadow-lg border border-white/20 object-cover" />
           <div className="flex flex-col">
             <span className="text-[20px] font-[1000] text-white tracking-tighter leading-none">DoAble India</span>
             <span className="text-[8px] font-black text-white/90 tracking-wide mt-1 flex items-center gap-1.5">
@@ -4161,6 +4175,8 @@ City: ${userCity}`;
 
         <NavButton active={activeTab === 'support'} onClick={() => { playTapSound(); setActiveTab('support'); window.scrollTo(0,0); }} icon={<MessageSquare className="w-[18px] h-[18px]" />} label="Support" activeColor="text-white" activeBg="bg-[#347475]" inactiveColor="text-[#347475]" inactiveBg="bg-[#347475]/5" />
       </nav>
+        </>
+      )}
       
       <SuccessPop show={showSuccess} onComplete={() => setShowSuccess(false)} />
       <FloatingToast toast={activeToast} onClear={() => setActiveToast(null)} />
