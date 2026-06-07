@@ -367,12 +367,18 @@ const AlertsView: React.FC<AlertsViewProps> = ({
     const userCityLower = (city || '').toString().toLowerCase().trim();
     const userTypeLower = (userType || '').toString().toLowerCase().trim();
     const userGenderLower = (userGender || '').toString().toLowerCase().trim();
+    const userEmailLower = (authEmail || '').toString().toLowerCase().trim();
     const uLocs = (userLocalities || []).map(l => l.toLowerCase().trim());
 
     return (items || []).filter(a => {
       if (showAllDebug) return true; // Show everything in debug/global mode
 
       const aData = a as any;
+
+      // 0. Email Targeting (Highest Priority)
+      const targetEmail = (aData.targetEmail || 'all').toString().toLowerCase().trim();
+      if (targetEmail !== 'all' && userEmailLower !== targetEmail) return false;
+
       const targetCity = (a.city || aData.City || 'All').toString().toLowerCase().trim();
       if (targetCity !== 'all' && userCityLower !== targetCity) return false;
 
