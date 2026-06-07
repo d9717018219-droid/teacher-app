@@ -73,8 +73,8 @@ const SupportView: React.FC<SupportViewProps> = ({
           showWelcomeScreen: false,
           webhookUrl: 'https://n8n.srv1497567.hstgr.cloud/webhook/a468d691-f1fd-4cb8-b259-3aba116f45b7/chat',
           initialMessages: [
-            'Hi! 👋 Welcome to DoAble India Support.',
-            'How can we help you today? Please type your query below.',
+            'Ram Ram! 🙏 Main Rahul hoon, DoAble India ka Senior Operations Coordinator.',
+            'Aapko kisi Job Order ka status jaanna hai ya koi aur help chahiye? Be-jhijhak batayein, main poori help karunga. 😊',
           ],
           i18n: {
             en: { 
