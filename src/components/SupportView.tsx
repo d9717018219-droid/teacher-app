@@ -142,7 +142,7 @@ City: ${userCity || 'N/A'}`;
     const shareData = {
       title: 'DoAble India - Home Tutors',
       text: 'Hi! I am using DoAble India App to find the best Home Tutors. It is amazing! You should try it too. Download now:',
-      url: 'https://doableindia.com'
+      url: 'https://play.google.com/store/apps/details?id=com.doableindia&pcampaignid=web_share'
     };
 
     if (navigator.share) {
