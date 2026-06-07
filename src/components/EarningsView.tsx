@@ -186,7 +186,7 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ tutorProfile, allTut
              <div className="bg-white/[0.02] rounded-2xl p-4 border border-white/5 space-y-2.5">
                 <div className="flex justify-between items-center px-0.5">
                    <p className="text-[8px] font-black text-white/30 uppercase tracking-widest">Goal Progress</p>
-                   <p className="text-[9px] font-black text-emerald-400 tracking-tighter">₹{Math.max(0, 50000 - totalIncome).toLocaleString()} to reach ₹50K milestone</p>
+                   <p className="text-[9px] font-black text-emerald-400 tracking-tighter">₹{Math.max(0, 50000 - totalIncome).toLocaleString()} more to hit ₹50K</p>
                 </div>
                 <div className="relative w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5 p-[1px]">
                    <motion.div 
