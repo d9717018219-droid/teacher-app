@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   Navigation,
   Laptop,
+  Monitor,
   Trophy
 } from 'lucide-react';
 import { JobLead, TutorProfile, UserType } from '../types';
@@ -187,7 +188,7 @@ export const HomeView = React.memo(({
     {
       title: "Elite Network",
       emoji: "🎓",
-      sub: "Established 2022 ✨",
+      sub: "Prestigious Educators ✨",
       desc: "Connect with the most prestigious private educators across the nation.",
       bg: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
       accent: "#fde047",
@@ -221,7 +222,7 @@ export const HomeView = React.memo(({
       text: "text-white"
     },
     {
-      title: "113+ Cities",
+      title: "109+ Cities",
       emoji: "📍",
       sub: "Pan India Reach 🇮🇳",
       desc: "The largest network of elite tutors operating in every major Indian city.",
@@ -236,7 +237,7 @@ export const HomeView = React.memo(({
       title: "Global Impact",
       emoji: "🌍",
       sub: "World Class Reach ✈️",
-      desc: "Transcending boundaries to provide elite education on a global scale.",
+      desc: "Present in USA, UK, Canada, Australia, Germany, France, Singapore, UAE & 15+ countries.",
       bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
       accent: "#fde047",
       icon: <Globe size={72} />,
@@ -641,39 +642,51 @@ export const HomeView = React.memo(({
             </div>
           </section>
 
-          {/* Mode (Classes at Home) */}
+          {/* Mode (Teaching Modes Redesigned) */}
           <section className="px-4 space-y-2.5">
             <div className="flex justify-between items-center px-1 text-left">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-4 bg-purple-500 rounded-full" />
-                <h3 className="text-[14px] font-bold text-[#0F172A] tracking-tight">Jobs by Mode of Teaching</h3>
+                <h3 className="text-[14px] font-bold text-[#0F172A] tracking-tight">Jobs by Mode</h3>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-               <div
-                 onClick={() => { playTapSound(); onModeClick?.('Home Tuition'); }}
-                 className="relative p-4 rounded-[20px] border flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer shadow-sm bg-rose-50 border-rose-100"
-               >
-                 <div className="mb-1 text-rose-600 text-left"><HomeIcon size={24} /></div>
-                 <div className="flex flex-col items-center gap-0.5">
-                   <span className="text-[12px] font-[1000] tracking-tight text-slate-900 text-rose-600">Home Tuition</span>
-                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">
-                     {counts.jobCounts[`job_mode_Home Tuition`] || 0}+ Jobs
-                   </span>
-                 </div>
-               </div>
-               <div
-                 onClick={() => { playTapSound(); onModeClick?.('Online Class'); }}
-                 className="relative p-4 rounded-[20px] border flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer shadow-sm bg-indigo-50 border-indigo-100"
-               >
-                 <div className="mb-1 text-indigo-600 text-left"><Laptop size={24} /></div>
-                 <div className="flex flex-col items-center gap-0.5">
-                   <span className="text-[12px] font-[1000] tracking-tight text-slate-900 text-indigo-600">Online Class</span>
-                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600">
-                     {counts.jobCounts[`job_mode_Online Class`] || 0}+ Jobs
-                   </span>
-                 </div>
-               </div>
+            <div className="grid grid-cols-3 gap-2">
+               {[
+                 { label: "Student's Place", match: 'Home Tuition', color: 'text-indigo-600', gradient: 'from-indigo-400 to-indigo-600', bg: 'bg-indigo-50', icon: <HomeIcon size={16} /> },
+                 { label: "Tutor's Place", match: "At Tutor's Place", color: 'text-emerald-600', gradient: 'from-emerald-400 to-emerald-600', bg: 'bg-emerald-50', icon: <User size={16} /> },
+                 { label: "Online Class", match: 'Online Class', color: 'text-purple-600', gradient: 'from-purple-400 to-purple-600', bg: 'bg-purple-50', icon: <Laptop size={16} /> },
+                 { label: "At Institute", match: 'At Institute', color: 'text-orange-600', gradient: 'from-orange-400 to-orange-600', bg: 'bg-orange-50', icon: <Monitor size={16} /> },
+                 { label: "At School", match: 'At School', color: 'text-rose-600', gradient: 'from-rose-400 to-rose-600', bg: 'bg-rose-50', icon: <Briefcase size={16} /> },
+                 { label: "All Modes", match: 'All', color: 'text-slate-600', gradient: 'from-slate-500 to-slate-700', bg: 'bg-slate-50', icon: <Sparkles size={16} /> }
+               ].map((mode, i) => {
+                 const count = counts.jobCounts[`job_mode_${mode.match}`] || 0;
+                 return (
+                   <div
+                     key={i}
+                     onClick={() => { playTapSound(); onModeClick?.(mode.match); }}
+                     className={cn(
+                       "group relative bg-white border rounded-[24px] p-3 overflow-hidden active:scale-95 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 text-center flex flex-col items-center gap-2",
+                       mode.bg.replace('50', '100/50') // Light border matching theme
+                     )}
+                   >
+                     <div className={cn("absolute -top-6 -right-6 w-16 h-16 rounded-full group-hover:scale-150 transition-transform duration-500 opacity-50", mode.bg)} />
+
+                     <div className={cn("relative z-10 w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-white shadow-md transition-transform group-hover:scale-110", mode.gradient)}>
+                       {mode.icon}
+                     </div>
+
+                     <div className="relative z-10 flex flex-col items-center gap-0.5 w-full">
+                       <div className="text-[8.5px] font-[1000] text-slate-900 tracking-tight leading-tight uppercase line-clamp-1">{mode.label}</div>
+                       <div className="flex items-center gap-1 mt-0.5">
+                         <div className={cn("w-1 h-1 rounded-full animate-pulse", mode.color.replace('text-', 'bg-'))} />
+                         <span className={cn("text-[7.5px] font-black uppercase tracking-widest opacity-60", mode.color)}>
+                           {count}+ Jobs
+                         </span>
+                       </div>
+                     </div>
+                   </div>
+                 );
+               })}
             </div>
           </section>
 

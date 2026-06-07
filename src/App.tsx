@@ -161,18 +161,15 @@ export default function App() {
     setUserType(finalUserType);
     localStorage.setItem('userType', finalUserType);
 
-    setIsRestoringSession(true);
-
     if (!isSignup) {
       localStorage.removeItem('lastProfileUpdate');
       setTimeout(() => loadData(), 10);
       setActiveToast({ title: 'Welcome Back! 👋', body: `Signed in as ${userData.email}` });
       setShowProfileSetup(false);
     } else {
-      setIsAutoFillDone(true); // For signup, animation finishes after its natural duration
       setShowSuccess(true);
       setActiveToast({ title: 'Welcome! 🎊', body: 'Your account has been created.' });
-      setTimeout(() => setShowProfileSetup(true), 6000); // Delay profile setup until animation finishes
+      setShowProfileSetup(false); // Do not open automatically
     }
     
     playTapSound();
@@ -181,29 +178,6 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isRestoringSession, setIsRestoringSession] = useState(false);
-  const [restoringStep, setRestoringStep] = useState(0);
-  const [isAutoFillDone, setIsAutoFillDone] = useState(false);
-
-  // Cycle through messages during restoration
-  useEffect(() => {
-    let interval: any;
-    if (isRestoringSession) {
-      setIsAutoFillDone(false);
-      setRestoringStep(0);
-      interval = setInterval(() => {
-        setRestoringStep(prev => {
-          if (prev >= 3 && isAutoFillDone) {
-            clearInterval(interval);
-            setTimeout(() => setIsRestoringSession(false), 800);
-            return 4;
-          }
-          return prev < 3 ? prev + 1 : prev;
-        });
-      }, 1500);
-    }
-    return () => clearInterval(interval);
-  }, [isRestoringSession, isAutoFillDone]);
   const [customUser, setCustomUser] = useState<any>(JSON.parse(localStorage.getItem('customUser') || 'null'));
   const activeUser = currentUser || customUser;
 
@@ -616,10 +590,12 @@ export default function App() {
       };
       const completion = calculateProfileCompletion(userData, userType);
       
-      // If profile is very incomplete (e.g. < 40%), show setup popup automatically
+      // Automatic popup disabled per user request
+      /*
       if (completion < 40) {
         setShowProfileSetup(true);
       }
+      */
     }
   }, [activeUser, showOnboarding, userType]);
   const [isSkipping, setIsSkipping] = useState(false);
@@ -638,13 +614,12 @@ export default function App() {
   // -------------------------------------------------------------
   useEffect(() => {
     if (!activeUser?.email || !userType) {
-      if (isRestoringSession) setIsAutoFillDone(true);
       return;
     }
     
     const lastUpdate = parseInt(localStorage.getItem(`lastProfileUpdate_${activeUser.email}`) || '0');
-    // If recently updated manually, don't auto-revert unless restoring session
-    if (!isRestoringSession && Date.now() - lastUpdate < 300000) {
+    // If recently updated manually, don't auto-revert
+    if (Date.now() - lastUpdate < 300000) {
       return;
     }
 
@@ -721,7 +696,7 @@ export default function App() {
         const dbDuration = getVal(lead, ['duration', 'Duration', 'avg_duration']);
         const dbMode = getVal(lead, ['mode', 'Mode', 'Mode of Teaching']);
 
-        // BATCH UPDATE: Create a new profile object to update state atomically
+        // BATCH UPDATE
         const nextProfile: any = { ...profile };
 
         if (foundId) { nextProfile.tutorId = foundId; localStorage.setItem('tutorId', foundId); }
@@ -771,21 +746,17 @@ export default function App() {
           if (extractedClass) { nextProfile.userClasses = [extractedClass]; localStorage.setItem('userClasses', JSON.stringify([extractedClass])); }
         }
         
-        // Single atomic state update
         setProfile(nextProfile);
         setShowOnboarding(false);
-        if (isRestoringSession) setIsAutoFillDone(true);
       } else {
-       // Only clear if the data has actually loaded from the network
        const dataLoaded = (userType === 'teacher' && tutors.length > 0) || (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0));
        if (dataLoaded) {
           setTutorId(null);
           localStorage.removeItem('tutorId');
           setIsTutorFetched(false);
-          if (isRestoringSession) setIsAutoFillDone(true);
        }
     }
-  }, [activeUser, userType, tutors, leads, firestoreLeads, isRestoringSession]);
+  }, [activeUser, userType, tutors, leads, firestoreLeads]);
   // -------------------------------------------------------------
 
 
@@ -887,9 +858,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('userCity', userCity);
-    setJobCityFilter(userCity.toLowerCase());
-    setTutorCityFilter(userCity.toLowerCase());
+    if (userCity) {
+      localStorage.setItem('userCity', userCity);
+      const finalFilter = userCity.toLowerCase() === 'all' ? 'all' : userCity.toLowerCase();
+      setJobCityFilter(finalFilter);
+      setTutorCityFilter(finalFilter);
+    }
   }, [userCity]);
 
   // Automatically fetch alerts from server when user enters the alerts tab
@@ -2181,7 +2155,7 @@ City: ${userCity}`;
           />
         )}
        {activeTab === 'jobs' && (
-          <JobsView 
+          <JobsView
             finalJobs={finalJobs}
             loading={loading}
             searchQuery={jobSearchQuery}
@@ -2200,8 +2174,10 @@ City: ${userCity}`;
             setSelectedJob={setSelectedJob}
             shortlistedIds={shortlistedIds}
             toggleShortlist={toggleShortlist}
+            userFirstName={userFirstName}
+            userGender={userGender}
           />
-       )}
+        )}
        {activeTab === 'earnings' && (
           <EarningsView 
             tutorProfile={tutors.find(t => {
@@ -2245,7 +2221,7 @@ City: ${userCity}`;
        {activeTab === 'alerts' && (
           <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userLocalities={userLocalities} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={activeUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={activeUser?.email} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
        )}
-       {activeTab === 'support' && (<SupportView userName={userName} userType={userType} userCity={userCity} />)}
+       {activeTab === 'support' && (<SupportView userName={userName} userFirstName={userFirstName} userType={userType} userCity={userCity} />)}
        {activeTab === 'post_need' && (
           <ParentHubView 
             userName={userName} 
@@ -2285,60 +2261,6 @@ City: ${userCity}`;
         userTime={userTime}
         userFee={userFee}
       />
-
-      <AnimatePresence>
-        {isRestoringSession && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[30000] bg-white flex flex-col items-center justify-center p-8 text-center"
-          >
-            <div className="relative w-24 h-24 mb-8">
-              <div className="absolute inset-0 border-4 border-primary/10 rounded-full" />
-              <motion.div 
-                className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              />
-              <motion.div 
-                className="absolute inset-4 bg-primary/10 rounded-full flex items-center justify-center text-primary"
-                animate={{ scale: [0.9, 1.1, 0.9] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <Sparkles size={32} />
-              </motion.div>
-            </div>
-            <motion.h3 
-              key={restoringStep}
-              initial={{ y: 10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -10, opacity: 0 }}
-              className="text-xl font-black text-slate-900 uppercase tracking-tight"
-            >
-              {restoringStep === 0 && "Identifying Account"}
-              {restoringStep === 1 && "Finding Profile"}
-              {restoringStep === 2 && (tutorId ? `${userType === 'parent' ? 'Order' : 'Tutor'} ID: #${tutorId}` : "Syncing Data")}
-              {restoringStep === 3 && (userType === 'parent' ? "Finding Tutors" : "Searching Jobs")}
-              {restoringStep === 4 && "Application Ready"}
-            </motion.h3>
-            <motion.p 
-              key={`p-${restoringStep}`}
-              initial={{ y: 10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -10, opacity: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-widest"
-            >
-              {restoringStep === 0 && "Connecting to DoAble network..."}
-              {restoringStep === 1 && "Searching database for matches..."}
-              {restoringStep === 2 && "Linking your legacy records..."}
-              {restoringStep === 3 && (userType === 'parent' ? "Matching best tutors for your needs..." : "Finding high-paying jobs near you...")}
-              {restoringStep === 4 && "Taking you to your dashboard..."}
-            </motion.p>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <ProfileSetupWizard 
         show={showProfileSetup} 

@@ -77,7 +77,7 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
     return fallback;
   };
 
-  const subjects = cleanValue(getValue(['subjects', 'Subjects', 'Preferred Subject(s)'], 'General')).split(/[;,]/)[0].trim();
+  const subjects = cleanValue(getValue(['subjects', 'Subjects', 'Preferred Subject(s)'], 'General')).trim();
   const classBoard = cleanValue(getValue(['Class / Board', 'classBoard', 'Class'], ((job.Class || '') + (job.Board ? ' (' + job.Board + ')' : '')) || 'General'));
   const { bg, icon } = getSubjectStyles(subjects, classBoard);
   
@@ -117,38 +117,29 @@ export const JobCard: React.FC<JobCardProps> = React.memo(({
           </div>
           
           <h4 className="text-[16px] font-[800] text-[#0F172A] leading-tight tracking-tight truncate">
-            {toTitleCase(name)}
+            {classBoard}
           </h4>
-          <p className="text-[#64748B] text-[12px] font-[500] truncate">{classBoard}</p>
+          <p className="text-[#64748B] text-[12px] font-[600] line-clamp-2 text-indigo-600 leading-tight">{toTitleCase(subjects)}</p>
           
           <div className="flex items-center gap-1 text-[#64748B] text-[12px] font-[500] pt-0.5">
             <MapPin size={11} className="text-slate-400" />
             <span className="truncate">{location}</span>
           </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <div className="bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
-               <span className="text-[#0F172A] text-[10px] font-black tracking-tighter whitespace-nowrap">
-                 ₹{formatCurrency(fee)}/month
-               </span>
-            </div>
-            <div className="bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
-               <span className="text-[#0F172A] text-[10px] font-bold tracking-tight">
-                 {requiredGender} Required
-               </span>
-            </div>
-          </div>
         </div>
-
-        {/* Compact Right Side (Removed icons, moved to bottom) */}
       </div>
 
       <div className="flex flex-col gap-2 pt-2 border-t border-slate-50">
-        <div className="flex justify-between items-center opacity-70">
-          <span className="text-[#94A3B8] text-[8px] font-black uppercase tracking-tight flex items-center gap-1">
-            <Clock size={8} /> Posted: {postedDate}
-          </span>
-          <span className="text-[#592973] text-[8px] font-black uppercase tracking-tight">✅ Verified Lead</span>
+        <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-slate-500 text-[8px] font-black uppercase tracking-tight flex items-center gap-1">
+              <User size={8} /> {requiredGender} Required
+            </span>
+          </div>
+          <div className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg">
+            <span className="text-[10px] font-black tracking-tighter whitespace-nowrap">
+              ₹{formatCurrency(fee)}/month
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

@@ -51,7 +51,7 @@ export function useProfileState() {
     const userLastName = localStorage.getItem('userLastName') || (userName ? userName.split(/\s+/).slice(1).join(' ') || '' : '');
 
     return {
-      userCity: localStorage.getItem('userCity') || 'Delhi',
+      userCity: localStorage.getItem('userCity') || 'all',
       userName: userName,
       userFirstName: userFirstName,
       userLastName: userLastName,
