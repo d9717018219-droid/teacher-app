@@ -224,57 +224,59 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ tutorProfile, allTut
           </div>
         </div>
 
-        <div className="bg-white rounded-[32px] shadow-xl border border-slate-100 overflow-hidden">
-           <table className="w-full text-left border-collapse">
-              <thead>
-                 <tr className="bg-slate-50/50 border-b border-slate-50">
-                    <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest">Rank</th>
-                    <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest">Tutor Details</th>
-                    <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Tuitions</th>
-                    <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Income</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                 {topEarners.length === 0 ? (
-                   <tr>
-                     <td colSpan={4} className="px-4 py-12 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">No verified earners in this city yet.</td>
-                   </tr>
-                 ) : (
-                   topEarners.map((t, i) => (
-                     <tr key={t.tutor_id} className={cn("active:bg-slate-50 transition-colors", i === 0 && "bg-amber-50/30")}>
-                        <td className="px-4 py-4">
-                           <div className={cn(
-                             "w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black",
-                             i === 0 ? "bg-amber-400 text-white shadow-lg shadow-amber-200" :
-                             i === 1 ? "bg-slate-200 text-slate-600" :
-                             i === 2 ? "bg-orange-100 text-orange-700" : "text-slate-400 border border-slate-100"
-                           )}>
-                             {i + 1}
-                           </div>
-                        </td>
-                        <td className="px-4 py-4">
-                           <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-1.5">
-                                 <span className="text-[12px] font-black text-slate-900 truncate max-w-[100px]">{toTitleCase(t.name)}</span>
-                                 {i < 3 && <BadgeCheck size={12} className="text-blue-500 shrink-0" />}
+        <div className="bg-white rounded-[28px] shadow-xl border border-slate-100 overflow-hidden">
+           <div className="overflow-x-auto no-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[320px]">
+                 <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-50">
+                       <th className="px-2 py-3 text-[7.5px] font-black text-slate-400 uppercase tracking-widest text-center">#</th>
+                       <th className="px-2 py-3 text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Tutor</th>
+                       <th className="px-2 py-3 text-[7.5px] font-black text-slate-400 uppercase tracking-widest text-right">Classes</th>
+                       <th className="px-2 py-3 text-[7.5px] font-black text-slate-400 uppercase tracking-widest text-right">Earnings</th>
+                    </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-50">
+                    {topEarners.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-12 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">No verified earners in this city yet.</td>
+                      </tr>
+                    ) : (
+                      topEarners.map((t, i) => (
+                        <tr key={t.tutor_id} className={cn("active:bg-slate-50 transition-colors", i === 0 && "bg-amber-50/30")}>
+                           <td className="px-2 py-4">
+                              <div className={cn(
+                                "w-5 h-5 rounded-md mx-auto flex items-center justify-center text-[9px] font-black",
+                                i === 0 ? "bg-amber-400 text-white shadow-lg shadow-amber-200" :
+                                i === 1 ? "bg-slate-200 text-slate-600" :
+                                i === 2 ? "bg-orange-100 text-orange-700" : "text-slate-400 border border-slate-100"
+                              )}>
+                                {i + 1}
                               </div>
-                              <span className="text-[10px] font-bold text-slate-400 tracking-tighter">#{getTutorId(t)}</span>
-                           </div>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                           <span className="text-[11px] font-black text-slate-700 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">{t.active_tuitions}</span>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                           <div className="flex flex-col items-end leading-none">
-                              <div className="text-[13px] font-[1000] text-emerald-600 tracking-tighter">₹{Number(t.monthly_earnings).toLocaleString()}</div>
-                              <span className="text-[7px] font-black text-slate-300 uppercase mt-0.5">/month</span>
-                           </div>
-                        </td>
-                     </tr>
-                   ))
-                 )}
-              </tbody>
-           </table>
+                           </td>
+                           <td className="px-2 py-4">
+                              <div className="flex flex-col gap-0.5 min-w-0">
+                                 <div className="flex items-center gap-1">
+                                    <span className="text-[11px] font-[1000] text-slate-900 truncate max-w-[85px] leading-tight">{toTitleCase(t.name)}</span>
+                                    {i < 3 && <BadgeCheck size={10} className="text-blue-500 shrink-0" />}
+                                 </div>
+                                 <span className="text-[8px] font-bold text-slate-400 tracking-tighter">ID #{getTutorId(t)}</span>
+                              </div>
+                           </td>
+                           <td className="px-2 py-4 text-right">
+                              <span className="text-[10px] font-black text-slate-700 bg-slate-50 px-1.5 py-0.5 rounded-lg border border-slate-100">{t.active_tuitions}</span>
+                           </td>
+                           <td className="px-2 py-4 text-right">
+                              <div className="flex flex-col items-end leading-none">
+                                 <div className="text-[12px] font-[1000] text-emerald-600 tracking-tighter">₹{Number(t.monthly_earnings).toLocaleString()}</div>
+                                 <span className="text-[6.5px] font-black text-slate-300 uppercase mt-0.5">/mo</span>
+                              </div>
+                           </td>
+                        </tr>
+                      ))
+                    )}
+                 </tbody>
+              </table>
+           </div>
         </div>
       </div>
     </div>
