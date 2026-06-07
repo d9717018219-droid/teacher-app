@@ -52,10 +52,14 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>DoAble India uses the camera to allow tutors and parents to upload profile photos and verification selfies.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>DoAble India uses your photo library so you can select and upload profile photos and verification images.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
-		<true/>
+		<false/>
 	</dict>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>

@@ -80,6 +80,7 @@ const SupportView: React.FC<SupportViewProps> = ({
               footer: '', 
               getStarted: 'Start Chatting', 
               inputPlaceholder: 'Type your message here...', 
+              closeButtonTooltip: 'Close',
             },
           },
         });

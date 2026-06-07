@@ -17,7 +17,8 @@
 		"PushNotifications": {
 			"presentationOptions": [
 				"badge",
-				"sound"
+				"sound",
+				"alert"
 			]
 		},
 		"CapacitorHttp": {

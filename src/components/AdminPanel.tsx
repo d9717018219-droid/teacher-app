@@ -4,7 +4,7 @@ import { db, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Send, Zap, AlertTriangle, Info, CheckCircle, Globe, Trash2, Search, User, Mail, Phone, Hash, Edit3, X, Save, ShieldCheck, Loader2 } from 'lucide-react';
-import { CITIES_LIST, CLASSES_LIST } from '../constants';
+import { CITIES_LIST, CLASSES_LIST } from '../utils/constants';
 import { TutorProfile } from '../types';
 import { cn, cleanValue, toTitleCase } from '../utils';
 
