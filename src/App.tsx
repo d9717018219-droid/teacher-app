@@ -19,9 +19,23 @@ import { JobsView } from './components/JobsView';
 import { TutorsView } from './components/TutorsView';
 import { EarningsView } from './components/EarningsView';
 import { ParentHubView } from './components/ParentHubView';
+import { SuccessPop } from './components/common/SuccessPop';
+import { FloatingToast } from './components/common/FloatingToast';
+import { DetailItem } from './components/common/DetailItem';
+import { NavButton } from './components/common/NavButton';
+import { SelectionDrawer } from './components/common/SelectionDrawer';
+import { FormModal } from './components/modals/FormModal';
+import { JobDetailModal } from './components/modals/JobDetailModal';
+import { TutorDetailModal } from './components/modals/TutorDetailModal';
+import { ConfirmPostJobModal } from './components/modals/ConfirmPostJobModal';
+import { ProfileSetupWizard } from './components/modals/ProfileSetupWizard';
+import { AuthModal } from './components/modals/AuthModal';
+import { AuthMode, AuthStep } from './hooks/useAuthState';
+import { AuthService } from './services/auth.service';
 
 import { requestNotificationPermission } from './firebase';
 import { useNotifications } from './hooks/useNotifications';
+import { useProfileState } from './hooks/useProfileState';
 import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp, cleanValue, saveToLargeStorage, getFromLargeStorage, calculateProfileCompletion } from './utils';
 import {
   CITIES_LIST,
@@ -33,7 +47,8 @@ import {
   CITY_TO_LOCATIONS_DATA,
   TUTOR_QUALIFICATIONS_LIST,
   TUTOR_EXPERIENCE_LIST,
-  TUTOR_FEE_LIST
+  TUTOR_FEE_LIST,
+  TIME_LIST
 } from './utils/constants';
 
 // ─── Dynamic Font Scaling ──────────────────────────────────────────
@@ -86,27 +101,6 @@ function DetailStat({ emoji, label, value, color = "bg-slate-900" }: { emoji: st
   );
 }
 
-const QUALIFICATIONS_LIST = [
-  "B.Arch", "B.Com", "B.Ed", "B.LLB", "B.Lib", "B.Ped", "B.Pharma", "B.Sc", "B.Tech", "BA", "BBA", "BBM", "BCA", "BDS", "BFA", "BHM", "BJ", "BPT", "CA", "CFA", "CS", "D.Ed", "D.El.Ed", "DM", "DNB", "Ed.D.", "ICWA", "LLB", "LLM", "M.Arch", "M.Com", "M.Ed", "M.Ped", "M.Pharma", "M.Sc", "M.Tech", "MA", "MBA", "MBBS", "MCA", "MD", "MDS", "MS", "NTT", "PGDCA", "PGDM", "Ph.D."
-];
-
-const EXPERIENCE_LIST = [
-  "Less than 1 Year",
-  "1 to 3 Years",
-  "3 to 5 Years",
-  "5 to 10 Years",
-  "More than 10 Years"
-];
-
-const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const TIME_LIST = [
-  '06:00 AM', '06:30 AM', '07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM',
-  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-  '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM',
-  '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
-  '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM', '08:30 PM', '09:00 PM'
-];
-
 export default function App() {
   const [leads, setLeads] = useState<JobLead[]>([]);
   const [firestoreLeads, setFirestoreLeads] = useState<JobLead[]>([]);
@@ -149,15 +143,67 @@ export default function App() {
   const [tutors, setTutors] = useState<TutorProfile[]>([]);
 
   // Auth State
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [resetPin, setResetPin] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setRetypePassword] = useState('');
+  const [authModalMode, setAuthModalMode] = useState<AuthMode>('signup');
+  const [authModalStep, setAuthModalStep] = useState<AuthStep>('email');
+
+  const handleAuthSuccess = (data: any) => {
+    const isSignup = !!data.userId;
+    const finalUserType = data.user?.userType || userType || 'teacher';
+    const finalEmail = data.user?.email || data.email;
+    const userData = { 
+      email: finalEmail, 
+      userType: finalUserType, 
+      uid: data.user?.id || data.userId 
+    };
+
+    setCustomUser(userData);
+    localStorage.setItem('customUser', JSON.stringify(userData));
+    setUserType(finalUserType);
+    localStorage.setItem('userType', finalUserType);
+
+    setIsRestoringSession(true);
+
+    if (!isSignup) {
+      localStorage.removeItem('lastProfileUpdate');
+      setTimeout(() => loadData(), 10);
+      setActiveToast({ title: 'Welcome Back! 👋', body: `Signed in as ${userData.email}` });
+      setShowProfileSetup(false);
+    } else {
+      setIsAutoFillDone(true); // For signup, animation finishes after its natural duration
+      setShowSuccess(true);
+      setActiveToast({ title: 'Welcome! 🎊', body: 'Your account has been created.' });
+      setTimeout(() => setShowProfileSetup(true), 6000); // Delay profile setup until animation finishes
+    }
+    
+    playTapSound();
+    setShowOnboarding(false);
+  };
+
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRestoringSession, setIsRestoringSession] = useState(false);
+  const [restoringStep, setRestoringStep] = useState(0);
+  const [isAutoFillDone, setIsAutoFillDone] = useState(false);
+
+  // Cycle through messages during restoration
+  useEffect(() => {
+    let interval: any;
+    if (isRestoringSession) {
+      setIsAutoFillDone(false);
+      setRestoringStep(0);
+      interval = setInterval(() => {
+        setRestoringStep(prev => {
+          if (prev >= 3 && isAutoFillDone) {
+            clearInterval(interval);
+            setTimeout(() => setIsRestoringSession(false), 800);
+            return 4;
+          }
+          return prev < 3 ? prev + 1 : prev;
+        });
+      }, 1500);
+    }
+    return () => clearInterval(interval);
+  }, [isRestoringSession, isAutoFillDone]);
   const [customUser, setCustomUser] = useState<any>(JSON.parse(localStorage.getItem('customUser') || 'null'));
   const activeUser = currentUser || customUser;
 
@@ -344,8 +390,9 @@ export default function App() {
     localStorage.removeItem('isVerified');
 
     setUserType(null);
+    setAuthModalMode('signup');
+    setAuthModalStep('email');
     setShowOnboarding(true);
-    setAuthStep('auth');
     setUserName(null);
     setUserGender('All');
     setUserCity('All');
@@ -364,7 +411,7 @@ export default function App() {
     setIsTutorFetched(false);
 
     setShowOnboarding(true);
-    setAuthMode('signin');
+    setAuthModalMode('signin');
   };
 
   const handleDeleteProfile = async () => {
@@ -372,34 +419,7 @@ export default function App() {
 
     setIsDeletingProfile(true);
     try {
-      const isNative = Capacitor.isNativePlatform();
-      const apiUrl = isNative ? 'https://doableindia.com/app-sys/api_copy.php' : '/api-crm/api_copy.php';
-
-      const tutorId = localStorage.getItem('tutorId');
-      
-      const payload: any = {
-        action: 'delete',
-        email: activeUser?.email
-      };
-      if (tutorId) {
-         payload['tutor_id'] = tutorId;
-      }
-
-      if (isNative) {
-        await CapacitorHttp.post({
-          url: apiUrl,
-          headers: {
-            'Content-Type': 'application/json'
-          },          data: payload
-        });
-      } else {
-        await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },          body: JSON.stringify(payload)
-        });
-      }
+      await AuthService.deleteProfile(activeUser?.email || '', tutorId);
       
       // Attempt to delete Firebase Auth user if it's a current FirebaseUser
       if (currentUser) {
@@ -414,7 +434,7 @@ export default function App() {
       handleLogout();
     } catch (error: any) {
       console.error(error);
-      setActiveToast({ title: 'Delete Failed ❌', body: error.message });
+      setActiveToast({ title: 'Delete Failed ❌', body: error instanceof Error ? error.message : 'Unknown error' });
     } finally {
       setIsDeletingProfile(false);
     }
@@ -425,271 +445,21 @@ export default function App() {
     setIsUpdatingProfile(true);
 
     try {
-      const isNative = Capacitor.isNativePlatform();
-      
-      if (userType === 'teacher') {
-        const url = 'https://doableindia.com/app-sys/api_copy.php';
-        // Map frontend state to EXACT 24 database columns provided by user
-        let currentTutorId = localStorage.getItem('tutorId') || '';
-        
-        // Fix: If tutorId contains email or legacy bad data, clear it
-        if (currentTutorId.includes('@') || currentTutorId === 'NEW_USER' || currentTutorId === 'NEW') {
-          currentTutorId = '';
-        }
+      const data = await AuthService.updateProfile(
+        { ...profile, email: activeUser.email },
+        userType || 'teacher',
+        tutors
+      );
 
-        // Auto-assign new ID if missing (23000+ range)
-        if (!currentTutorId) {
-          // Generate a unique 5-digit ID based on timestamp to avoid collisions
-          const uniqueId = Math.floor(10000 + Math.random() * 90000);
-          currentTutorId = uniqueId.toString();
-          localStorage.setItem('tutorId', currentTutorId);
-          setTutorId(currentTutorId);
-        }
-
-        const profileData: any = {
-          action: 'upsert',
-          tutor_id: currentTutorId,
-          first_name: userFirstName,
-          last_name: userLastName,
-          name: `${userFirstName} ${userLastName}`.trim() || userName || 'Tutor',
-          email: activeUser.email,
-          phone: userPhone,
-          gender: userGender,
-          age: userAge,
-          dob: userDob,
-          qualification: userQualifications.join(', '),
-          experience: userExperience,
-          school_teacher: isSchoolTeacher === 'Yes' ? 'Yes' : 'No',
-          days: userDays,
-          time: userTime,
-          class_group: userClasses.join(', '),
-          subjects: userSubjects.join(', '),
-          city: userCity,
-          location: userLocalities.join(', '),
-          residency: userResidency,
-          Residency: userResidency,
-          block: userResidency,
-          society: userResidency,
-          have_vehicle: hasVehicle === 'Yes' ? 'Yes' : 'No',
-          communication: userCommunication,
-          mode: userMode,
-          fee: userFee,
-          aadhar: userAadhar,
-          Aadhar: userAadhar,
-          address: userAddress,
-          Address: userAddress,
-          about: aboutMe,
-          photo: profilePhoto || '',
-          selfie: userSelfie || '',
-          active_tuitions: tutors.find(t => t.email?.toLowerCase().trim() === activeUser.email?.toLowerCase().trim())?.active_tuitions || 0,
-          monthly_earnings: tutors.find(t => t.email?.toLowerCase().trim() === activeUser.email?.toLowerCase().trim())?.monthly_earnings || 0,
-          status: localStorage.getItem('tutorStatus') || 'Active',
-          verified: localStorage.getItem('isVerified') || 'No',
-          created_time: new Date().toISOString().split('T')[0]
-        };
-
-        console.log(`🚀 [Profile-Sync] Sending Data for ID ${currentTutorId}:`, {
-           ...profileData,
-           photo: profileData.photo ? `${profileData.photo.substring(0, 30)}...` : 'NONE',
-           selfie: profileData.selfie ? `${profileData.selfie.substring(0, 30)}...` : 'NONE'
-        });
-        
-        let data;
-        if (isNative) {
-          try {
-            const response = await CapacitorHttp.post({
-              url: url,
-              headers: { 
-                'Content-Type': 'application/json'
-              },
-              data: profileData
-            });
-            console.log('📡 Profile sync native response:', response.status, response.data);
-            
-            if (response.status >= 400) {
-               throw new Error(`Server Error (${response.status})`);
-            }
-            
-            if (!response.data) {
-               throw new Error('Empty response from server');
-            }
-            
-            data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-          } catch (nativeErr: any) {
-             console.error('Native Request Failed:', nativeErr);
-             throw new Error(nativeErr.message || 'Network request failed');
-          }
-        } else {
-          const params = new URLSearchParams();
-          Object.entries(profileData).forEach(([key, val]) => {
-            params.append(key, String(val));
-          });
-
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: params.toString()
-          });
-          
-          if (!response.ok) {
-             const text = await response.text();
-             console.error("SERVER RAW ERROR (Tutor Sync):", text);
-             throw new Error(`HTTP Error (${response.status})`);
-          }
-          
-          const text = await response.text();
-          data = text ? JSON.parse(text) : {};
-          console.log('🌐 Profile sync web response:', data);
-        }
-        console.log('Profile sync response:', data);
-        
-        if (data && (data.status === 'success' || data.message?.includes('success'))) {
-          const newId = data.tutor_id || data.id;
-          if (newId) {
-            localStorage.setItem('tutorId', newId.toString());
-            setTutorId(newId.toString());
-          }
-          
-          // Prevent auto-revert: Save timestamp of this update (Email specific)
-          localStorage.setItem(`lastProfileUpdate_${activeUser.email}`, Date.now().toString());
-
-          loadData();
-          setShowSuccess(true);
-          setShowProfileSetup(false);
-  
-        } else {
-          setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
-  
-        }
-      }
-      else if (userType === 'parent') {
-        const url = 'https://doableindia.com/app-sys/api_copy.php';
-        
-        let currentParentId = localStorage.getItem('tutorId') || ''; // Reusing tutorId key for parent unique ID
-        
-        // Only reset if it's a non-numeric or default placeholder
-        if (currentParentId.includes('@') || currentParentId === 'NEW_USER' || currentParentId === 'NEW' || !/^\d+$/.test(currentParentId)) {
-          currentParentId = '';
-        }
-
-        if (!currentParentId) {
-          // Only generate a random ID if no valid numeric ID exists
-          const uniqueId = Math.floor(10000 + Math.random() * 90000);
-          currentParentId = uniqueId.toString();
-          localStorage.setItem('tutorId', currentParentId);
-          setTutorId(currentParentId);
-        }
-
-        const fullPhone = (userCountryCode + userPhone).replace(/\s+/g, '');
-
-        // Map frontend state to lowercase database column names
-        const parentData: any = {
-          action: 'upsert',
-          order_id: currentParentId, // Use the generated ID
-          Order_ID: currentParentId,
-          'Order ID': currentParentId,
-          email: activeUser.email,
-          Email: activeUser.email,
-          phone: fullPhone,
-          Phone: fullPhone,
-          name: `${userFirstName} ${userLastName}`.trim() || userName,
-          Name: `${userFirstName} ${userLastName}`.trim() || userName,
-          First_Name: userFirstName,
-          Last_Name: userLastName,
-          'First Name': userFirstName,
-          'Last Name': userLastName,
-          class_group: userClasses[0] || '', 
-          classes: [userClasses[1] || userClasses[0]].filter(c => c), // Only specific class, as array
-          Class: userClasses[1] || userClasses[0] || '',
-          'Class / Board': userClasses.includes('Entrance Exam & Specialization') 
-          ? userBoard 
-          : `${userClasses[1] || userClasses[0] || ''} (${userBoard})`,
-          subjects: userSubjects, // Zoho Multi-select
-          Subjects: userSubjects,
-          'Subject(s)': userSubjects.join(', '),
-          city: userCity,
-          City: userCity,
-          locality: userLocalities, // Send raw array for api.php to map dynamically
-          Locality: userLocalities,
-          location: userLocalities.map(loc => `${loc}-${userCity}`).join(', '), // Mapped to location with city suffix (no spaces)
-          Location: userLocalities.map(loc => `${loc}-${userCity}`).join(', '),
-          residency: userResidency, // Mapped to residency
-          Residency: userResidency,
-          block: userResidency,
-          Block: userResidency,
-          society: userResidency,
-          Society: userResidency,
-          gender: userGender,
-          Gender: userGender,
-          'Tutor Gender Preference': userGender,
-          address: userAddress,
-          Address: userAddress,
-          board: userBoard,
-          Board: userBoard,
-          mode: userMode,
-          Mode: userMode,
-          days: userDays.split(', ').filter(d => d), // Zoho Multi-select array
-          time: userTime.split(', ').filter(t => t), // Zoho Multi-select array
-          duration: userDuration,
-          Duration: userDuration,
-          fee: userFee,
-          Fee: userFee,
-          notes: aboutMe,
-          Notes: aboutMe,
-          created_time: new Date().toISOString().slice(0, 19).replace('T', ' ')
-        };
-
-        console.log(`Syncing parent profile to ${url}...`, parentData);
-        let data;
-        if (isNative) {
-          const response = await CapacitorHttp.post({
-            url: url,
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            data: parentData
-          });
-          console.log('📡 Parent profile sync native response:', response.status, response.data);
-          data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-        } else {
-          const params = new URLSearchParams();
-          Object.entries(parentData).forEach(([key, val]) => {
-            if (Array.isArray(val)) {
-              params.append(key, val.join(', ')); // For web fetch fallback
-            } else {
-              params.append(key, String(val));
-            }
-          });
-
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: params.toString()
-          });
-          
-          if (!response.ok) {
-             const text = await response.text();
-             console.error("SERVER RAW ERROR (Parent Sync):", text);
-             throw new Error(`HTTP Error (${response.status})`);
-          }
-          
-          const text = await response.text();
-          data = text ? JSON.parse(text) : {};
-          console.log('🌐 Parent profile sync web response:', data);
-        }
-        console.log('Parent profile sync response:', data);
-        
-        if (data && (data.status === 'success' || data.message?.includes('success'))) {
-          // Fix Order ID Mismatch: Use the ID returned by Zoho (the real 5-digit ID)
-          const finalId = data.order_id || data.zoho_id || data.id || currentParentId;
+      if (data && (data.status === 'success' || data.message?.includes('success'))) {
+        const finalId = data.tutor_id || data.order_id || data.zoho_id || data.id;
+        if (finalId) {
           localStorage.setItem('tutorId', finalId.toString());
           setTutorId(finalId.toString());
+        }
 
-          // Persistence Fix: Ensure all fields are saved to localStorage explicitly
+        // Save all fields for persistence (Email specific)
+        if (userType === 'parent') {
           localStorage.setItem('userName', `${userFirstName} ${userLastName}`.trim());
           localStorage.setItem('userFirstName', userFirstName);
           localStorage.setItem('userLastName', userLastName);
@@ -708,19 +478,15 @@ export default function App() {
           localStorage.setItem('userDuration', userDuration);
           localStorage.setItem('userFee', userFee);
           localStorage.setItem('aboutMe', aboutMe);
-
-          // Prevent auto-revert: Save timestamp of this update
-          localStorage.setItem('lastProfileUpdate', Date.now().toString());
-
-          loadData(); // Run in background
-          setShowSuccess(true);
-          setShowProfileSetup(false);
-  
         }
- else {
-          setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
-  
-        }
+
+        localStorage.setItem(`lastProfileUpdate_${activeUser.email}`, Date.now().toString());
+
+        loadData();
+        setShowSuccess(true);
+        setShowProfileSetup(false);
+      } else {
+        setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
       }
     } catch (error: any) {
       console.error('Error syncing profile:', error);
@@ -730,69 +496,47 @@ export default function App() {
     }
   };
 
-  const [userCity, setUserCity] = useState<string>(localStorage.getItem('userCity') || 'Delhi');
-  const [userName, setUserName] = useState<string | null>(localStorage.getItem('userName'));
-  const [userFirstName, setUserFirstName] = useState<string>(() => {
-    const saved = localStorage.getItem('userFirstName');
-    if (saved) return saved;
-    const full = localStorage.getItem('userName') || '';
-    return full.split(/\s+/)[0] || '';
-  });
-  const [userLastName, setUserLastName] = useState<string>(() => {
-    const saved = localStorage.getItem('userLastName');
-    if (saved) return saved;
-    const full = localStorage.getItem('userName') || '';
-    return full.split(/\s+/).slice(1).join(' ') || '';
-  });
-  const [userCountryCode, setUserCountryCode] = useState<string>(localStorage.getItem('userCountryCode') || '+91');
-  const [tutorId, setTutorId] = useState<string | null>(localStorage.getItem('tutorId'));
-  const [userGender, setUserGender] = useState<string | null>(localStorage.getItem('userGender') || 'All');
-  const [userType, setUserType] = useState<UserType | null>(localStorage.getItem('userType') as UserType);
-  const [userClasses, setUserClasses] = useState<string[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('userClasses') || '[]');
-      return Array.isArray(saved) ? saved.filter(c => c && c.trim() !== '') : [];
-    } catch { return []; }
-  });
-  const [userSubjects, setUserSubjects] = useState<string[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('userSubjects') || '[]');
-      return Array.isArray(saved) ? saved.filter(s => s && s.trim() !== '') : [];
-    } catch { return []; }
-  });
-  const [userLocalities, setUserLocalities] = useState<string[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('userLocalities') || '[]');
-      return Array.isArray(saved) ? saved.filter(l => l && l.trim() !== '') : [];
-    } catch { return []; }
-  });
-  const [userPhone, setUserPhone] = useState<string>(localStorage.getItem('userPhone') || '');
-  const [userDob, setUserDob] = useState<string>(localStorage.getItem('userDob') || '');
-  const [userAge, setUserAge] = useState<string>(localStorage.getItem('userAge') || '');
-  const [userQualifications, setUserQualifications] = useState<string[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('userQualifications') || '[]');
-      return Array.isArray(saved) ? saved.filter(q => q && q.trim() !== '') : [];
-    } catch { return []; }
-  });
-  const [userExperience, setUserExperience] = useState<string>(localStorage.getItem('userExperience') || '');
-  const [isSchoolTeacher, setIsSchoolTeacher] = useState<string>(localStorage.getItem('isSchoolTeacher') || 'No');
-  const [hasVehicle, setHasVehicle] = useState<string>(localStorage.getItem('hasVehicle') || 'No');
-  const [aboutMe, setAboutMe] = useState<string>(localStorage.getItem('aboutMe') || '');
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(localStorage.getItem('userPhoto'));
-  
-  // Parent Specific States
-  const [userBoard, setUserBoard] = useState<string>(localStorage.getItem('userBoard') || 'CBSE');
-  const [userMode, setUserMode] = useState<string>(localStorage.getItem('userMode') || 'Home Tuition');
-  const [userCommunication, setUserCommunication] = useState<string>(localStorage.getItem('userCommunication') || '');
-  const [userAddress, setUserAddress] = useState<string>(localStorage.getItem('userAddress') || '');
-  const [userDays, setUserDays] = useState<string>(localStorage.getItem('userDays') || '');
-  const [userTime, setUserTime] = useState<string>(localStorage.getItem('userTime') || '');
-  const [userDuration, setUserDuration] = useState<string>(localStorage.getItem('userDuration') || '1 Hour');
-  const [userFee, setUserFee] = useState<string>(localStorage.getItem('userFee') || '');
-  const [userResidency, setUserResidency] = useState<string>(localStorage.getItem('userResidency') || '');
-  const [userAadhar, setUserAadhar] = useState<string>(localStorage.getItem('userAadhar') || '');
-  const [userSelfie, setUserSelfie] = useState<string | null>(localStorage.getItem('userSelfie'));
+  const { profile, setProfile, updateField } = useProfileState();
+  const {
+    userCity, userName, userFirstName, userLastName, userCountryCode,
+    tutorId, userGender, userType, userClasses, userSubjects,
+    userLocalities, userPhone, userDob, userAge, userQualifications,
+    userExperience, isSchoolTeacher, hasVehicle, aboutMe, profilePhoto,
+    userBoard, userMode, userCommunication, userAddress, userDays,
+    userTime, userDuration, userFee, userResidency, userAadhar, userSelfie
+  } = profile;
+
+  const setUserCity = (val: string) => updateField('userCity', val);
+  const setUserName = (val: string | null) => updateField('userName', val);
+  const setUserFirstName = (val: string) => updateField('userFirstName', val);
+  const setUserLastName = (val: string) => updateField('userLastName', val);
+  const setUserCountryCode = (val: string) => updateField('userCountryCode', val);
+  const setTutorId = (val: string | null) => updateField('tutorId', val);
+  const setUserGender = (val: string | null) => updateField('userGender', val);
+  const setUserType = (val: UserType | null) => updateField('userType', val);
+  const setUserClasses = (val: string[]) => updateField('userClasses', val);
+  const setUserSubjects = (val: string[]) => updateField('userSubjects', val);
+  const setUserLocalities = (val: string[]) => updateField('userLocalities', val);
+  const setUserPhone = (val: string) => updateField('userPhone', val);
+  const setUserDob = (val: string) => updateField('userDob', val);
+  const setUserAge = (val: string) => updateField('userAge', val);
+  const setUserQualifications = (val: string[]) => updateField('userQualifications', val);
+  const setUserExperience = (val: string) => updateField('userExperience', val);
+  const setIsSchoolTeacher = (val: string) => updateField('isSchoolTeacher', val);
+  const setHasVehicle = (val: string) => updateField('hasVehicle', val);
+  const setAboutMe = (val: string) => updateField('aboutMe', val);
+  const setProfilePhoto = (val: string | null) => updateField('profilePhoto', val);
+  const setUserBoard = (val: string) => updateField('userBoard', val);
+  const setUserMode = (val: string) => updateField('userMode', val);
+  const setUserCommunication = (val: string) => updateField('userCommunication', val);
+  const setUserAddress = (val: string) => updateField('userAddress', val);
+  const setUserDays = (val: string) => updateField('userDays', val);
+  const setUserTime = (val: string) => updateField('userTime', val);
+  const setUserDuration = (val: string) => updateField('userDuration', val);
+  const setUserFee = (val: string) => updateField('userFee', val);
+  const setUserResidency = (val: string) => updateField('userResidency', val);
+  const setUserAadhar = (val: string) => updateField('userAadhar', val);
+  const setUserSelfie = (val: string | null) => updateField('userSelfie', val);
 
   // Calculate age from DOB
   useEffect(() => {
@@ -809,44 +553,6 @@ export default function App() {
       localStorage.setItem('userAge', ageStr);
     }
   }, [userDob]);
-
-  const handleSelfieChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        alert("Image is too large. Please select an image under 5MB.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setUserSelfie(base64String);
-        localStorage.setItem('userSelfie', base64String);
-        
-        // Also update profilePhoto to ensure it shows up in Account Settings preview
-        setProfilePhoto(base64String);
-        localStorage.setItem('userPhoto', base64String);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 1024 * 1024) { // 1MB limit
-        alert("Image is too large. Please select an image under 1MB.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setProfilePhoto(base64String);
-        localStorage.setItem('userPhoto', base64String);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   // Job Filters
   const [jobFilterClasses, setJobFilterClasses] = useState<string[]>([]);
@@ -916,12 +622,8 @@ export default function App() {
       }
     }
   }, [activeUser, showOnboarding, userType]);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signup');
-  const [authStep, setAuthStep] = useState<'selection' | 'auth'>('selection');
   const [isSkipping, setIsSkipping] = useState(false);
-  const [emailChecked, setEmailChecked] = useState(false);
-  const [isEmailExist, setEmailExist] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
 
   const [tutorStatus, setTutorStatus] = useState<'registered' | 'new' | null>(null);
   
@@ -936,13 +638,13 @@ export default function App() {
   // -------------------------------------------------------------
   useEffect(() => {
     if (!activeUser?.email || !userType) {
-       // console.log('🔍 [Auto-Fill] Missing activeUser email or userType. Skipping...');
+      if (isRestoringSession) setIsAutoFillDone(true);
       return;
     }
     
     const lastUpdate = parseInt(localStorage.getItem(`lastProfileUpdate_${activeUser.email}`) || '0');
-    if (Date.now() - lastUpdate < 300000) {
-       // console.log(`⏳ [Auto-Fill] Skipping for ${activeUser.email} (Recent update detected).`);
+    // If recently updated manually, don't auto-revert unless restoring session
+    if (!isRestoringSession && Date.now() - lastUpdate < 300000) {
       return;
     }
 
@@ -955,69 +657,36 @@ export default function App() {
       try { return JSON.parse(val); } catch { return val.toString().split(',').map((s: string) => s.trim()).filter(Boolean); }
     };
 
-    console.log(`🚀 [SUPER-DEBUG] START Auto-Fill for Email: "${email}" (${userType})`);
-    console.log(`🚀 [SUPER-DEBUG] Total Tutors in list: ${tutors.length}`);
-
-      if (userType === 'teacher' && tutors.length > 0) {
-        // Deep Debug: Log first few tutors and check for partial matches
-        console.log(`🔍 [Deep-Debug] Checking matches for "${email}" in ${tutors.length} records...`);
-        
+    if (userType === 'teacher' && tutors.length > 0) {
         const matches = tutors.filter(t => {
-          const tEmail = (t.email || t.Email || '').toString().toLowerCase().replace(/\s+/g, '');
-          if (tEmail === email) {
-            console.log(`🎯 [SUPER-DEBUG] EXACT MATCH FOUND: ID=${t.tutor_id || t['Tutor ID']}, Email=${tEmail}`);
-          }
+          const tEmail = (t.email || (t as any).Email || '').toString().toLowerCase().replace(/\s+/g, '');
           return tEmail === email;
         });
         
         if (matches.length > 0) {
           lead = matches.sort((a, b) => parseInt(b.tutor_id || '0') - parseInt(a.tutor_id || '0'))[0];
-          console.log(`✅ [SUPER-DEBUG] PICKING LATEST MATCH: ID=${lead.tutor_id || lead['Tutor ID']}`);
-        } else {
-          console.warn(`❌ [SUPER-DEBUG] NO MATCH FOUND for "${email}" in the entire tutors list.`);
         }
-      } else if (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0)) {
+    } else if (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0)) {
         const combinedLeads = [...firestoreLeads, ...leads];
-        console.log(`📡 [Parent-AutoFill-Debug] Total Leads to search: ${combinedLeads.length}`);
-        
         const userLeads = combinedLeads.filter(l => {
           const lEmail = (l.email || (l as any).Email || (l as any).email || '').toString().toLowerCase().replace(/\s+/g, '');
-          const match = lEmail === email && email.length > 5;
-          if (match) console.log(`🎯 [Parent-AutoFill-Debug] MATCH FOUND! Order ID: ${l.order_id || l['Order ID']}`);
-          return match;
+          return lEmail === email && email.length > 5;
         });
 
         if (userLeads.length > 0) {
           lead = userLeads.sort((a, b) => new Date(b['Updated Time'] || (b as any).updated_at || 0).getTime() - new Date(a['Updated Time'] || (a as any).updated_at || 0).getTime())[0];
-           // console.log(`✅ [Auto-Fill] Picking Latest Parent Lead:`, lead);
-        } else {
-           // console.warn(`❌ [Auto-Fill] No parent lead found for email: ${email}`);
-          if (combinedLeads.length > 0) {
-            console.log('🔍 [Parent-AutoFill-Debug] Sample emails in combined list:', combinedLeads.slice(0, 10).map(l => (l.email || (l as any).Email || 'MISSING')));
-          }
         }
-      }
+    }
 
-      if (lead) {
-        // console.log(`🚀 [Auto-Fill-Audit] STARTING state updates for ID: ${lead.order_id || lead['Order ID']}`);
-        
-        // NEW: Bulletproof Case-Insensitive Extractor
+    if (lead) {
+        // Bulletproof Case-Insensitive Extractor
         const getVal = (obj: any, keys: string[], fallback: string = '') => {
           const objKeys = Object.keys(obj);
           for (const searchKey of keys) {
-            // 1. Try exact match
-            if (obj[searchKey] !== undefined && obj[searchKey] !== null && obj[searchKey] !== '' && obj[searchKey] !== 'undefined') {
-              // console.log(`✅ [Auto-Fill-Audit] EXACT Key "${searchKey}" matched: "${obj[searchKey]}"`);
-              return obj[searchKey];
-            }
-            // 2. Try case-insensitive match
+            if (obj[searchKey] !== undefined && obj[searchKey] !== null && obj[searchKey] !== '' && obj[searchKey] !== 'undefined') return obj[searchKey];
             const foundKey = objKeys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === searchKey.toLowerCase().replace(/[^a-z0-9]/g, ''));
-            if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== '' && obj[foundKey] !== 'undefined') {
-               // console.log(`✅ [Auto-Fill-Audit] FUZZY Key "${foundKey}" matched for "${searchKey}": "${obj[foundKey]}"`);
-               return obj[foundKey];
-            }
+            if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== '' && obj[foundKey] !== 'undefined') return obj[foundKey];
           }
-          // console.log(`❌ [Auto-Fill-Audit] FAILED to match any keys for: ${keys.join(', ')}`);
           return fallback;
         };
 
@@ -1026,13 +695,11 @@ export default function App() {
           return val.toString().split(',').map((s: string) => s.trim()).filter(Boolean).join(', ');
         };
 
-        const foundId = getVal(lead, ['order_id', 'orderId', 'Order ID', 'id', 'ID']).toString();
-        
+        const foundId = getVal(lead, ['tutor_id', 'order_id', 'orderId', 'Order ID', 'id', 'ID']).toString();
         const fullName = getVal(lead, ['name', 'Name', 'Full_Name', 'fullName']); 
-        const emailVal = getVal(lead, ['email', 'Email']);
+        const city = getVal(lead, ['city', 'City', 'Preferred_City']);
         const phone = getVal(lead, ['phone', 'Phone', 'Mobile']).toString().replace('+91', '').trim();
         const gender = getVal(lead, ['gender', 'Gender', 'Sex']) || 'Male';
-        const city = getVal(lead, ['city', 'City', 'Preferred_City']);
         const dob = getVal(lead, ['dob', 'DOB', 'Date_of_Birth', 'birth_date']);
         const age = getVal(lead, ['age', 'Age']);
         const qualification = parseMulti(getVal(lead, ['qualification', 'Qualification', 'qualifications']));
@@ -1044,40 +711,6 @@ export default function App() {
         const vehicle = getVal(lead, ['have_vehicle', 'vehicle', 'Vehicle']);
         const schoolExp = getVal(lead, ['school_teacher', 'school_exp', 'School_Teacher']);
 
-        // console.log(`📊 [Auto-Fill-Audit] FINAL Extracted: Name=${fullName}, ID=${foundId}, Email=${emailVal}`);
-
-        if (fullName) {
-          const parts = fullName.trim().split(/\s+/);
-          const fName = parts[0] || '';
-          const lName = parts.slice(1).join(' ') || '';
-          setUserFirstName(fName); 
-          setUserLastName(lName);
-          localStorage.setItem('userFirstName', fName);
-          localStorage.setItem('userLastName', lName);
-          setUserName(fullName); 
-          localStorage.setItem('userName', fullName);
-        }
-
-        if (city) { setUserCity(city); localStorage.setItem('userCity', city); }
-        if (phone) { setUserPhone(phone); localStorage.setItem('userPhone', phone); }
-        if (gender) { setUserGender(gender); localStorage.setItem('userGender', gender); }
-        if (dob) { setUserDob(dob); localStorage.setItem('userDob', dob); }
-        if (age) { setUserAge(age); localStorage.setItem('userAge', age); }
-        if (experience) { setUserExperience(experience); localStorage.setItem('userExperience', experience); }
-        if (qualification.length > 0) { 
-           setUserQualifications(qualification); localStorage.setItem('userQualifications', JSON.stringify(qualification)); 
-        }
-        if (subjects.length > 0) { 
-           setUserSubjects([...subjects]); 
-           localStorage.setItem('userSubjects', JSON.stringify(subjects)); 
-        }
-        if (aadhar) { setUserAadhar(aadhar); localStorage.setItem('userAadhar', aadhar); }
-        if (address) { setUserAddress(address); localStorage.setItem('userAddress', address); }
-        if (communication) { setUserCommunication(communication); localStorage.setItem('userCommunication', communication); }
-        if (vehicle) { setHasVehicle(vehicle); localStorage.setItem('hasVehicle', vehicle); }
-        if (schoolExp) { setIsSchoolTeacher(schoolExp); localStorage.setItem('isSchoolTeacher', schoolExp); }
-
-        // Shared Fields with high-priority mappings
         const dbClassGrp = getVal(lead, ['class_group', 'Class', 'class', 'classGroup']);
         const dbLocs = parseMulti(getVal(lead, ['location', 'locality', 'locations', 'Locality', 'Locations']));
         const dbDays = normalizeCommaStr(getVal(lead, ['days', 'Days', 'Available_Day_s', 'weekly_days', 'Weekly Days']));
@@ -1088,53 +721,71 @@ export default function App() {
         const dbDuration = getVal(lead, ['duration', 'Duration', 'avg_duration']);
         const dbMode = getVal(lead, ['mode', 'Mode', 'Mode of Teaching']);
 
-        if (foundId) { setTutorId(foundId); localStorage.setItem('tutorId', foundId); }
-        
-        if (dbLocs.length > 0) { 
-           setUserLocalities([...dbLocs]); 
-           localStorage.setItem('userLocalities', JSON.stringify(dbLocs)); 
-        }
-        if (dbDays) { setUserDays(dbDays); localStorage.setItem('userDays', dbDays); }
-        if (dbTime) { setUserTime(dbTime); localStorage.setItem('userTime', dbTime); }
-        if (dbFee) { setUserFee(dbFee); localStorage.setItem('userFee', dbFee); }
-        if (dbAbout) { setAboutMe(dbAbout); localStorage.setItem('aboutMe', dbAbout); }
-        if (dbResidency) { setUserResidency(dbResidency); localStorage.setItem('userResidency', dbResidency); }
-        if (dbDuration) { setUserDuration(dbDuration); localStorage.setItem('userDuration', dbDuration); }
-        if (dbMode) { setUserMode(dbMode); localStorage.setItem('userMode', dbMode); }
+        // BATCH UPDATE: Create a new profile object to update state atomically
+        const nextProfile: any = { ...profile };
 
-        if (userType === 'teacher') {
-          if (dbClassGrp) {
-            const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII', 'Entrance Exam & Specialization'];
-            const matched = groups.find(g => dbClassGrp.includes(g));
-            if (matched) { setUserClasses([matched]); localStorage.setItem('userClasses', JSON.stringify([matched])); }
-          }
+        if (foundId) { nextProfile.tutorId = foundId; localStorage.setItem('tutorId', foundId); }
+        if (fullName) {
+          const parts = fullName.trim().split(/\s+/);
+          nextProfile.userFirstName = parts[0] || '';
+          nextProfile.userLastName = parts.slice(1).join(' ') || '';
+          nextProfile.userName = fullName;
+          localStorage.setItem('userFirstName', nextProfile.userFirstName);
+          localStorage.setItem('userLastName', nextProfile.userLastName);
+          localStorage.setItem('userName', fullName);
+        }
+        if (city) { nextProfile.userCity = city; localStorage.setItem('userCity', city); }
+        if (phone) { nextProfile.userPhone = phone; localStorage.setItem('userPhone', phone); }
+        if (gender) { nextProfile.userGender = gender; localStorage.setItem('userGender', gender); }
+        if (dob) { nextProfile.userDob = dob; localStorage.setItem('userDob', dob); }
+        if (age) { nextProfile.userAge = age; localStorage.setItem('userAge', age); }
+        if (experience) { nextProfile.userExperience = experience; localStorage.setItem('userExperience', experience); }
+        if (qualification.length > 0) { nextProfile.userQualifications = qualification; localStorage.setItem('userQualifications', JSON.stringify(qualification)); }
+        if (subjects.length > 0) { nextProfile.userSubjects = subjects; localStorage.setItem('userSubjects', JSON.stringify(subjects)); }
+        if (aadhar) { nextProfile.userAadhar = aadhar; localStorage.setItem('userAadhar', aadhar); }
+        if (address) { nextProfile.userAddress = address; localStorage.setItem('userAddress', address); }
+        if (communication) { nextProfile.userCommunication = communication; localStorage.setItem('userCommunication', communication); }
+        if (vehicle) { nextProfile.hasVehicle = vehicle; localStorage.setItem('hasVehicle', vehicle); }
+        if (schoolExp) { nextProfile.isSchoolTeacher = schoolExp; localStorage.setItem('isSchoolTeacher', schoolExp); }
+        if (dbLocs.length > 0) { nextProfile.userLocalities = dbLocs; localStorage.setItem('userLocalities', JSON.stringify(dbLocs)); }
+        if (dbDays) { nextProfile.userDays = dbDays; localStorage.setItem('userDays', dbDays); }
+        if (dbTime) { nextProfile.userTime = dbTime; localStorage.setItem('userTime', dbTime); }
+        if (dbFee) { nextProfile.userFee = dbFee; localStorage.setItem('userFee', dbFee); }
+        if (dbAbout) { nextProfile.aboutMe = dbAbout; localStorage.setItem('aboutMe', dbAbout); }
+        if (dbResidency) { nextProfile.userResidency = dbResidency; localStorage.setItem('userResidency', dbResidency); }
+        if (dbDuration) { nextProfile.userDuration = dbDuration; localStorage.setItem('userDuration', dbDuration); }
+        if (dbMode) { nextProfile.userMode = dbMode; localStorage.setItem('userMode', dbMode); }
+
+        if (userType === 'teacher' && dbClassGrp) {
+          const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII', 'Entrance Exam & Specialization'];
+          const matched = groups.find(g => dbClassGrp.includes(g));
+          if (matched) { nextProfile.userClasses = [matched]; localStorage.setItem('userClasses', JSON.stringify([matched])); }
           setIsTutorFetched(true);
-        } else {
-          // Parent logic for class/board extraction
+        } else if (userType === 'parent') {
           let extractedClass = '';
           if (dbClassGrp && dbClassGrp.includes('(')) {
             extractedClass = dbClassGrp.split('(')[0].trim();
             const board = dbClassGrp.match(/\((.*?)\)/)?.[1] || '';
-            if (board) { setUserBoard(board); localStorage.setItem('userBoard', board); }
-          } else if (dbClassGrp) {
-            extractedClass = dbClassGrp;
-          }
-          if (extractedClass) { setUserClasses([extractedClass]); localStorage.setItem('userClasses', JSON.stringify([extractedClass])); }
+            if (board) { nextProfile.userBoard = board; localStorage.setItem('userBoard', board); }
+          } else if (dbClassGrp) extractedClass = dbClassGrp;
+          if (extractedClass) { nextProfile.userClasses = [extractedClass]; localStorage.setItem('userClasses', JSON.stringify([extractedClass])); }
         }
+        
+        // Single atomic state update
+        setProfile(nextProfile);
         setShowOnboarding(false);
+        if (isRestoringSession) setIsAutoFillDone(true);
       } else {
        // Only clear if the data has actually loaded from the network
        const dataLoaded = (userType === 'teacher' && tutors.length > 0) || (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0));
        if (dataLoaded) {
-           // console.warn(`❌ [Auto-Fill] Profile NOT FOUND for ${email}. Clearing ID.`);
           setTutorId(null);
           localStorage.removeItem('tutorId');
           setIsTutorFetched(false);
-       } else {
-           // console.log('⏳ [Auto-Fill] Waiting for network data before clearing...');
+          if (isRestoringSession) setIsAutoFillDone(true);
        }
     }
-  }, [activeUser, userType, tutors, leads, firestoreLeads]);
+  }, [activeUser, userType, tutors, leads, firestoreLeads, isRestoringSession]);
   // -------------------------------------------------------------
 
 
@@ -1198,362 +849,6 @@ export default function App() {
       }
       setIsFetchingTutor(false);
     }, 800);
-  };
-
-  const handleEmailProceed = async () => {
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      setAuthError('Please enter a valid email address.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const isNative = Capacitor.isNativePlatform();
-      // Use absolute URL to avoid 404 on local dev and ensure connectivity
-      const url = 'https://doableindia.com/app-sys/api_copy.php';
-      
-      const payload = { 
-        action: 'get',
-        email, 
-        userType: userType || 'teacher' // Default to teacher if not selected
-      };
-
-      let responseData;
-      if (isNative) {
-        const response = await CapacitorHttp.post({
-          url,
-          headers: { 'Content-Type': 'application/json' },
-          data: payload
-        });
-        responseData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      } else {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        responseData = await response.json();
-      }
-
-      // Record Found -> Proceed to Password
-      // We check for responseData.data because the live server might return success 
-      // but without data (it just created a blank profile).
-      if (responseData.status === 'success' && responseData.data) {
-        setEmailChecked(true);
-        setEmailExist(true);
-        // Sync user type from server record
-        if (responseData.data.user_type) {
-           setUserType(responseData.data.user_type === 'parent' ? 'parent' : 'teacher');
-        }
-      } else {
-        // Record NOT Found or Blank Profile created -> Go to Signup Selection
-        playTapSound();
-        setAuthMode('signup');
-        setAuthStep('selection');
-        setActiveToast({ title: 'New to DoAble? ✨', body: 'Please select your role to create an account.' });
-      }
-    } catch (err) {
-      console.error('Email Check Error:', err);
-      // If server is unreachable, we allow them to proceed as a fallback or show a clear error
-      setAuthError('Unable to connect to server. Please try again.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleEmailSignIn = async () => {
-    if (!email || !password) {
-      setAuthError('Please enter both email and password.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/signin';
-      
-      let data;
-      if (isNative) {
-        const payload = { 
-          action: 'signin',
-          email, 
-          password,
-          userType: userType || 'teacher'
-        };
-
-        const response = await CapacitorHttp.post({
-          url: url,
-          headers: {
-            'Content-Type': 'application/json'
-          },          data: payload
-        });
-        
-        console.log('📡 Auth Response:', url, response.status, JSON.stringify(response.data));
-
-        if (response.status >= 500) {
-           setAuthError(`Server Error (${response.status}).`);
-           setIsAuthLoading(false);
-           return;
-        }
-
-        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      } else {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },          body: JSON.stringify({ 
-            action: 'signin', 
-            email, 
-            password,
-            userType: userType || 'teacher'
-          })
-        });
-        data = await response.json();
-      }
-      
-      if (data.status === 'success') {
-        const userData = { email: data.user.email, userType: data.user.userType, uid: data.user.id };
-        setCustomUser(userData);
-        localStorage.setItem('customUser', JSON.stringify(userData));
-        setUserType(data.user.userType);
-        localStorage.setItem('userType', data.user.userType);
-
-        // Force refresh: Clear any update locks and fetch fresh data from CRM
-        localStorage.removeItem('lastProfileUpdate');
-        
-        // Load data in background without blocking UI
-        setTimeout(() => {
-          loadData();
-        }, 10);
-
-        playTapSound();
-        setShowOnboarding(false);
-
-        setActiveToast({ title: 'Welcome Back! 👋', body: `Signed in as ${data.user.email}` });
-        setShowProfileSetup(false);
-        setShowOnboarding(false);
-      } else {
-        setAuthError(data.message || 'Invalid email or password.');
-      }
-    } catch (error: any) {
-      console.error('Sign In Error:', error);
-      setAuthError('Connection error. Please try again.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleEmailSignUp = async () => {
-    if (!email || !password) {
-      setAuthError('Please enter both email and password.');
-      return;
-    }
-    if (password.length < 6) {
-      setAuthError('Password should be at least 6 characters.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const isNative = Capacitor.isNativePlatform();
-
-      // Check if email already exists
-      const checkUrl = 'https://doableindia.com/app-sys/api_copy.php';
-      const checkPayload = { action: 'get', email, userType: userType || 'teacher' };
-      
-      let checkData;
-      if (isNative) {
-        const checkRes = await CapacitorHttp.post({ url: checkUrl, headers: { 'Content-Type': 'application/json' }, data: checkPayload });
-        checkData = typeof checkRes.data === 'string' ? JSON.parse(checkRes.data) : checkRes.data;
-      } else {
-        const checkRes = await fetch(checkUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checkPayload) });
-        checkData = await checkRes.json();
-      }
-
-      if (checkData.status === 'success' && checkData.data) {
-        playTapSound();
-        setAuthMode('signin');
-        setEmailChecked(true);
-        setActiveToast({ title: 'Already Registered 👋', body: 'This email is already registered. Please sign in.' });
-        setIsAuthLoading(false);
-        return;
-      }
-
-      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/signup';
-
-      let data;
-      if (isNative) {
-        const payload = { 
-          action: 'signup',
-          email, 
-          password, 
-          userType: userType || 'teacher' 
-        };
-
-        const response = await CapacitorHttp.post({
-          url: url,
-          headers: {
-            'Content-Type': 'application/json'
-          },          data: payload
-        });
-        
-        console.log('📡 Auth Response:', url, response.status, JSON.stringify(response.data));
-
-        if (response.status >= 500) {
-           setAuthError(`Server Error (${response.status}).`);
-           setIsAuthLoading(false);
-           return;
-        }
-
-        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      } else {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },          body: JSON.stringify({ 
-            action: 'signup', 
-            email, 
-            password, 
-            userType: userType || 'teacher' 
-          })
-        });
-        data = await response.json();
-      }
-
-      if (data.status === 'success') {
-        const userData = { email: email, userType: userType || 'teacher', uid: data.userId };
-        setCustomUser(userData);
-        localStorage.setItem('customUser', JSON.stringify(userData));
-        setUserType(userType || 'teacher');
-        localStorage.setItem('userType', userType || 'teacher');
-        playTapSound();
-        setShowSuccess(true);
-        setActiveToast({ title: 'Welcome! 🎊', body: 'Your account has been created.' });
-        setShowProfileSetup(true); // Open profile setup for new users
-        setShowOnboarding(false);
-      } else {
-        setAuthError(data.message || 'Failed to sign up.');
-      }
-    } catch (error: any) {
-      console.error('Sign Up Error:', error);
-      setAuthError('Connection error. Please try again.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setAuthError('Please enter your email address.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/forgot-password';
-
-      let data;
-      if (isNative) {
-        const response = await CapacitorHttp.post({
-          url: url,
-          headers: {
-            'Content-Type': 'application/json'
-          },          data: { 
-            action: 'forgot_password',
-            email 
-          }
-        });
-        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      } else {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },          body: JSON.stringify({ 
-            action: 'forgot_password', 
-            email 
-          })
-        });
-        data = await response.json();
-      }
-      if (data.status === 'success') {
-        setAuthMode('reset');
-        setAuthError(null);
-      } else {
-        setAuthError(data.message || 'Failed to send reset PIN.');
-      }
-    } catch (error: any) {
-      setAuthError('Connection error.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!resetPin || !newPassword || !confirmPassword) {
-      setAuthError('Please fill all fields.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setAuthError('Passwords do not match.');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setAuthError('Password must be at least 6 characters.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const isNative = Capacitor.isNativePlatform();
-      const url = isNative ? 'https://doableindia.com/app-sys/app_auth.php' : '/api/auth/reset-password';
-
-      let data;
-      if (isNative) {
-        const response = await CapacitorHttp.post({
-          url: url,
-          headers: {
-            'Content-Type': 'application/json'
-          },          data: { 
-            action: 'reset_password',
-            email, 
-            pin: resetPin, 
-            password: newPassword 
-          }
-        });
-        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      } else {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },          body: JSON.stringify({ 
-            action: 'reset_password', 
-            email, 
-            pin: resetPin, 
-            password: newPassword 
-          })
-        });
-        data = await response.json();
-      }
-
-      if (data.status === 'success') {
-        alert('Password updated successfully. Please Sign In.');
-        setAuthMode('signin');
-        setResetPin('');
-        setNewPassword('');
-        setRetypePassword('');
-      } else {
-        setAuthError(data.message || 'Reset failed.');
-      }
-    } catch (error: any) {
-      setAuthError('Connection error.');
-    } finally {
-      setIsAuthLoading(false);
-    }
   };
 
   const mainScrollRef = useRef<HTMLDivElement>(null);
@@ -1966,10 +1261,12 @@ City: ${userCity}`;
       const isNative = Capacitor.isNativePlatform();
       const ts = Date.now();
       
-      // NEW: Include email for parents to fetch their specific data even if not "Searching"
-      const emailParam = (userType === 'parent' && activeUser?.email) ? `&email=${encodeURIComponent(activeUser.email.toLowerCase().replace(/\s+/g, ''))}` : '';
+      // Fix: Tutors see ALL jobs, Parents see only THEIR jobs
+      const leadsEmailParam = (userType === 'parent' && activeUser?.email) ? `&email=${encodeURIComponent(activeUser.email.toLowerCase().replace(/\s+/g, ''))}` : '';
       
-      const LEADS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_data.php?t=${ts}${emailParam}` : `/api/leads?t=${ts}${emailParam}`;
+      const LEADS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_data.php?t=${ts}${leadsEmailParam}` : `/api/leads?t=${ts}${leadsEmailParam}`;
+      
+      // Fix: Never filter Tutors list by email, otherwise 'Featured Tutors' and matching will break
       const TUTORS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_copy_data.php?force_refresh=${ts}` : `/api/tutors?t=${ts}`;
 
        // console.log('📡 [Network] Fetching Leads from:', LEADS_URL);
@@ -2107,10 +1404,10 @@ City: ${userCity}`;
     return () => { unsubscribeLeads(); unsubscribeAuth(); };
   }, []);
 
-  const handleSignIn = async () => {
+  const handleGoogleSignIn = async () => {
     try {
       playTapSound();
-      console.log('🔄 handleSignIn started...');
+      console.log('🔄 handleGoogleSignIn started...');
       
       if (Capacitor.isNativePlatform()) {
         console.log('📱 Native Platform: Initializing GoogleAuth.signIn()...');
@@ -2479,195 +1776,30 @@ City: ${userCity}`;
       <audio ref={audioRef} preload="auto" />
 
       {/* Onboarding & Auth Flow Overlay */}
-      <AnimatePresence>
-        {showOnboarding && (
-          <div className="fixed inset-0 z-[20000] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/95" />
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-full max-sm:max-w-sm max-w-sm">
-              {authStep === 'selection' ? (
-                <div className="space-y-6 text-center">
-                  <div className="flex justify-between items-center px-2">
-                    <button onClick={() => { playTapSound(); setAuthStep('auth'); }} className="text-slate-400 hover:text-white/50"><ChevronLeft size={20} /></button>
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Step 1 of 2</p>
-                    <div className="w-5" />
-                  </div>
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Choose Your Path</h2>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">How would you like to proceed?</p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    <button 
-                      onClick={() => { 
-                        playTapSound(); 
-                        setUserType('parent'); 
-                        localStorage.setItem('userType', 'parent'); 
-                        setAuthStep('auth'); 
-                      }}
-                      className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
-                        <LucideUser size={24} strokeWidth={3} />
-                      </div>
-                      <div className="text-left">
-                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">I'm a Parent</h4>
-                        <p className="text-[10px] font-bold text-slate-400">Looking for professional tutors</p>
-                      </div>
-                    </button>
-                    <button 
-                      onClick={() => { 
-                        playTapSound(); 
-                        setUserType('teacher'); 
-                        localStorage.setItem('userType', 'teacher'); 
-                        setAuthStep('auth'); 
-                      }}
-                      className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
-                        <GraduationCap size={24} strokeWidth={3} />
-                      </div>
-                      <div className="text-left">
-                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">I'm a Tutor</h4>
-                        <p className="text-[10px] font-bold text-slate-400">Want to join the elite network</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-[40px] p-8 shadow-2xl space-y-6">
-                  <div className="flex justify-center items-center text-center relative h-6">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">
-                      {authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Create Account' : authMode === 'forgot' ? 'Forgot Password' : 'Reset Password'}
-                    </h3>
-                  </div>
-
-                  <div className="space-y-4">
-                    {authMode !== 'reset' ? (
-                      <>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Email Address</label>
-                          <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                            <input 
-                              type="email" 
-                              value={email} 
-                              onChange={(e) => { setEmail(e.target.value); setEmailChecked(false); }} 
-                              placeholder="name@example.com" 
-                              className={cn("w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all", emailChecked && authMode === 'signin' && "opacity-50")} 
-                              readOnly={emailChecked && authMode === 'signin'}
-                            />
-                            {emailChecked && authMode === 'signin' && (
-                              <button onClick={() => { setEmailChecked(false); setPassword(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-primary uppercase tracking-widest">Change</button>
-                            )}
-                          </div>
-                        </div>
-
-                        {((authMode === 'signin' && emailChecked) || authMode === 'signup') && authMode !== 'forgot' && (
-                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-1.5 overflow-hidden">
-                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Password</label>
-                            <div className="relative">
-                              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" autoFocus />
-                              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                                {showPassword ? <Eye size={18} strokeWidth={2.5} /> : <EyeOff size={18} strokeWidth={2.5} />}
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                        <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
-                          <p className="text-[10px] font-bold text-primary text-center leading-relaxed">Enter the 6-digit PIN sent to <br/><span className="underline">{email}</span></p>
-                        </div>
-                        
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Security PIN</label>
-                          <div className="relative">
-                            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                            <input type="text" maxLength={6} value={resetPin} onChange={(e) => setResetPin(e.target.value)} placeholder="000000" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-center text-lg font-black tracking-[1em] text-slate-700 outline-none focus:border-primary transition-all" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">New Password</label>
-                          <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                            <input type={showPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 chars" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                              {showPassword ? <Eye size={18} strokeWidth={2.5} /> : <EyeOff size={18} strokeWidth={2.5} />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Confirm Password</label>
-                          <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                            <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setRetypePassword(e.target.value)} placeholder="Repeat password" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {authError && <div className="text-rose-500 text-[10px] font-bold px-1 flex items-center gap-1.5"><AlertCircle size={12} /> {authError}</div>}
-
-                    <button 
-                      onClick={
-                        authMode === 'signin' 
-                          ? (emailChecked ? handleEmailSignIn : handleEmailProceed) 
-                          : authMode === 'signup' 
-                            ? handleEmailSignUp 
-                            : authMode === 'forgot' 
-                              ? handleForgotPassword 
-                              : handleResetPassword
-                      }
-                      disabled={isAuthLoading}
-                      className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
-                    >
-                      {isAuthLoading ? <Loader2 size={16} className="animate-spin" /> : (
-                        authMode === 'signin' 
-                          ? (emailChecked ? 'Sign In' : 'Proceed') 
-                          : authMode === 'signup' 
-                            ? 'Sign Up' 
-                            : authMode === 'forgot' 
-                              ? 'Send PIN' 
-                              : 'Verify & Reset'
-                      )}
-                    </button>
-
-                    <div className="flex flex-col gap-3 pt-2">
-                      {authMode === 'signin' && (
-                        <>
-                          {emailChecked && (
-                            <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Forgot Password?</button>
-                          )}
-                          <div className="h-px bg-slate-100 w-full" />
-                          <button onClick={() => { playTapSound(); setAuthMode('signup'); setAuthStep('selection'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">New to DoAble? <span className="text-primary underline">Sign Up</span></button>
-                        </>
-                      )}
-                      {authMode === 'signup' && (
-                        <>
-                          <div className="h-px bg-slate-100 w-full" />
-                          <button onClick={() => { playTapSound(); setAuthMode('signin'); setAuthStep('selection'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">Already Registered user? <span className="text-primary underline">Sign In</span></button>
-                        </>
-                      )}
-                      {(authMode === 'forgot' || authMode === 'reset') && (
-                        <button onClick={() => { setAuthMode('signin'); setAuthError(null); setAuthStep('auth'); setEmailChecked(false); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Back to <span className="text-primary underline">Sign In</span></button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <AuthModal 
+        show={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onSuccess={handleAuthSuccess}
+        onGoogleSignIn={handleGoogleSignIn}
+        playTapSound={playTapSound}
+        setActiveToast={setActiveToast}
+        userType={userType}
+        setUserType={setUserType}
+        userName={userName}
+        initialMode={authModalMode}
+        initialStep={authModalStep}
+      />
 
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap');
+        
         :root {
           --safe-area-top: env(safe-area-inset-top, 0px);
           --safe-area-bottom: env(safe-area-inset-bottom, 0px);
         }
+        
+        .font-genz { font-family: 'Comfortaa', cursive; }
+
         .no-line { border: none !important; box-shadow: none !important; outline: none !important; }
         .sticky-fix { background-color: rgba(255, 255, 255, 0.7) !important; backdrop-filter: blur(8px); }
         
@@ -2894,7 +2026,16 @@ City: ${userCity}`;
         <div className="flex items-center gap-3 relative z-10">
              <div className="flex items-center gap-1.5 bg-white/10 p-0.5 rounded-2xl border border-white/10">
                 <button
-                  onClick={() => { playTapSound(); if (!activeUser) { setAuthMode('signin'); setAuthStep('auth'); setShowOnboarding(true); } else { setShowProfileSetup(true); } }}
+                  onClick={() => { 
+                    playTapSound(); 
+                    if (!activeUser) { 
+                      setAuthModalMode('signin'); 
+                      setAuthModalStep('email'); 
+                      setShowOnboarding(true); 
+                    } else { 
+                      setShowProfileSetup(true); 
+                    } 
+                  }}
                   className="p-1.5 text-white hover:text-white transition-all active:scale-90 flex items-center gap-2 relative"
                 >
                   <div className="relative w-7 h-7 flex items-center justify-center">
@@ -2936,7 +2077,11 @@ City: ${userCity}`;
             playTapSound={playTapSound}
             setFormType={setFormType}
             setShowFormModal={setShowFormModal}
-            onSignUpClick={() => { setAuthMode('signup'); setAuthStep('selection'); setShowOnboarding(true); }}
+            onSignUpClick={() => { 
+              setAuthModalMode('signup'); 
+              setAuthModalStep('email'); 
+              setShowOnboarding(true); 
+            }}
             setActiveTab={setActiveTab}
             setShowFilterDrawer={setShowFilterDrawer} 
             getDynamicGreeting={getDynamicGreeting} 
@@ -3120,1028 +2265,118 @@ City: ${userCity}`;
       </main>
 
       {/* Post Requirement Confirmation Modal */}
-      <AnimatePresence>
-        {showConfirmPost && (
-          <div className="fixed inset-0 z-[25000] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowConfirmPost(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              {/* Fixed Header */}
-              <div className="p-6 pb-4 border-b border-slate-50 flex justify-between items-start shrink-0">
-                <div className="space-y-1">
-                  <h3 className="text-xl font-[1000] text-slate-900 tracking-tight leading-none pt-1">Confirm & Post Job</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Review your summary</p>
-                </div>
-                <button onClick={() => setShowConfirmPost(false)} className="p-2 bg-slate-50 rounded-full text-slate-400 active:scale-90 transition-all"><X size={18} /></button>
-              </div>
-
-              {/* Scrollable Summary Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                {/* 1. Basic Info Section */}
-                <div className="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100/50 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-indigo-100 pb-2 mb-1">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-500 flex items-center justify-center text-white"><Hash size={12} /></div>
-                    <span className="text-[10px] font-black uppercase text-indigo-900 tracking-widest">Basic Details</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Order ID</p>
-                      <p className="text-[12px] font-black text-primary">#{tutorId || 'Pending'}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                        {userClasses.includes('Entrance Exam & Specialization') ? 'Category & Exam' : 'Class & Board'}
-                      </p>
-                      <p className="text-[12px] font-black text-slate-800">
-                        {userClasses.includes('Entrance Exam & Specialization') 
-                          ? `${userClasses[0]} (${userBoard})`
-                          : `${userClasses.join(', ')} (${userBoard})`
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Requirement Section */}
-                <div className="bg-amber-50/50 rounded-2xl p-4 border border-amber-100/50 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-amber-100 pb-2 mb-1">
-                    <div className="w-6 h-6 rounded-lg bg-amber-500 flex items-center justify-center text-white"><BookText size={12} /></div>
-                    <span className="text-[10px] font-black uppercase text-amber-900 tracking-widest">What You Need</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Subjects Needed</p>
-                      <p className="text-[11px] font-black text-slate-800 leading-tight">{userSubjects.join(', ') || 'All Subjects'}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Tutor Gender Preference</p>
-                      <p className="text-[11px] font-black text-slate-800">{userGender}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Location Section */}
-                <div className="bg-emerald-50/50 rounded-2xl p-4 border border-emerald-100/50 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-emerald-100 pb-2 mb-1">
-                    <div className="w-6 h-6 rounded-lg bg-emerald-500 flex items-center justify-center text-white"><MapPin size={12} /></div>
-                    <span className="text-[10px] font-black uppercase text-emerald-900 tracking-widest">Where You Need</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-0.5">
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">City</p>
-                        <p className="text-[11px] font-black text-slate-800">{userCity}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Society / Block</p>
-                        <p className="text-[11px] font-black text-slate-800 leading-tight">{userResidency || 'N/A'}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Locality</p>
-                      <p className="text-[11px] font-black text-slate-800 leading-tight">{userLocalities.join(', ') || 'N/A'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Schedule & Fee Section */}
-                <div className="bg-rose-50/50 rounded-2xl p-4 border border-rose-100/50 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-rose-100 pb-2 mb-1">
-                    <div className="w-6 h-6 rounded-lg bg-rose-500 flex items-center justify-center text-white"><Clock size={12} /></div>
-                    <span className="text-[10px] font-black uppercase text-rose-900 tracking-widest">When & How Much</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Mode</p>
-                      <p className="text-[11px] font-black text-indigo-600">{userMode}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Duration</p>
-                      <p className="text-[11px] font-black text-slate-800">{userDuration || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Preferred Days</p>
-                      <p className="text-[11px] font-black text-slate-800 leading-tight">{userDays || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Preferred Time</p>
-                      <p className="text-[11px] font-black text-slate-800 leading-tight">{userTime || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t border-rose-100 mt-2">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Final Budget / Fee</p>
-                    <p className="text-[16px] font-black text-emerald-600">₹{userFee || 'TBD'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Fixed Footer */}
-              <div className="p-6 border-t border-slate-100 bg-white shrink-0 space-y-4">
-                <div className="bg-indigo-50 rounded-2xl p-3 border border-indigo-100 flex items-start gap-3">
-                  <ShieldCheck className="text-indigo-500 shrink-0" size={16} />
-                  <p className="text-[9px] font-bold text-indigo-700 leading-tight">
-                    Tutors will see these details, but your <span className="underline">Phone and Email will remain hidden</span> for your privacy.
-                  </p>
-                </div>
-
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => { playTapSound(); setShowConfirmPost(false); setShowProfileSetup(true); }}
-                    className="flex-1 h-14 rounded-2xl border-2 border-slate-100 text-slate-400 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Edit3 size={14} /> Edit Need
-                  </button>
-                  <button 
-                    onClick={handleConfirmPost}
-                    disabled={isUpdatingProfile}
-                    className="flex-[2] h-14 rounded-2xl bg-[#572149] text-white font-black text-[11px] uppercase tracking-[0.1em] shadow-xl shadow-[#572149]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    {isUpdatingProfile ? <Loader2 size={18} className="animate-spin" /> : <>Confirm & Post <Sparkles size={16} /></>}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-       {showProfileSetup && (
-         <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4">
-           <div onClick={() => setShowProfileSetup(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-           <div className="relative bg-white w-full max-w-[420px] rounded-[40px] shadow-2xl overflow-hidden flex flex-col h-[90vh] border border-white/20">
-              
-              <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0 bg-white pt-8">
-                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                     <Settings size={20} />
-                   </div>
-                   <div>
-                     <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900 leading-none">
-                       Complete Your Profile
-                     </h3>
-                     <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tight">
-                       Update all your details in one place
-                     </p>
-                   </div>
-                 </div>
-                 <button onClick={() => setShowProfileSetup(false)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition-all"><X size={16} /></button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 space-y-10 custom-scrollbar">
-                 <div className="space-y-10 pb-10">
-                   {/* ─── SECTION 1: IDENTITY ─── */}
-                   <div className="space-y-6">
-                     <div className="flex items-center gap-2 text-primary">
-                       <LucideUser size={16} />
-                       <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Identity & Basics</h4>
-                     </div>
-                     <div className="space-y-4">
-                       <div className="grid grid-cols-2 gap-4">
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">First Name</label>
-                           <input type="text" value={userFirstName} onChange={(e) => { const val = e.target.value; setUserFirstName(val); localStorage.setItem('userFirstName', val); const full = `${val} ${userLastName}`.trim(); setUserName(full); localStorage.setItem('userName', full); }} placeholder="Rahul" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                         </div>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Last Name</label>
-                           <input type="text" value={userLastName} onChange={(e) => { const val = e.target.value; setUserLastName(val); localStorage.setItem('userLastName', val); const full = `${userFirstName} ${val}`.trim(); setUserName(full); localStorage.setItem('userName', full); }} placeholder="Sharma" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                         </div>
-                       </div>
-                       <div className="space-y-1.5">
-                         <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">WhatsApp Number</label>
-                         <div className="flex gap-2">
-                           <div className="w-24 relative">
-                             <select value={userCountryCode} onChange={(e) => { setUserCountryCode(e.target.value); localStorage.setItem('userCountryCode', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-3 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">
-                               <option value="+91">🇮🇳 +91</option>
-                               <option value="+1">🇺🇸 +1</option>
-                               <option value="+44">🇬🇧 +44</option>
-                               <option value="+971">🇦🇪 +971</option>
-                               <option value="+61">🇦🇺 +61</option>
-                               <option value="+1">🇨🇦 +1</option>
-                               <option value="+65">🇸🇬 +65</option>
-                             </select>
-                           </div>
-                           <div className="flex-1 relative">
-                             <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="tel" value={userPhone || ''} onChange={(e) => { setUserPhone(e.target.value); localStorage.setItem('userPhone', e.target.value); }} placeholder="9971XXXXXX" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                           </div>
-                         </div>
-                       </div>
-                       <div className="space-y-3">
-                         <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? 'Tutor Gender Preference' : 'Gender'}</label>
-                         <div className="flex flex-wrap gap-2">
-                           {(userType === 'teacher' ? ['Male', 'Female', 'Transgender'] : ['Male', 'Female', 'All']).map(g => (
-                             <button key={g} onClick={() => { playTapSound(); setUserGender(g); localStorage.setItem('userGender', g); }} className={cn("flex-1 px-4 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", userGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{g}</button>
-                           ))}
-                         </div>
-                       </div>
-                     </div>
-                   </div>
-
-                   {/* ─── SECTION 2: PERSONAL (TUTOR) or ACADEMICS (PARENT) ─── */}
-                   {userType === 'teacher' ? (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <FileText size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Personal Details</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="grid grid-cols-2 gap-4">
-                           <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Date of Birth</label>
-                             <input type="date" value={userDob} onChange={(e) => { setUserDob(e.target.value); localStorage.setItem('userDob', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                           </div>
-                           <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Age</label>
-                             <div className="w-full bg-slate-100 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-500">{userAge ? `${userAge} Years` : 'Select DOB'}</div>
-                           </div>
-                         </div>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Aadhar Number</label>
-                           <div className="relative">
-                             <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="text" maxLength={12} value={userAadhar} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); setUserAadhar(val); localStorage.setItem('userAadhar', val); }} placeholder="12-digit Aadhar Number" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                           </div>
-                         </div>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Full Address</label>
-                           <div className="relative">
-                             <MapPin className="absolute left-4 top-4 text-slate-300" size={16} />
-                             <textarea value={userAddress} onChange={(e) => { setUserAddress(e.target.value); localStorage.setItem('userAddress', e.target.value); }} placeholder="House No, Street, Landmark..." rows={3} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all resize-none" />
-                           </div>
-                         </div>
-                       </div>
-                     </div>
-                   ) : (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <BookOpen size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Academic Requirements</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Class Group</label>
-                           <div className="grid grid-cols-2 gap-2">
-                             {CLASSES_LIST.map(c => {
-                               const isGroupActive = userClasses.includes(c) || (CLASS_GROUP_MAPPING[c] || []).some(sub => userClasses.includes(sub));
-                               return (
-                                 <button key={c} onClick={() => { playTapSound(); setUserClasses([c]); localStorage.setItem('userClasses', JSON.stringify([c])); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
-                               );
-                             })}
-                           </div>
-                         </div>
-                         {(() => {
-                           const currentGroup = CLASSES_LIST.find(g => userClasses.includes(g) || (CLASS_GROUP_MAPPING[g] || []).some(s => userClasses.includes(s)));
-                           if (!currentGroup) return null;
-                           return (
-                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Specific Class</label>
-                               <div className="flex flex-wrap gap-2">
-                                 {(CLASS_GROUP_MAPPING[currentGroup] || []).map(sub => (
-                                   <button 
-                                     key={sub} 
-                                     onClick={() => { 
-                                       playTapSound(); 
-                                       const next = userClasses.includes(sub) 
-                                         ? userClasses.filter(c => c !== sub) 
-                                         : [...userClasses.filter(c => CLASSES_LIST.includes(c)), sub]; 
-                                       setUserClasses(next); 
-                                       localStorage.setItem('userClasses', JSON.stringify(next)); 
-                                     }} 
-                                     className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter transition-all", userClasses.includes(sub) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}
-                                   >
-                                     {sub}
-                                   </button>
-                                 ))}
-                               </div>
-                             </div>
-                           );
-                         })()}
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">
-                             {userClasses.includes('Entrance Exam & Specialization') ? 'Exam / Category' : 'Board'}
-                           </label>
-                           <div className="grid grid-cols-2 gap-2">
-                             {(userClasses.includes('Entrance Exam & Specialization') 
-                               ? (SPECIALIZED_SUB_CATEGORIES['Entrance Exam & Specialization'] || [])
-                               : ['CBSE', 'ICSE', 'State Board', 'IB/IGCSE']
-                             ).map(b => (
-                               <button key={b} onClick={() => { playTapSound(); setUserBoard(b); localStorage.setItem('userBoard', b); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
-                             ))}
-                           </div>
-                         </div>
-
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Subjects Needed</label>
-                           <div className="flex flex-wrap gap-2">
-                             {(() => {
-                               if (userClasses.includes('Entrance Exam & Specialization')) {
-                                 const subjects = SPECIALIZED_SUBJECTS[userBoard];
-                                 if (!subjects) return [];
-                                 
-                                 if (Array.isArray(subjects)) {
-                                   return subjects.map(s => (
-                                     <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
-                                   ));
-                                 } else {
-                                   // Grouped Subjects (Languages)
-                                   return Object.entries(subjects).map(([group, subjs]: [string, any]) => (
-                                     <div key={group} className="w-full space-y-2 mt-2">
-                                       <div className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest border-l-2 border-primary/30 pl-2">{group}</div>
-                                       <div className="flex flex-wrap gap-2">
-                                         {subjs.map((s: string) => (
-                                           <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
-                                         ))}
-                                       </div>
-                                     </div>
-                                   ));
-                                 }
-                               }
-                               const groupName = userClasses[0];
-                               return (groupName ? CLASS_SUBJECTS_DATA[groupName] || [] : []).map(s => (
-                                 <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
-                               ));
-                             })()}
-                           </div>
-                         </div>
-                       </div>
-                     </div>
-                   )}
-
-                   {/* ─── SECTION 3: BIO & COMM (TUTOR) or LOCATION (PARENT) ─── */}
-                   {userType === 'teacher' ? (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <Edit3 size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Bio & Communication</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">About Me (Catchy Bio)</label>
-                           <div className="relative">
-                             <Edit3 className="absolute left-4 top-4 text-slate-300" size={16} />
-                             <textarea value={aboutMe} onChange={(e) => { setAboutMe(e.target.value); localStorage.setItem('aboutMe', e.target.value); }} placeholder="Write a short, catchy bio. Mention teaching style & why parents should hire you." rows={4} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-[12px] font-bold text-slate-700 outline-none focus:border-primary transition-all resize-none" />
-                             <div className="flex items-center gap-1.5 mt-2 ml-1 text-primary">
-                               <Sparkles size={12} />
-                               <span className="text-[9px] font-black uppercase tracking-tight">Pro-Tip: Use AI like ChatGPT or Gemini.</span>
-                             </div>
-                           </div>
-                         </div>
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Communication Proficiency</label>
-                           <div className="space-y-2">
-                             {[
-                               { label: 'Beginner', desc: 'Hindi/Regional preferred', value: 'Beginner: Understands English prefers teaching in Hindi/Regional Language' },
-                               { label: 'Intermediate', desc: 'Speaks/Explains in English', value: 'Intermediate: Speaks comfortably explains concepts in English.' },
-                               { label: 'Fluent', desc: 'Strictly English sessions', value: 'Fluent: Teaches the entire session strictly in English.' }
-                             ].map(item => (
-                               <button key={item.label} onClick={() => { playTapSound(); setUserCommunication(item.value); localStorage.setItem('userCommunication', item.value); }} className={cn("w-full p-4 rounded-2xl border-2 text-left transition-all", userCommunication === item.value ? "border-primary bg-primary/5 shadow-md" : "border-slate-100 bg-white")}>
-                                 <span className={cn("text-[11px] font-black uppercase tracking-wider block", userCommunication === item.value ? "text-primary" : "text-slate-700")}>{item.label}</span>
-                                 <p className="text-[9px] font-bold text-slate-400 leading-tight">{item.desc}</p>
-                               </button>
-                             ))}
-                           </div>
-                         </div>
-                       </div>
-                     </div>
-                   ) : (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <MapPin size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Location & Mode</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of Learning</label>
-                           <div className="flex gap-2">
-                             {['Home Tuition', 'Online Class'].map(m => (
-                               <button key={m} onClick={() => { playTapSound(); setUserMode(m); localStorage.setItem('userMode', m); }} className={cn("flex-1 py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center gap-1", userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}><span>{m === 'Home Tuition' ? '🏠' : '💻'}</span><span>{m}</span></button>
-                             ))}
-                           </div>
-                         </div>
-                         {userMode !== 'Online Class' && (
-                           <div className="space-y-4">
-                             <div className="space-y-1.5">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">City</label>
-                               <select value={userCity} onChange={(e) => { setUserCity(e.target.value); localStorage.setItem('userCity', e.target.value); setUserLocalities([]); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">{CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                             </div>
-                             <div className="space-y-1.5">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Locality</label>
-                               <select value={userLocalities[0] || ''} onChange={(e) => { setUserLocalities([e.target.value]); localStorage.setItem('userLocalities', JSON.stringify([e.target.value])); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"><option value="">Select Locality</option>{(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => <option key={l} value={l}>{l}</option>)}</select>
-                             </div>
-                             <div className="space-y-1.5">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Society / Block</label>
-                               <div className="relative"><MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} /><input type="text" value={userResidency || ''} onChange={(e) => { setUserResidency(e.target.value); localStorage.setItem('userResidency', e.target.value); }} placeholder="e.g. DLF Phase 3" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" /></div>
-                             </div>
-                           </div>
-                         )}
-                       </div>
-                     </div>
-                   )}
-
-                   {/* ─── SECTION 4: ACADEMICS (TUTOR) or SCHEDULE (PARENT) ─── */}
-                   {userType === 'teacher' ? (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <BookOpen size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Academic Expertise</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Teaching Classes</label>
-                           <div className="grid grid-cols-2 gap-2">
-                             {CLASSES_LIST.map(c => {
-                               const isGroupActive = userClasses.includes(c) || (CLASS_GROUP_MAPPING[c] || []).some(sub => userClasses.includes(sub));
-                               return (
-                                 <button key={c} onClick={() => { playTapSound(); setUserClasses([c]); localStorage.setItem('userClasses', JSON.stringify([c])); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
-                               );
-                             })}
-                           </div>
-                         </div>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">
-                             {userClasses.includes('Entrance Exam & Specialization') ? 'Exam / Category' : 'Board'}
-                           </label>
-                           <div className="grid grid-cols-2 gap-2">
-                             {(userClasses.includes('Entrance Exam & Specialization') 
-                               ? (SPECIALIZED_SUB_CATEGORIES['Entrance Exam & Specialization'] || [])
-                               : ['CBSE', 'ICSE', 'State Board', 'IB/IGCSE']
-                             ).map(b => (
-                               <button key={b} onClick={() => { playTapSound(); setUserBoard(b); localStorage.setItem('userBoard', b); setUserSubjects([]); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
-                             ))}
-                           </div>
-                         </div>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Subjects Teaching</label>
-                           <div className="flex flex-wrap gap-2">
-                             {(() => {
-                               if (userClasses.includes('Entrance Exam & Specialization')) {
-                                 const subjects = SPECIALIZED_SUBJECTS[userBoard];
-                                 if (!subjects) return [];
-                                 
-                                 if (Array.isArray(subjects)) {
-                                   return subjects.map(s => (
-                                     <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
-                                   ));
-                                 } else {
-                                   // Grouped Subjects (Languages)
-                                   return Object.entries(subjects).map(([group, subjs]: [string, any]) => (
-                                     <div key={group} className="w-full space-y-2 mt-2">
-                                       <div className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest border-l-2 border-primary/30 pl-2">{group}</div>
-                                       <div className="flex flex-wrap gap-2">
-                                         {subjs.map((s: string) => (
-                                           <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
-                                         ))}
-                                       </div>
-                                     </div>
-                                   ));
-                                 }
-                               }
-
-                               const allSubjects: string[] = [];
-                               userClasses.forEach(c => {
-                                 (CLASS_SUBJECTS_DATA[c] || []).forEach(s => { if (!allSubjects.includes(s)) allSubjects.push(s); });
-                               });
-                               return (allSubjects.length > 0 ? allSubjects : (userClasses[0] ? CLASS_SUBJECTS_DATA[userClasses[0]] || [] : [])).map(s => (
-                                 <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; setUserSubjects(next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
-                               ));
-                             })()}
-                           </div>
-                         </div>
-                       </div>
-                     </div>
-                   ) : (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <Clock size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Schedule & Duration</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Days</label>
-                           <div className="flex flex-wrap gap-2">
-                             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                               <button key={day} onClick={() => { playTapSound(); const currentDays = userDays ? userDays.split(', ') : []; const next = currentDays.includes(day) ? currentDays.filter(v => v !== day) : [...currentDays, day]; setUserDays(next.join(', ')); localStorage.setItem('userDays', next.join(', ')); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tight transition-all", (userDays ? userDays.split(', ') : []).includes(day) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{day}</button>
-                             ))}
-                           </div>
-                         </div>
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Time</label>
-                           <div className="grid grid-cols-3 gap-2 max-h-[180px] overflow-y-auto p-1 custom-scrollbar">
-                             {TIME_LIST.map(time => (
-                               <button key={time} onClick={() => { playTapSound(); const currentTimes = userTime ? userTime.split(', ') : []; const next = currentTimes.includes(time) ? currentTimes.filter(v => v !== time) : [...currentTimes, time]; setUserTime(next.join(', ')); localStorage.setItem('userTime', next.join(', ')); }} className={cn("py-2 px-1 rounded-lg border font-bold text-[9px] text-center transition-all", (userTime ? userTime.split(', ') : []).includes(time) ? "border-primary bg-primary/10 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{time}</button>
-                             ))}
-                           </div>
-                         </div>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Session Duration</label>
-                           <select value={userDuration} onChange={(e) => { setUserDuration(e.target.value); localStorage.setItem('userDuration', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"><option value="1 Hour">1 Hour</option><option value="1.5 Hours">1.5 Hours</option><option value="2 Hours">2 Hours</option><option value="2.5 Hours">2.5 Hours</option></select>
-                         </div>
-                       </div>
-                     </div>
-                   )}
-
-                   {/* ─── SECTION 5: PROFESSIONAL (TUTOR) ─── */}
-                   {userType === 'teacher' && (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <GraduationCap size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Professional Details</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Qualifications</label>
-                           <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-2 bg-slate-50 rounded-2xl border border-slate-100 custom-scrollbar">
-                             {TUTOR_QUALIFICATIONS_LIST.map(q => (
-                               <button key={q} onClick={() => { playTapSound(); const next = userQualifications.includes(q) ? userQualifications.filter(v => v !== q) : [...userQualifications, q]; setUserQualifications(next); localStorage.setItem('userQualifications', JSON.stringify(next)); }} className={cn("px-3 py-2 rounded-xl border-2 font-bold text-[9px] uppercase transition-all", userQualifications.includes(q) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{q}</button>
-                             ))}
-                           </div>
-                         </div>
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Teaching Experience</label>
-                           <div className="grid grid-cols-1 gap-2">
-                             {TUTOR_EXPERIENCE_LIST.map(exp => (
-                               <button key={exp} onClick={() => { playTapSound(); setUserExperience(exp); localStorage.setItem('userExperience', exp); }} className={cn("w-full py-3 px-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest text-left transition-all", userExperience === exp ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{exp}</button>
-                             ))}
-                           </div>
-                         </div>
-                       </div>
-                     </div>
-                   )}
-
-                   {/* ─── SECTION 6: LOCATION & LOGISTICS (TUTOR) ─── */}
-                   {userType === 'teacher' && (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <MapPin size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Location & Logistics</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of Teaching</label>
-                           <div className="flex gap-2">
-                             {['Home Tuition', 'Online Class'].map(m => (
-                               <button key={m} onClick={() => { playTapSound(); setUserMode(m); localStorage.setItem('userMode', m); }} className={cn("flex-1 py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center gap-1", userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}><span>{m === 'Home Tuition' ? '🏠' : '💻'}</span><span>{m}</span></button>
-                             ))}
-                           </div>
-                         </div>
-                         {userMode !== 'Online Class' && (
-                           <div className="space-y-4">
-                             <div className="space-y-1.5">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">City</label>
-                               <select value={userCity} onChange={(e) => { setUserCity(e.target.value); localStorage.setItem('userCity', e.target.value); setUserLocalities([]); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">{CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                             </div>
-                             <div className="space-y-1.5">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Localities (Select Multiple)</label>
-                               <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-2 bg-slate-50 rounded-2xl border border-slate-100 custom-scrollbar">{(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => (
-                                 <button key={l} onClick={() => { playTapSound(); const next = userLocalities.includes(l) ? userLocalities.filter(v => v !== l) : [...userLocalities, l]; setUserLocalities(next); localStorage.setItem('userLocalities', JSON.stringify(next)); }} className={cn("px-3 py-2 rounded-xl border-2 font-bold text-[10px] uppercase transition-all", userLocalities.includes(l) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{l}</button>
-                               ))}</div>
-                             </div>
-                             <div className="space-y-3">
-                               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Own Vehicle?</label>
-                               <div className="flex gap-2">
-                                 {['Yes', 'No'].map(v => (
-                                   <button key={v} onClick={() => { playTapSound(); setHasVehicle(v); localStorage.setItem('hasVehicle', v); }} className={cn("flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", hasVehicle === v ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{v}</button>
-                                 ))}
-                               </div>
-                             </div>
-                           </div>
-                         )}
-                       </div>
-                     </div>
-                   )}
-
-                   {/* ─── SECTION 7: SCHEDULE & FEE (TUTOR) ─── */}
-                   {userType === 'teacher' && (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <Clock size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Schedule & Fee</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Days</label>
-                           <div className="flex flex-wrap gap-2">
-                             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                               <button key={day} onClick={() => { playTapSound(); const currentDays = userDays ? userDays.split(', ') : []; const next = currentDays.includes(day) ? currentDays.filter(v => v !== day) : [...currentDays, day]; setUserDays(next.join(', ')); localStorage.setItem('userDays', next.join(', ')); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tight transition-all", (userDays ? userDays.split(', ') : []).includes(day) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{day}</button>
-                             ))}
-                           </div>
-                         </div>
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Time</label>
-                           <div className="grid grid-cols-3 gap-2 max-h-[180px] overflow-y-auto p-1 custom-scrollbar">
-                             {TIME_LIST.map(time => (
-                               <button key={time} onClick={() => { playTapSound(); const currentTimes = userTime ? userTime.split(', ') : []; const next = currentTimes.includes(time) ? currentTimes.filter(v => v !== time) : [...currentTimes, time]; setUserTime(next.join(', ')); localStorage.setItem('userTime', next.join(', ')); }} className={cn("py-2 px-1 rounded-lg border font-bold text-[9px] text-center transition-all", (userTime ? userTime.split(', ') : []).includes(time) ? "border-primary bg-primary/10 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{time}</button>
-                             ))}
-                           </div>
-                         </div>
-                         <div className="space-y-3">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Fee Charges (Per Hour)</label>
-                           <div className="grid grid-cols-1 gap-2">
-                             {TUTOR_FEE_LIST.map(f => (
-                               <button key={f} onClick={() => { playTapSound(); setUserFee(f); localStorage.setItem('userFee', f); }} className={cn("w-full py-3 px-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest text-left transition-all", userFee === f ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{f}</button>
-                             ))}
-                           </div>
-                         </div>
-                       </div>
-                     </div>
-                   )}
-
-
-
-                   {/* ─── SECTION 8: SELFIE (TUTOR) ─── */}
-                   {userType === 'teacher' && (
-                     <div className="space-y-6 pt-6 border-t border-slate-50">
-                       <div className="flex items-center gap-2 text-primary">
-                         <Camera size={16} />
-                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Profile Pic</h4>
-                       </div>
-                       <div className="space-y-4">
-                         <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200 gap-4">
-                            {userSelfie ? (
-                              <div className="relative group">
-                                <img src={userSelfie} alt="Profile" className="w-48 h-48 rounded-[32px] object-cover border-4 border-white shadow-2xl" />
-                                <button 
-                                  onClick={() => { setUserSelfie(null); localStorage.removeItem('userSelfie'); }}
-                                  className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90"
-                                >
-                                  <X size={16} strokeWidth={3} />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center gap-4 py-4">
-                                 <div className="w-20 h-20 bg-primary/10 rounded-[24px] flex items-center justify-center text-primary">
-                                   <Camera size={40} />
-                                 </div>
-                                 <label className="bg-[#191445] text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all cursor-pointer">
-                                    Capture / Upload
-                                    <input type="file" accept="image/*" className="hidden" onChange={handleSelfieChange} />
-                                 </label>
-                                 <p className="text-[9px] font-bold text-slate-400 uppercase">Max Size: 5MB • Any Format</p>
-                              </div>
-                            )}
-                         </div>
-                         <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 flex items-start gap-4">
-                            <ShieldCheck size={20} className="text-amber-500 shrink-0 mt-0.5" />
-                            <p className="text-[10px] font-bold text-amber-800 leading-snug">
-                              Please upload a <span className="font-black">Professional Passport Photo</span>. Do not upload side faces, cropped photos, or casual selfies. A clear front-facing photo helps in getting more leads.
-                            </p>
-                         </div>
-                       </div>
-                     </div>
-                   )}
-
-                   {/* ─── SECTION 9: ACCOUNT SETTINGS ─── */}
-                   <div className="space-y-6 pt-6 border-t border-slate-50">
-                     <div className="flex items-center gap-2 text-primary">
-                       <Settings size={16} />
-                       <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Account & Settings</h4>
-                     </div>
-                     <div className="space-y-6">
-                       {userType === 'parent' && (
-                         <div className="space-y-1.5">
-                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Student/Need Details</label>
-                           <textarea value={aboutMe} onChange={(e) => { setAboutMe(e.target.value); localStorage.setItem('aboutMe', e.target.value); }} placeholder="Tell us more about the requirement..." rows={3} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all resize-none" />
-                         </div>
-                       )}
-                       <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex items-center gap-4">
-                         <div className="relative">{profilePhoto ? <img src={profilePhoto} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" /> : <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-white shadow-md"><LucideUser size={24} /></div>}</div>
-                         <div className="min-w-0 flex-1">
-                           <div className="text-[12px] font-black text-slate-900 truncate">{userName || (userType === 'teacher' ? 'Tutor' : 'Parent')}</div>
-                           <div className="text-[10px] font-bold text-slate-400 truncate">{activeUser?.email}</div>
-                           <div className="text-[9px] font-black text-primary uppercase tracking-widest mt-0.5">{userType === 'parent' ? 'Order ID' : 'Tutor ID'}: #{tutorId || 'Pending'}</div>
-                         </div>
-                       </div>
-                       <div className="pt-6 border-t border-slate-100/50">
-                         <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><AlertCircle size={12} /> Danger Zone</p>
-                         <button onClick={handleDeleteProfile} disabled={isDeletingProfile} className="w-full bg-rose-500 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-rose-200">{isDeletingProfile ? <Loader2 size={16} className="animate-spin" /> : <><Trash2 size={16} /> Delete My Profile</>}</button>
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-              </div>
-
-              <div className="p-6 border-t border-slate-50 bg-white flex items-center gap-3 shrink-0">
-                 <button 
-                   onClick={handleLogout}
-                   className="flex-1 h-14 rounded-2xl bg-pink-500 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-pink-200 flex items-center justify-center gap-2"
-                 >
-                   <LogOut size={16} /> Sign Out
-                 </button>
-                 <button 
-                   onClick={() => { playTapSound(); handleUpdateProfile(); }}
-                   disabled={isUpdatingProfile}
-                   className="flex-[1.5] h-14 rounded-2xl bg-sky-400 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-sky-100 flex items-center justify-center gap-2"
-                 >
-                   {isUpdatingProfile ? <Loader2 size={16} className="animate-spin" /> : <>Save Details <Check size={16} strokeWidth={3} /></>}
-                 </button>
-              </div>
-           </div>
-         </div>
-       )}
+      <ConfirmPostJobModal
+        show={showConfirmPost}
+        onClose={() => setShowConfirmPost(false)}
+        onEdit={() => { playTapSound(); setShowConfirmPost(false); setShowProfileSetup(true); }}
+        onConfirm={handleConfirmPost}
+        isUpdating={isUpdatingProfile}
+        tutorId={tutorId}
+        userClasses={userClasses}
+        userBoard={userBoard}
+        userSubjects={userSubjects}
+        userGender={userGender}
+        userCity={userCity}
+        userResidency={userResidency}
+        userLocalities={userLocalities}
+        userMode={userMode}
+        userDuration={userDuration}
+        userDays={userDays}
+        userTime={userTime}
+        userFee={userFee}
+      />
 
       <AnimatePresence>
-        {selectedJob && (
-          <div className="fixed inset-0 z-[18000] flex items-end sm:items-center justify-center p-0 sm:p-4">
-            {(() => {
-              if (selectedJob['Order ID'] === '7752' || (selectedJob as any).order_id === '7752' || (selectedJob as any).id === '7752') {
-                console.log('🚨 [CRITICAL-DEBUG] Job #7752 Detail View Object:', JSON.stringify(selectedJob, null, 2));
-              }
-              return null;
-            })()}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedJob(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-               {/* Premium Header */}
-               <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0 bg-white relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full -mr-16 -mt-16" />
-                  <div className="relative z-10 space-y-0.5">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Job Opportunity</h3>
-                    <div className="flex items-center gap-2">
-                       <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 flex items-center gap-1">
-                         <BadgeCheck size={10} strokeWidth={3} /> VERIFIED LEAD
-                       </span>
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{getJobId(selectedJob)}</span>
-                    </div>
-                  </div>
-                  <button onClick={() => setSelectedJob(null)} className="relative z-10 p-2.5 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-600 transition-all active:scale-90">
-                    <X size={18} strokeWidth={3} />
-                  </button>
-               </div>
-
-               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-12">
-                  {/* Primary Info Card */}
-                  <div className="bg-slate-900 rounded-[32px] p-6 text-white shadow-xl relative overflow-hidden">
-                    <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-primary/20 rounded-full blur-3xl" />
-                    <div className="relative z-10 space-y-4">
-                      <div className="space-y-1">
-                        <div className="bg-white/10 w-fit px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-primary-foreground border border-white/5">
-                          {selectedJob.Class || selectedJob['Class / Board'] || (selectedJob as any).class_group || 'Premium Class'}
-                        </div>
-                        <h4 className="text-[16px] font-[1000] text-white leading-snug tracking-tight">
-                          {selectedJob.subjects || selectedJob['Preferred Subject(s)'] || (selectedJob as any).subject || 'General Subjects'}
-                        </h4>
-                      </div>
-                      <div className="flex justify-between items-start pt-3 gap-4">
-                        <div className="flex flex-col gap-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-black tracking-tight uppercase">
-                            <MapPin size={11} strokeWidth={3} /> {selectedJob.City || (selectedJob as any).city || 'India'}
-                          </div>
-                          <div className="text-slate-300 text-[11px] font-medium leading-relaxed">
-                            {cleanValue(selectedJob.residency || (selectedJob as any).residency || '', '') ? `${selectedJob.residency || (selectedJob as any).residency}, ` : ''}{cleanValue(selectedJob.Locations || (selectedJob as any).locations || (selectedJob as any).location || (selectedJob as any).locality || '', 'All Areas')}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          {(() => {
-                            const rawFee = selectedJob.Fee || (selectedJob as any).fee || (selectedJob as any).budget || selectedJob['Fee/Month'] || (selectedJob as any).monthly_fee || (selectedJob as any).Fee_hour || '';
-                            const isNumeric = /[0-9]/.test(rawFee.toString());
-                            return (
-                              <div className="flex flex-col items-end">
-                                <div className="text-[22px] font-black text-emerald-400 leading-none">
-                                  {isNumeric ? `₹${formatCurrency(rawFee)}` : rawFee || '₹0'}
-                                </div>
-                                <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-1">Monthly Budget</span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Details Grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <DetailItem icon={<LucideUser size={12} className="text-indigo-500" />} label="Tutor Gender" value={selectedJob.Gender || (selectedJob as any).gender || (selectedJob as any).preferred_gender || 'Any Preference'} />
-                    <DetailItem icon={<Clock size={12} className="text-rose-500" />} label="Preferred Time" value={selectedJob.time || (selectedJob as any).preferred_time || 'Flexible'} />
-                    <DetailItem icon={<Calendar size={12} className="text-amber-500" />} label="Weekly Days" value={selectedJob.days || (selectedJob as any).weekly_days || (selectedJob as any).Days || 'N/A'} />
-                    <DetailItem icon={<Navigation size={12} className="text-blue-500" />} label="Teaching Mode" value={selectedJob.mode || (selectedJob as any).Mode || 'Home Tuition'} />
-                    <DetailItem icon={<Zap size={12} className="text-emerald-500" />} label="Avg. Duration" value={selectedJob.duration || (selectedJob as any).Duration || (selectedJob as any).avg_duration || '1.5 Hours'} />
-                    <DetailItem icon={<BadgeCheck size={12} className="text-purple-500" />} label="Lead Status" value={selectedJob.status || (selectedJob as any).internal_remark || 'Active'} />
-                  </div>
-
-                  {/* Requirements Section */}
-                  <div className="bg-slate-50 rounded-[28px] p-5 border border-slate-100 space-y-2.5">
-                    <div className="text-[10px] font-black uppercase text-slate-400 tracking-[0.15em] flex items-center gap-2">
-                      <FileText size={12} className="text-slate-400" /> Parent's Requirement
-                    </div>
-                    <p className="text-[13px] font-bold text-slate-600 leading-relaxed italic">
-                      "{selectedJob.Notes || 'Looking for an experienced tutor who can help with core concepts and regular practice sessions.'}"
-                    </p>
-                  </div>
-
-                  {/* Security Advice */}
-                  <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100/50 flex items-start gap-3">
-                    <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
-                    <p className="text-[10.5px] font-bold text-blue-800 leading-snug">
-                      Your safety is our priority. DoAble India verifies every lead, but we recommend meeting in a safe environment for the first session.
-                    </p>
-                  </div>
-               </div>
-
-               {/* Action Footer */}
-               <div className="p-6 pt-2 border-t border-slate-50 bg-white shrink-0">
-                  <button 
-                    onClick={() => handleApplyJob(selectedJob)}
-                    className="w-full bg-[#191445] text-white h-16 rounded-[24px] font-black text-[13px] uppercase tracking-[0.2em] shadow-2xl shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-3"
-                  >
-                    Apply for this Job <ArrowRight size={20} strokeWidth={3} />
-                  </button>
-                  <p className="text-center text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-4">Mention Order ID: #{getJobId(selectedJob)}</p>
-               </div>
-            </motion.div>
-          </div>
-        )}
-
-        {selectedTutor && (
-          <div className="fixed inset-0 z-[18000] flex items-end sm:items-center justify-center p-0 sm:p-4">
-            {console.log('👤 [Tutor-Modal-Debug] Selected Tutor Data:', selectedTutor)}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedTutor(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-               <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0 bg-slate-50/50">
-                  <div className="space-y-0.5">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Tutor Profile</h3>
-                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5"><BadgeCheck size={10} /> {selectedTutor.verified === 'Yes' ? 'Verified Expert' : 'Awaiting Verification'}</p>
-                  </div>
-                  <button onClick={() => setSelectedTutor(null)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm transition-all">
-                    <X size={16} />
-                  </button>
-               </div>
-
-               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {selectedTutor.photo ? (
-                        <img src={selectedTutor.photo} alt={selectedTutor.name} className="w-20 h-20 rounded-[28px] object-cover border-4 border-white shadow-xl" />
-                      ) : (
-                        <div className="w-20 h-20 rounded-[28px] bg-indigo-50 flex items-center justify-center text-indigo-500 border-4 border-white shadow-xl">
-                          <LucideUser size={32} />
-                        </div>
-                      )}
-                      {selectedTutor.verified === 'Yes' && (
-                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-full border-2 border-white">
-                          <Check size={10} strokeWidth={4} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-[20px] font-[1000] text-slate-900 tracking-tight leading-tight">{toTitleCase(selectedTutor.name)}</h4>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{getTutorId(selectedTutor)}</span>
-                          <div className="w-1 h-1 bg-slate-200 rounded-full" />
-                          <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{selectedTutor.experience} Experience</span>
-                        </div>
-                        <div className="flex items-center gap-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-tight">
-                           <span className="flex items-center gap-1"><LucideUser size={10} className="text-slate-400" /> {selectedTutor.gender || 'Any'}</span>
-                           <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                           <span className="flex items-center gap-1"><TrendingUp size={10} className="text-slate-400" /> {selectedTutor.age ? `${selectedTutor.age} Yrs` : 'N/A'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                       <DetailItem icon={<GraduationCap size={12} />} label="Qualification" value={selectedTutor.qualification.join(', ') || 'Graduate'} />
-                    </div>
-                    <DetailItem icon={<MapPin size={12} />} label="City" value={selectedTutor.city} />
-                    <div className="col-span-2">
-                       <DetailItem icon={<BookOpen size={12} />} label="Classes" value={selectedTutor.class_group.join(', ') || 'All Classes'} />
-                    </div>
-                    <DetailItem 
-                      icon={<TrendingUp size={12} />} 
-                      label="Expectation" 
-                      value={( /[0-9]/.test((selectedTutor.fee || '').toString()) ? `₹${formatCurrency(selectedTutor.fee || '0')}` : (selectedTutor.fee || '₹0') ) + '/hr'} 
-                    />
-                    <DetailItem icon={<Navigation size={12} />} label="Teaching Mode" value={selectedTutor.mode || 'Home Tuition'} />
-                    <DetailItem icon={<Calendar size={12} />} label="Available Days" value={selectedTutor.days || 'All Days'} />
-                    <DetailItem icon={<Clock size={12} />} label="Preferred Time" value={selectedTutor.time || 'Flexible'} />
-                    <DetailItem icon={<Smartphone size={12} />} label="Own Vehicle" value={selectedTutor.have_vehicle || 'No'} />
-                    <div className="col-span-2">
-                       <DetailItem icon={<MapPin size={12} />} label="Preferred Locations" value={selectedTutor.location.join(', ') || 'All Areas'} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h5 className="text-[11px] font-black uppercase text-slate-400 tracking-widest ml-1">Expertise Subjects</h5>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedTutor.subjects.slice(0, 6).map(s => (
-                        <span key={s} className="bg-slate-50 text-slate-700 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-slate-100">{s}</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 rounded-[28px] p-5 border border-slate-100 space-y-2">
-                    <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5"><FileText size={10} /> About Tutor</h5>
-                    <p className="text-[13px] font-[600] text-slate-700 leading-relaxed whitespace-normal break-words">
-                      {(() => {
-                        const aboutText = selectedTutor.about || `Passionate educator with ${selectedTutor.experience} of teaching experience in ${selectedTutor.city}.`;
-                        const lastDot = aboutText.lastIndexOf('.');
-                        return lastDot !== -1 ? aboutText.substring(0, lastDot + 1) : aboutText;
-                      })()}
-                    </p>
-                  </div>
-               </div>
-
-               <div className="p-6 border-t border-slate-100 bg-white shrink-0">
-                  <button 
-                    onClick={() => { playTapSound(); openWhatsApp(`Hi, I am interested in hiring Tutor ID: #${getTutorId(selectedTutor)} (${selectedTutor.name}). Please share more details.`); }}
-                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
-                  >
-                    Hire this Tutor <ArrowRight size={18} strokeWidth={3} />
-                  </button>
-               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showSelectionDrawer && (
-          <div className="fixed inset-0 z-[16000] flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowSelectionDrawer(null)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="relative bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
-                 <div className="space-y-0.5">
-                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">{showSelectionDrawer.title}</h3>
-                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                     {showSelectionDrawer.isMulti ? 'Multi-select enabled' : 'Choose one option'}
-                   </p>
-                 </div>
-                 <button onClick={() => setShowSelectionDrawer(null)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm transition-all">
-                   <X size={16} />
-                 </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                {showSelectionDrawer.options.map(opt => {
-                  const active = showSelectionDrawer.selected.includes(opt);
-                  return (
-                    <button 
-                      key={opt}
-                      onClick={() => handleSelection(opt)}
-                      className={cn(
-                        "w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all active:scale-[0.98]",
-                        active ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-slate-50 bg-white text-slate-600 hover:border-slate-100"
-                      )}
-                    >
-                      <span className="text-[13px] font-bold tracking-tight">{opt}</span>
-                      <div className={cn(
-                        "w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all",
-                        active ? "bg-primary border-primary" : "border-slate-200"
-                      )}>
-                        {active && <Check size={14} strokeWidth={4} className="text-white" />}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {showSelectionDrawer.isMulti && (
-                <div className="p-5 border-t border-slate-100 bg-slate-50/50">
-                  <button 
-                    onClick={() => setShowSelectionDrawer(null)}
-                    className="w-full py-4 rounded-2xl bg-slate-900 text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
-                  >
-                    Done ({showSelectionDrawer.selected.length} Selected)
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {showFormModal && (
-        <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4">
-          <div onClick={() => setShowFormModal(false)} className="absolute inset-0 bg-slate-900/60" />
-          <div className="relative bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[85vh]">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50"><h3 className="text-lg font-black uppercase">{formType === 'teacher' ? 'Tutor Registration' : 'Requirement Details'}</h3><button onClick={() => setShowFormModal(false)} className="p-3 bg-white rounded-2xl text-slate-400 shadow-sm"><X size={20} strokeWidth={3} /></button></div>
-            <div className="flex-1 overflow-y-auto">
-              <iframe 
-                className="w-full h-full min-h-[600px] border-none" 
-                src={formType === 'teacher' 
-                  ? 'https://forms.doableindia.com/info2701/form/UpdateForm/formperma/5q6-EFWKiWGtqhyYNfjqMGyCYXXst3OOPqOmQCD7yT8?zf_enablecamera=true' 
-                  : 'https://forms.doableindia.com/info2701/form/ShareRequirement/formperma/Y-6ujBL2ntI_ufnw8JPcHpyFOAGHButgY6SigoCfs6o'
-                } 
-                allow={formType === 'teacher' ? "camera;" : "geolocation;"}
-                allowFullScreen={formType !== 'teacher'}
+        {isRestoringSession && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[30000] bg-white flex flex-col items-center justify-center p-8 text-center"
+          >
+            <div className="relative w-24 h-24 mb-8">
+              <div className="absolute inset-0 border-4 border-primary/10 rounded-full" />
+              <motion.div 
+                className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
               />
+              <motion.div 
+                className="absolute inset-4 bg-primary/10 rounded-full flex items-center justify-center text-primary"
+                animate={{ scale: [0.9, 1.1, 0.9] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Sparkles size={32} />
+              </motion.div>
             </div>
-          </div>
-        </div>
-      )}
+            <motion.h3 
+              key={restoringStep}
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -10, opacity: 0 }}
+              className="text-xl font-black text-slate-900 uppercase tracking-tight"
+            >
+              {restoringStep === 0 && "Identifying Account"}
+              {restoringStep === 1 && "Finding Profile"}
+              {restoringStep === 2 && (tutorId ? `${userType === 'parent' ? 'Order' : 'Tutor'} ID: #${tutorId}` : "Syncing Data")}
+              {restoringStep === 3 && (userType === 'parent' ? "Finding Tutors" : "Searching Jobs")}
+              {restoringStep === 4 && "Application Ready"}
+            </motion.h3>
+            <motion.p 
+              key={`p-${restoringStep}`}
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -10, opacity: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-widest"
+            >
+              {restoringStep === 0 && "Connecting to DoAble network..."}
+              {restoringStep === 1 && "Searching database for matches..."}
+              {restoringStep === 2 && "Linking your legacy records..."}
+              {restoringStep === 3 && (userType === 'parent' ? "Matching best tutors for your needs..." : "Finding high-paying jobs near you...")}
+              {restoringStep === 4 && "Taking you to your dashboard..."}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ProfileSetupWizard 
+        show={showProfileSetup} 
+        onClose={() => setShowProfileSetup(false)} 
+        profile={{ ...profile, email: activeUser?.email || '' }}
+        updateField={updateField}
+        onUpdate={handleUpdateProfile}
+        onDelete={handleDeleteProfile}
+        onLogout={handleLogout}
+        isUpdating={isUpdatingProfile}
+        isDeleting={isDeletingProfile}
+        playTapSound={playTapSound}
+        tutors={tutors}
+      />
+
+      <JobDetailModal 
+        job={selectedJob} 
+        onClose={() => setSelectedJob(null)} 
+        onApply={handleApplyJob} 
+      />
+
+      <TutorDetailModal 
+        tutor={selectedTutor} 
+        onClose={() => setSelectedTutor(null)} 
+        playTapSound={playTapSound} 
+      />
+
+      <SelectionDrawer
+        config={showSelectionDrawer}
+        onClose={() => setShowSelectionDrawer(null)}
+        onSelect={handleSelection}
+      />
+
+      <FormModal 
+        show={showFormModal} 
+        onClose={() => setShowFormModal(false)} 
+        formType={formType as any} 
+      />
 
       {/* ─── BOTTOM NAVIGATION ─── */}
       <nav className="fixed bottom-0 left-0 right-0 z-[10000] px-4 pb-[calc(1rem+var(--safe-area-bottom,20px))] pt-3 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex items-center justify-between gap-1 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
@@ -4184,95 +2419,8 @@ City: ${userCity}`;
   );
 }
 
-function SuccessPop({ show, onComplete }: { show: boolean, onComplete: () => void }) {
-  useEffect(() => {
-    if (show) {
-      const timer = setTimeout(onComplete, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [show, onComplete]);
 
-  return (
-    <AnimatePresence>
-      {show && (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[30000] flex justify-center pointer-events-none w-full max-w-[400px] px-4">
-          <motion.div
-            initial={{ y: -50, opacity: 0, scale: 0.9 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: -50, opacity: 0, scale: 0.9 }}
-            className="bg-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-4 border border-emerald-100 pointer-events-auto w-full"
-          >
-            <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-              <Check size={20} strokeWidth={4} />
-            </div>
-            <div className="pr-2">
-              <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-tighter">Success ✅</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Changes saved successfully</p>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
-}
 
-function FloatingToast({ toast, onClear }: { toast: { title: string, body: string } | null, onClear: () => void }) {
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(onClear, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast, onClear]);
 
-  return (
-    <AnimatePresence>
-      {toast && (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[25000] flex justify-center pointer-events-none w-full max-w-[400px] px-4">
-          <motion.div
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            className="bg-slate-900 text-white p-4 rounded-3xl shadow-2xl flex items-center gap-4 w-full pointer-events-auto border border-white/10"
-          >
-            <div className={cn(
-              "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0",
-              toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') ? "bg-rose-500/20 text-rose-500" : "bg-emerald-500/20 text-emerald-500"
-            )}>
-              {toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
-            </div>
-            <div className="flex-1 min-w-0 pr-4">
-              <h4 className="text-[11px] font-black uppercase tracking-widest leading-none">{toast.title}</h4>
-              <p className="text-[10px] font-bold text-slate-400 truncate mt-1.5">{toast.body}</p>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
-}
 
-function NavButton({ active, onClick, icon, label, activeColor, activeBg, inactiveColor, inactiveBg, badge }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; activeColor: string; activeBg: string; inactiveColor: string; inactiveBg: string; badge?: number }) {
-  return (
-    <button onClick={onClick} className={cn("flex-1 flex flex-col items-center gap-1 py-1.5 rounded-full transition-all duration-300 active:scale-95 mx-0.5 relative", active ? activeBg + " " + activeColor + " shadow-lg scale-105" : inactiveBg + " " + inactiveColor + " opacity-60")}>
-      {icon}
-      {badge !== undefined && badge > 0 && (
-        <span className="absolute top-1 right-2 w-3.5 h-3.5 bg-orange-500 text-white text-[7px] font-black flex items-center justify-center rounded-full border border-white shadow-sm animate-pulse">
-          {badge}
-        </span>
-      )}
-      <span className="text-[7px] font-[1000] tracking-tight">{label}</span>
-    </button>
-  );
-}
 
-function DetailItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex flex-col gap-1.5 shadow-sm h-full">
-      <div className="flex items-center gap-1.5 text-slate-400">
-        {icon}
-        <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
-      </div>
-      <span className="text-[11px] font-[900] text-slate-800 tracking-tight leading-relaxed whitespace-normal break-words">{value}</span>
-    </div>
-  );
-}

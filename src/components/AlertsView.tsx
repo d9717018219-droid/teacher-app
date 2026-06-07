@@ -10,7 +10,7 @@ import { cn, getCityPhone, formatCurrency, openWhatsApp, formatWhatsAppStyle } f
 import { createChat } from '@n8n/chat';
 import '@n8n/chat/style.css';
 
-import { CITIES_LIST, CLASSES_LIST } from '../constants';
+import { CITIES_LIST, CLASSES_LIST } from '../utils/constants';
 
 interface AlertsViewProps {
   city: string;

@@ -64,6 +64,8 @@ interface HomeViewProps {
   onClassClick?: (className: string) => void;
   onLocalityClick?: (locality: string) => void;
   onGenderClick?: (gender: 'Male' | 'Female') => void;
+  onModeClick?: (mode: string) => void;
+  onCityClick?: (city: string) => void;
 }
 
 const CLASS_GROUP_MAPPING: Record<string, string[]> = {
@@ -101,7 +103,9 @@ export const HomeView = React.memo(({
   allJobs = [],
   onClassClick,
   onLocalityClick,
-  onGenderClick
+  onGenderClick,
+  onModeClick,
+  onCityClick
 }: HomeViewProps) => {
   const [currentBanner, setCurrentBanner] = React.useState(0);
 
@@ -128,7 +132,7 @@ export const HomeView = React.memo(({
     ['Home Tuition', 'Online Class'].forEach(mode => {
       const m = mode.toLowerCase().trim();
       jobCounts[`job_mode_${mode}`] = allJobs.filter(l => {
-        const jm = (l.Mode || (l as any).mode || (l as any)['Mode of Teaching'] || (l as any)['Mode of teaching'] || '').toLowerCase().trim();
+        const jm = ((l as any).Mode || (l as any).mode || (l as any)['Mode of Teaching'] || (l as any)['Mode of teaching'] || '').toLowerCase().trim();
         if (jm.includes('any') || jm.includes('both')) return true;
         if (m.includes('online')) return jm.includes('online');
         if (m.includes('home')) return jm.includes('home') || jm.includes('offline') || jm === '';
@@ -143,7 +147,7 @@ export const HomeView = React.memo(({
       const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
       
       jobCounts[`job_loc_${loc}`] = allJobs.filter(l => regex.test((l.Locations || (l as any).location || '').toString().toLowerCase())).length;
-      tutorCounts[`tutor_loc_${loc}`] = allTutors.filter(t => (Array.isArray(t.location) ? t.location.join(', ') : (t.location || '').toString()).toLowerCase().includes(searchLoc)).length;
+      tutorCounts[`tutor_loc_${loc}`] = allTutors.filter(t => (Array.isArray(t.location) ? t.location.join(', ') : String(t.location || '')).toLowerCase().includes(searchLoc)).length;
     });
 
     return { jobCounts, tutorCounts };
