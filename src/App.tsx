@@ -1348,8 +1348,11 @@ City: ${userCity}`;
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
+      const isIos = Capacitor.getPlatform() === 'ios';
       GoogleAuth.initialize({
-        clientId: '237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com',
+        clientId: isIos 
+          ? '237759117673-s9ujpmq5o951otqn207i8b3bnbpiof46.apps.googleusercontent.com'
+          : '237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com',
         scopes: ['profile', 'email'],
       });
     }

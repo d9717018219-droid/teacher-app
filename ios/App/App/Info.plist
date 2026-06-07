@@ -21,7 +21,18 @@
 	<key>CFBundleShortVersionString</key>
 	<string>345.2.7</string>
 	<key>CFBundleVersion</key>
-	<string>365</string>	<key>ITSAppUsesNonExemptEncryption</key>
+	<string>365</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.237759117673-s9ujpmq5o951otqn207i8b3bnbpiof46</string>
+			</array>
+		</dict>
+	</array>	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
