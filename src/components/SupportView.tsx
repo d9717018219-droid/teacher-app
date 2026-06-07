@@ -27,7 +27,9 @@ import {
   Headphones,
   Info,
   ChevronDown,
-  Home as HomeIcon
+  Home as HomeIcon,
+  Apple,
+  Play
 } from 'lucide-react';
 import { createChat } from '@n8n/chat';
 import '@n8n/chat/style.css';
@@ -134,6 +136,21 @@ Name: ${userName || 'N/A'}
 Phone: ${userPhone || 'N/A'}
 City: ${userCity || 'N/A'}`;
     window.open(`mailto:info@doableindia.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_system');
+  };
+
+  const handleShare = () => {
+    const shareData = {
+      title: 'DoAble India - Home Tutors',
+      text: 'Hi! I am using DoAble India App to find the best Home Tutors. It is amazing! You should try it too. Download now:',
+      url: 'https://doableindia.com'
+    };
+
+    if (navigator.share) {
+      navigator.share(shareData).catch(() => {});
+    } else {
+      const shareUrl = `https://wa.me/?text=${encodeURIComponent(shareData.text + ' ' + shareData.url)}`;
+      window.open(shareUrl, '_blank');
+    }
   };
 
   const containerVariants = {
@@ -281,6 +298,50 @@ City: ${userCity || 'N/A'}`;
                    </motion.div>
                 ))}
              </div>
+          </motion.div>
+          {/* SECTION 9 – REFER US (EMOTIONAL & STYLISH) */}
+          <motion.div variants={itemVariants} className="pt-4 pb-20 space-y-4 text-center">
+             <div className="bg-gradient-to-br from-indigo-50 to-white rounded-[32px] p-8 border border-indigo-100 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-100/50 rounded-full -mr-12 -mt-12 blur-2xl" />
+                <div className="relative z-10 space-y-3">
+                   <div className="flex justify-center">
+                      <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg animate-bounce">
+                         <Heart size={24} fill="currentColor" />
+                      </div>
+                   </div>
+                   <h3 className="text-slate-900 text-xl font-[1000] tracking-tight">Help Us Grow Together</h3>
+                   <p className="text-slate-500 text-[12px] font-bold leading-relaxed max-w-[240px] mx-auto">
+                      Education is the greatest gift. Your one referral can change a teacher's life and help a child achieve their dreams.
+                   </p>
+                   
+                   <div className="flex flex-col gap-2.5 pt-4">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Available On</p>
+                      <div className="flex items-center justify-center gap-3">
+                         <button 
+                            onClick={handleShare}
+                            className="bg-black text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all"
+                         >
+                            <Play size={16} fill="white" className="text-white" />
+                            <div className="text-left leading-none">
+                               <p className="text-[7px] font-black uppercase opacity-60">Get it on</p>
+                               <p className="text-[11px] font-black">Google Play</p>
+                            </div>
+                         </button>
+                         <button 
+                            onClick={handleShare}
+                            className="bg-black text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all"
+                         >
+                            <Apple size={16} fill="white" className="text-white" />
+                            <div className="text-left leading-none">
+                               <p className="text-[7px] font-black uppercase opacity-60">Download on the</p>
+                               <p className="text-[11px] font-black">App Store</p>
+                            </div>
+                         </button>
+                      </div>
+                   </div>
+                </div>
+             </div>
+             <p className="text-[10px] font-bold text-slate-300 italic">"Be a part of India's teaching revolution."</p>
           </motion.div>
        </div>
     </motion.div>
