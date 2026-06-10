@@ -20,7 +20,13 @@ if ($conn->connect_error) {
 
 // Fetch from 'CRM_Leads' table
 $email = isset($_GET['email']) ? $conn->real_escape_string($_GET['email']) : '';
-$where = $email ? "WHERE `email` = '$email' OR `Email` = '$email'" : "";
+$phone = isset($_GET['phone']) ? $conn->real_escape_string($_GET['phone']) : '';
+
+$whereArr = [];
+if ($email) $whereArr[] = "(`email` = '$email' OR `Email` = '$email')";
+if ($phone) $whereArr[] = "`phone` LIKE '%$phone%'";
+
+$where = !empty($whereArr) ? "WHERE " . implode(" OR ", $whereArr) : "";
 
 $sql = "SELECT * FROM `CRM_Leads` $where ORDER BY CAST(`tutor_id` AS UNSIGNED) DESC";
 $result = $conn->query($sql);

@@ -143,8 +143,8 @@ export function calculateProfileCompletion(userData: any, userType: 'parent' | '
   const commonFields = ['name', 'phone', 'gender', 'classes', 'subjects', 'mode'];
   
   // Role-specific fields
-  const teacherSpecific = ['dob', 'age', 'qualification', 'experience', 'communication', 'days', 'time', 'about', 'aadhar', 'address'];
-  const parentSpecific = ['days', 'time', 'duration', 'city', 'localities'];
+  const teacherSpecific = ['dob', 'qualification', 'experience', 'communication', 'days', 'time', 'about', 'aadhar', 'address'];
+  const parentSpecific = ['days', 'time', 'duration', 'city', 'localities', 'address'];
 
   // Conditional fields (Only required for Home Tuition - Teachers)
   const isOnline = (userData.mode || '').toString().toLowerCase().includes('online');
@@ -160,9 +160,15 @@ export function calculateProfileCompletion(userData: any, userType: 'parent' | '
     const val = userData[field];
     if (val !== undefined && val !== null) {
       if (Array.isArray(val)) {
-        if (val.length > 0) filledFields++;
-      } else if (val.toString().trim() !== '') {
-        filledFields++;
+        // Only count if array has actual content
+        const cleanArr = val.filter(i => i && i.toString().trim() !== '');
+        if (cleanArr.length > 0) filledFields++;
+      } else {
+        const strVal = val.toString().trim();
+        // Ignore placeholders or empty strings
+        if (strVal !== '' && strVal !== 'null' && strVal !== 'undefined' && strVal !== 'all' && strVal !== 'N/A') {
+          filledFields++;
+        }
       }
     }
   });

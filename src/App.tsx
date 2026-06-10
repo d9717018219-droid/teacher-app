@@ -3,7 +3,7 @@ import { Search, MapPin, Loader2, Home as HomeIcon, FileText, User as LucideUser
 import { collection, onSnapshot, query, where, orderBy, limit, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc, getDocsFromServer, enableNetwork } from 'firebase/firestore';
 import { db, auth, auth as firebaseAuth, getFirebaseApiKey } from './firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
-import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
+import { User as FirebaseUser, onAuthStateChanged, signInWithPopup, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -146,12 +146,170 @@ export default function App() {
   const [authModalMode, setAuthModalMode] = useState<AuthMode>('signup');
   const [authModalStep, setAuthModalStep] = useState<AuthStep>('email');
 
+  const autoFillProfile = (lead: any, finalUserType: UserType) => {
+    if (!lead) return;
+    
+    const getV = (keys: string[]) => {
+      for (const k of keys) {
+        if (lead[k] !== undefined && lead[k] !== null && lead[k] !== '' && lead[k] !== 'undefined') return lead[k];
+      }
+      return null;
+    };
+
+    const id = getV(finalUserType === 'teacher' ? ['tutor_id', 'id'] : ['order_id', 'Order ID', 'id']);
+    const fullName = getV(['name', 'Name', 'fullName', 'Full_Name']);
+    
+    console.log(`✅ [Auto-fill-Logic] Mapping for ${fullName} (${finalUserType}) - ID: ${id}`);
+    
+    if (id) { 
+      const idStr = String(id);
+      setTutorId(idStr); 
+      localStorage.setItem('tutorId', idStr); 
+      updateField('tutorId', idStr);
+    }
+
+    // Split Name
+    if (fullName && typeof fullName === 'string') {
+      const nameParts = fullName.trim().split(/\s+/);
+      const fName = nameParts[0] || '';
+      const lName = nameParts.slice(1).join(' ') || '';
+      setUserFirstName(fName); 
+      setUserLastName(lName);
+      localStorage.setItem('userFirstName', fName);
+      localStorage.setItem('userLastName', lName);
+      updateField('userFirstName', fName);
+      updateField('userLastName', lName);
+      setUserName(fullName);
+      localStorage.setItem('userName', fullName);
+      updateField('userName', fullName);
+    }
+
+    // Basic Fields
+    const fields = [
+      { key: 'userCity', vals: ['city', 'City', 'Preferred_City'] },
+      { key: 'userGender', vals: ['gender', 'Gender', 'Sex'] },
+      { key: 'userPhone', vals: ['phone', 'Phone', 'Mobile'] },
+      { key: 'userDob', vals: ['dob', 'DOB', 'Date_of_Birth'] },
+      { key: 'userAge', vals: ['age', 'Age'] },
+      { key: 'userExperience', vals: ['experience', 'Experience'] },
+      { key: 'userBoard', vals: ['board', 'Board', 'userBoard', 'Class / Board'] },
+      { key: 'userMode', vals: ['mode', 'Mode', 'Mode of Teaching'] },
+      { key: 'userCommunication', vals: ['communication', 'Communication'] },
+      { key: 'userAddress', vals: ['address', 'Address', 'Full_Address'] },
+      { key: 'userDays', vals: ['days', 'Days', 'Available_Day_s'] },
+      { key: 'userTime', vals: ['time', 'Time', 'Available_Time_s'] },
+      { key: 'userDuration', vals: ['duration', 'Duration', 'userDuration'] },
+      { key: 'userFee', vals: ['fee', 'Fee', 'Fee/Month', 'budget'] },
+      { key: 'userResidency', vals: ['residency', 'Residency', 'society', 'Block'] },
+      { key: 'userAadhar', vals: ['aadhar', 'Aadhar', 'Aadhar_Number'] },
+      { key: 'userEmail', vals: ['email', 'Email', 'email_id'] },
+      { key: 'aboutMe', vals: ['about', 'About', 'Notes', 'requirement'] }
+    ];
+
+    fields.forEach(({ key, vals }) => {
+      const val = getV(vals);
+      if (val !== null) {
+        let finalVal = String(val);
+        // Special case for comma separated days/time to ensure space consistency
+        if ((key === 'userDays' || key === 'userTime') && finalVal.includes(',')) {
+          finalVal = finalVal.split(',').map(s => s.trim()).join(', ');
+        }
+        localStorage.setItem(key, finalVal);
+        // @ts-ignore
+        updateField(key as any, finalVal);
+        
+        // Update direct state for common ones
+        if (key === 'userCity') setUserCity(finalVal);
+        if (key === 'userGender') setUserGender(finalVal as any);
+        if (key === 'aboutMe') setAboutMe(finalVal);
+      }
+    });
+
+    // JSON Fields
+    const jsonFields = [
+      { key: 'userClasses', vals: ['class_group', 'Class', 'class', 'classGroup'] },
+      { key: 'userSubjects', vals: ['subjects', 'Subjects', 'subject'] },
+      { key: 'userLocalities', vals: ['location', 'locality', 'locations', 'Locality', 'Locations'] },
+      { key: 'userQualifications', vals: ['qualification', 'Qualification', 'qualifications'] }
+    ];
+
+    jsonFields.forEach(({ key, vals }) => {
+      let val = getV(vals);
+      if (val) {
+        let arr: string[] = [];
+        if (typeof val === 'string') {
+          if (val.includes('[') && val.includes(']')) {
+            try { arr = JSON.parse(val); } catch { arr = val.replace(/[\[\]"]/g, '').split(',').map(s => s.trim()); }
+          } else {
+            arr = val.split(',').map(s => s.trim()).filter(Boolean);
+          }
+        } else if (Array.isArray(val)) {
+          arr = val;
+        }
+
+        if (arr.length > 0) {
+          localStorage.setItem(key, JSON.stringify(arr));
+          // @ts-ignore
+          updateField(key as any, arr);
+          if (key === 'userClasses') setUserClasses(arr);
+          if (key === 'userSubjects') setUserSubjects(arr);
+          if (key === 'userLocalities') setUserLocalities(arr);
+        }
+      }
+    });
+
+    const photo = getV(['photo', 'Photo', 'Selfie', 'selfie', 'profilePhoto']);
+    if (photo) {
+       localStorage.setItem('userPhoto', String(photo));
+       updateField('profilePhoto', String(photo));
+    }
+  };
+
   const handleAuthSuccess = (data: any) => {
     const isSignup = !!data.userId;
-    const finalUserType = data.user?.userType || userType || 'teacher';
-    const finalEmail = data.user?.email || data.email;
+    // CRITICAL FIX: Prioritize the type detected by the server during login
+    const serverDetectedType = data.data?.user_type || data.user?.userType || data.userType;
+    let finalUserType = serverDetectedType || userType || 'teacher';
+    
+    const finalEmail = (data.user?.email || data.email || '').toLowerCase().trim();
+    const finalPhone = (data.user?.phone || data.phone || '').replace(/\D/g, '');
+    
+    console.log(`[Auth-Success] Server Detected Type: ${serverDetectedType}, Current State Type: ${userType}`);
+    console.log(`[Auth-Logic] Pool Sizes - Tutors: ${tutors.length}, Leads: ${leads.length}, FirestoreLeads: ${firestoreLeads.length}`);
+
+    // Robust Type Cross-Check
+    if (!serverDetectedType) {
+       const emailToMatch = finalEmail;
+       const phoneToMatch = finalPhone.replace(/^91/, '');
+       
+       const foundInTutors = tutors.some(t => {
+         const tEmail = (t.email || '').toLowerCase().trim();
+         const tPhone = (t.phone || '').replace(/\D/g, '').replace(/^91/, '');
+         return (emailToMatch && tEmail === emailToMatch) || (phoneToMatch && tPhone === phoneToMatch);
+       });
+       
+       const foundInLeads = [...leads, ...firestoreLeads].some(l => {
+         const lEmail = (l.email || (l as any).Email || (l as any).email_id || '').toString().toLowerCase().trim();
+         const lPhone = (l.phone || (l as any).Phone || (l as any).Mobile || '').toString().replace(/\D/g, '').replace(/^91/, '');
+         return (emailToMatch && lEmail === emailToMatch) || (phoneToMatch && lPhone === phoneToMatch);
+       });
+
+       console.log(`[Auth-Logic] Search Results - FoundInTutors: ${foundInTutors}, FoundInLeads: ${foundInLeads}`);
+
+       if (foundInLeads && !foundInTutors) {
+          finalUserType = 'parent';
+          console.log(`[Auth-Logic] Cross-check decision: 'parent' (Found in Leads)`);
+       } else if (foundInTutors && !foundInLeads) {
+          finalUserType = 'teacher';
+          console.log(`[Auth-Logic] Cross-check decision: 'teacher' (Found in Tutors)`);
+       }
+    }
+
+    console.log(`[Auth-Success] Final Type Decision: ${finalUserType}`);
+    
     const userData = { 
       email: finalEmail, 
+      phone: finalPhone,
       userType: finalUserType, 
       uid: data.user?.id || data.userId 
     };
@@ -160,11 +318,31 @@ export default function App() {
     localStorage.setItem('customUser', JSON.stringify(userData));
     setUserType(finalUserType);
     localStorage.setItem('userType', finalUserType);
+    
+    if (finalPhone) {
+      localStorage.setItem('userPhone', finalPhone);
+      updateField('userPhone', finalPhone);
+    }
 
     if (!isSignup) {
       localStorage.removeItem('lastProfileUpdate');
+      
+      const emailToMatch = finalEmail;
+      const phoneToMatch = finalPhone.replace(/\D/g, '').replace(/^91/, '');
+      const combinedPool = (finalUserType === 'parent') ? [...firestoreLeads, ...leads] : tutors;
+      
+      const existingProfile = combinedPool.find((t: any) => {
+        const tEmail = (t.email || t.Email || t.email_id || '').toString().toLowerCase().trim();
+        const tPhone = (t.phone || t.Phone || t.Mobile || '').toString().replace(/\D/g, '').replace(/^91/, '');
+        return (emailToMatch && tEmail === emailToMatch) || (phoneToMatch && tPhone === phoneToMatch);
+      });
+
+      if (existingProfile) {
+        autoFillProfile(existingProfile, finalUserType as UserType);
+      }
+
       setTimeout(() => loadData(), 10);
-      setActiveToast({ title: 'Welcome Back! 👋', body: `Signed in as ${userData.email}` });
+      setActiveToast({ title: 'Welcome Back! 👋', body: `Signed in as ${userData.email || userData.phone}` });
       setShowProfileSetup(false);
     } else {
       setShowSuccess(true);
@@ -234,73 +412,39 @@ export default function App() {
       const url = 'https://doableindia.com/app-sys/api.php';
       
       const fullPhone = (userCountryCode + userPhone).replace(/\s+/g, '');
+      
+      // Ensure we have a valid Order ID for existing users
+      const finalOrderId = tutorId || localStorage.getItem('tutorId') || '';
+
       const parentData = {
         action: 'upsert',
         email: activeUser.email,
-        Email: activeUser.email,
+        order_id: finalOrderId,
+        Order_ID: finalOrderId,
         name: `${userFirstName} ${userLastName}`.trim() || userName,
-        Name: `${userFirstName} ${userLastName}`.trim() || userName,
-        First_Name: userFirstName,
-        Last_Name: userLastName,
-        'First Name': userFirstName,
-        'Last Name': userLastName,
         phone: fullPhone,
-        Phone: fullPhone,
-        userType: 'parent',
-        status: 'Searching',
-        Status: 'Searching',
-        classes: userClasses, // Zoho Multi-select
-        class: userClasses[1] || userClasses[0] || '',
-        Class: userClasses[1] || userClasses[0] || '',
-        class_group: userClasses[0] || '',
-        'Class / Board': userClasses.includes('Entrance Exam & Specialization') 
-          ? userBoard 
-          : `${userClasses[1] || userClasses[0] || ''} (${userBoard})`,
-        subjects: userSubjects, // Zoho Multi-select
-        Subjects: userSubjects,
-        'Subject(s)': userSubjects.join(', '),
-        city: userCity,
-        City: userCity,
-        locality: userLocalities.join(', '),
-        Locality: userLocalities.join(', '),
-        location: userLocalities.map(loc => `${loc}-${userCity}`).join(', '),
-        Location: userLocalities.map(loc => `${loc}-${userCity}`).join(', '),
-        residency: userResidency,
-        Residency: userResidency,
-        block: userResidency,
-        Block: userResidency,
-        society: userResidency,
-        Society: userResidency,
-        gender: userGender,
-        Gender: userGender,
-        'Tutor Gender Preference': userGender,
-        address: userAddress,
-        Address: userAddress,
+        class: userClasses[0] || '',
         board: userBoard,
-        Board: userBoard,
         mode: userMode,
-        Mode: userMode,
-        'Mode of Teaching': userMode,
-        time: userTime,
-        Time: userTime,
-        'Preferred Time': userTime,
-        days: userDays,
-        Days: userDays,
-        'Available Days': userDays,
-        duration: userDuration,
-        Duration: userDuration,
+        city: userCity,
         fee: userFee,
-        Fee: userFee,
-        'Fee/Month': userFee,
+        gender: userGender,
+        address: userAddress,
+        days: userDays,
+        duration: userDuration,
+        time: userTime,
+        subjects: userSubjects, // PHP script now handles array to string conversion
+        location: userLocalities.join(', '),
+        residency: userResidency,
         notes: aboutMe,
-        Notes: aboutMe,
-        About: aboutMe,
-        created_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
-        locations: userLocalities.map(loc => `${loc}-${userCity}`).join(', ')
+        status: 'Searching'
       };
+
+      console.log('📡 [Confirm-Post-Parent] Sending Payload:', parentData);
 
       const isNative = Capacitor.isNativePlatform();
       let responseOk = false;
+      let resText = '';
 
       if (isNative) {
         const response = await CapacitorHttp.post({
@@ -309,25 +453,22 @@ export default function App() {
           data: parentData
         });
         responseOk = response.status === 200;
+        console.log('📡 [Confirm-Post-Parent] Native Response:', response.data);
       } else {
-        const params = new URLSearchParams();
-        Object.entries(parentData).forEach(([key, val]) => {
-          params.append(key, String(val));
-        });
-
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params.toString()
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(parentData)
         });
         responseOk = response.ok;
+        resText = await response.text();
+        console.log('📡 [Confirm-Post-Parent] Web Response:', resText);
       }
       
       if (responseOk) {
         loadData();
         setActiveToast({ title: 'Requirement Posted! 🚀', body: 'Tutors can now see your requirement.' });
         setShowConfirmPost(false);
-
       }
     } catch (error) {
       console.error('Error posting requirement:', error);
@@ -393,7 +534,7 @@ export default function App() {
 
     setIsDeletingProfile(true);
     try {
-      await AuthService.deleteProfile(activeUser?.email || '', tutorId);
+      await AuthService.deleteProfile(activeUser?.email || '', tutorId, userPhone, userType || undefined);
       
       // Attempt to delete Firebase Auth user if it's a current FirebaseUser
       if (currentUser) {
@@ -414,59 +555,149 @@ export default function App() {
     }
   };
 
-  const handleUpdateProfile = async () => {
+  const handleUpdateProfile = async (silent = false, overrideVisibility?: boolean) => {
     if (!activeUser?.email) return;
-    setIsUpdatingProfile(true);
+    if (!silent) setIsUpdatingProfile(true);
 
     try {
-      const data = await AuthService.updateProfile(
-        { ...profile, email: activeUser.email },
-        userType || 'teacher',
-        tutors
-      );
+      let data: any;
+      const currentVisibility = overrideVisibility !== undefined ? overrideVisibility : leadVisibility;
 
-      if (data && (data.status === 'success' || data.message?.includes('success'))) {
-        const finalId = data.tutor_id || data.order_id || data.zoho_id || data.id;
+      // EMAIL PROTECTION: Prevent fake whatsapp emails from overwriting real emails in Zoho
+      const sessionEmail = activeUser?.email || '';
+      const storedEmail = profile.userEmail || '';
+      const isSessionFake = sessionEmail.includes('@whatsapp.com');
+      const isStoredFake = storedEmail.includes('@whatsapp.com');
+      const finalEmail = (isSessionFake && !isStoredFake && storedEmail) ? storedEmail : sessionEmail;
+
+      if (userType === 'parent') {
+        // PARENT SYNC: Strictly use api.php
+        const url = 'https://doableindia.com/app-sys/api.php';
+        const fullPhone = (userCountryCode + userPhone).replace(/\s+/g, '');
+
+        // Ensure we have a valid Order ID for existing users
+        const finalOrderId = tutorId || localStorage.getItem('tutorId') || '';
+
+        const parentPayload = {
+          action: 'upsert',
+          email: finalEmail,
+          order_id: finalOrderId, // Backward compatibility
+          Order_ID: finalOrderId, // PHP safe('Order_ID') match
+          name: `${userFirstName} ${userLastName}`.trim() || userName,
+          phone: fullPhone,
+          class: userClasses[0] || '',
+          board: userBoard,
+          mode: userMode,
+          city: userCity,
+          fee: userFee,
+          gender: userGender,
+          address: userAddress,
+          days: userDays,
+          duration: userDuration,
+          time: userTime,
+          subjects: userSubjects,
+          location: userLocalities.join(', '),
+          residency: userResidency,
+          notes: aboutMe,
+          status: currentVisibility ? 'Searching' : 'Not Converted'
+        };
+
+        console.log('📡 [Profile-Update-Parent] Sending Payload:', parentPayload);
+
+        const isNative = Capacitor.isNativePlatform();
+        if (isNative) {
+          const res = await CapacitorHttp.post({ url, headers: { 'Content-Type': 'application/json' }, data: parentPayload });
+          data = res.data;
+        } else {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(parentPayload),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          const text = await res.text();
+          try { data = JSON.parse(text); } catch { data = { status: 'error', message: text }; }
+        }
+      } else {
+        // TEACHER SYNC: Strictly use api_copy.php via AuthService
+        data = await AuthService.updateProfile(
+          { 
+            ...profile, 
+            email: finalEmail,
+            status: currentVisibility ? 'Active' : 'In-Active' 
+          },
+          'teacher',
+          tutors
+        );
+      }
+
+      // Handle both standard success and Zoho success format
+      const isZohoSuccess = data?.data?.[0]?.code === 'SUCCESS' || data?.data?.[0]?.status === 'success';
+      const zohoId = data?.data?.[0]?.details?.id;
+
+      if (data && (data.status === 'success' || data.message?.includes('success') || isZohoSuccess)) {
+        const finalId = zohoId || data.tutor_id || data.order_id || data.zoho_id || data.id;
         if (finalId) {
           localStorage.setItem('tutorId', finalId.toString());
           setTutorId(finalId.toString());
         }
 
-        // Save all fields for persistence (Email specific)
-        if (userType === 'parent') {
-          localStorage.setItem('userName', `${userFirstName} ${userLastName}`.trim());
-          localStorage.setItem('userFirstName', userFirstName);
-          localStorage.setItem('userLastName', userLastName);
-          localStorage.setItem('userPhone', userPhone);
-          localStorage.setItem('userCountryCode', userCountryCode);
-          localStorage.setItem('userCity', userCity);
-          localStorage.setItem('userGender', userGender || '');
-          localStorage.setItem('userBoard', userBoard);
-          localStorage.setItem('userMode', userMode);
-          localStorage.setItem('userResidency', userResidency);
-          localStorage.setItem('userClasses', JSON.stringify(userClasses));
-          localStorage.setItem('userSubjects', JSON.stringify(userSubjects));
-          localStorage.setItem('userLocalities', JSON.stringify(userLocalities));
-          localStorage.setItem('userDays', userDays);
-          localStorage.setItem('userTime', userTime);
-          localStorage.setItem('userDuration', userDuration);
-          localStorage.setItem('userFee', userFee);
-          localStorage.setItem('aboutMe', aboutMe);
+        // Save all fields for persistence
+        localStorage.setItem('userName', `${userFirstName} ${userLastName}`.trim());
+        localStorage.setItem('userFirstName', userFirstName);
+        localStorage.setItem('userLastName', userLastName);
+        localStorage.setItem('userPhone', userPhone);
+        localStorage.setItem('userCountryCode', userCountryCode);
+        localStorage.setItem('userCity', userCity);
+        localStorage.setItem('userGender', userGender || '');
+        localStorage.setItem('userBoard', userBoard);
+        localStorage.setItem('userMode', userMode);
+        localStorage.setItem('userResidency', userResidency);
+        localStorage.setItem('userClasses', JSON.stringify(userClasses));
+        localStorage.setItem('userSubjects', JSON.stringify(userSubjects));
+        localStorage.setItem('userLocalities', JSON.stringify(userLocalities));
+        localStorage.setItem('userDays', userDays);
+        localStorage.setItem('userTime', userTime);
+        localStorage.setItem('userDuration', userDuration);
+        localStorage.setItem('userFee', userFee);
+        localStorage.setItem('aboutMe', aboutMe);
+
+        if (userType === 'teacher') {
+          localStorage.setItem('userQualifications', JSON.stringify(userQualifications));
+          localStorage.setItem('userExperience', userExperience);
+          localStorage.setItem('userAadhar', userAadhar);
+          if (profilePhoto) localStorage.setItem('userPhoto', profilePhoto);
+          if (userSelfie) localStorage.setItem('userSelfie', userSelfie);
         }
 
         localStorage.setItem(`lastProfileUpdate_${activeUser.email}`, Date.now().toString());
 
+        // CRITICAL FIX: Update the 'users' table role to match current session
+        try {
+           const currentPhone = (activeUser.phone || userPhone || '').replace(/\D/g, '');
+           await AuthService.updateType(finalEmail, currentPhone, userType || 'parent');
+           console.log(`📡 [Role-Sync] Updated users table to: ${userType} for ${finalEmail}`);
+        } catch (e) {
+           console.error('Failed to sync role to users table:', e);
+        }
+
         loadData();
-        setShowSuccess(true);
-        setShowProfileSetup(false);
+        if (!silent) {
+          setShowSuccess(true);
+          setShowProfileSetup(false);
+        }
       } else {
-        setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
+        if (!silent) setActiveToast({ title: 'Update Failed ❌', body: data?.message || 'Server error occurred' });
       }
     } catch (error: any) {
       console.error('Error syncing profile:', error);
-      setActiveToast({ title: 'Connection Error', body: error.message || 'Please check your internet connection.' });
+      if (!silent) setActiveToast({ title: 'Connection Error', body: error.message || 'Please check your internet connection.' });
     } finally {
-      setIsUpdatingProfile(false);
+      if (!silent) setIsUpdatingProfile(false);
     }
   };
 
@@ -479,6 +710,37 @@ export default function App() {
     userBoard, userMode, userCommunication, userAddress, userDays,
     userTime, userDuration, userFee, userResidency, userAadhar, userSelfie
   } = profile;
+
+  const leadVisibility = (profile as any).leadVisibility ?? false;
+  const setLeadVisibility = async (val: boolean) => {
+    if (val) {
+      if (profileCompletion < 100) {
+        setActiveToast({ 
+          title: 'Profile Incomplete ⚠️', 
+          body: `Please complete your profile (${profileCompletion}%) before enabling visibility.` 
+        });
+        return;
+      }
+
+      // 100% Complete -> Show confirmation to re-check preferences
+      const confirm = window.confirm("Ready to connect? 🚀\n\nPlease ensure your Classes, Subjects and Location are up to date so the right tutors can reach you.");
+      
+      if (!confirm) {
+        // User wants to check -> Open profile
+        setShowProfileSetup(true);
+        return;
+      }
+    }
+
+    updateField('leadVisibility' as any, val);
+    localStorage.setItem('leadVisibility', val ? 'true' : 'false');
+    playTapSound();
+
+    // Trigger silent DB sync
+    if (userType === 'parent') {
+      await handleUpdateProfile(true, val);
+    }
+  };
 
   const setUserCity = (val: string) => updateField('userCity', val);
   const setUserName = (val: string | null) => updateField('userName', val);
@@ -610,151 +872,40 @@ export default function App() {
   const [isTutorFetched, setIsTutorFetched] = useState(false);
 
   // -------------------------------------------------------------
-  // NEW: Robust Auto-fill Logic using existing data
+  // FINAL CLEAN: One-Time Robust Auto-fill
   // -------------------------------------------------------------
+  const autoFillDone = useRef(false);
   useEffect(() => {
-    if (!activeUser?.email || !userType) {
-      return;
-    }
+    if (!activeUser || !userType || autoFillDone.current) return;
     
-    const lastUpdate = parseInt(localStorage.getItem(`lastProfileUpdate_${activeUser.email}`) || '0');
-    // If recently updated manually, don't auto-revert
-    if (Date.now() - lastUpdate < 300000) {
-      return;
-    }
+    // WAIT for data pools
+    const isDataLoading = (userType === 'teacher' && tutors.length === 0) || 
+                          (userType === 'parent' && leads.length === 0 && firestoreLeads.length === 0);
+    if (isDataLoading) return;
 
-    const email = activeUser.email.toLowerCase().replace(/\s+/g, '');
+    const email = (activeUser.email || '').toLowerCase().replace(/\s+/g, '');
+    const phone = (activeUser.phone || '').replace(/\D/g, '').replace(/^91/, '').replace(/^0/, '');
     let lead: any = null;
 
-    const parseMulti = (val: any) => {
-      if (!val) return [];
-      if (Array.isArray(val)) return val;
-      try { return JSON.parse(val); } catch { return val.toString().split(',').map((s: string) => s.trim()).filter(Boolean); }
-    };
-
-    if (userType === 'teacher' && tutors.length > 0) {
-        const matches = tutors.filter(t => {
+    if (userType === 'teacher') {
+        lead = tutors.find(t => {
           const tEmail = (t.email || (t as any).Email || '').toString().toLowerCase().replace(/\s+/g, '');
-          return tEmail === email;
+          const tPhone = (t.phone || (t as any).Phone || '').toString().replace(/\D/g, '').replace(/^91/, '').replace(/^0/, '');
+          return (email && email.length > 5 && tEmail === email) || (phone && tPhone === phone);
         });
-        
-        if (matches.length > 0) {
-          lead = matches.sort((a, b) => parseInt(b.tutor_id || '0') - parseInt(a.tutor_id || '0'))[0];
-        }
-    } else if (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0)) {
+    } else {
         const combinedLeads = [...firestoreLeads, ...leads];
-        const userLeads = combinedLeads.filter(l => {
-          const lEmail = (l.email || (l as any).Email || (l as any).email || '').toString().toLowerCase().replace(/\s+/g, '');
-          return lEmail === email && email.length > 5;
+        lead = combinedLeads.find(l => {
+          const lEmail = (l.email || (l as any).Email || (l as any).email_id || '').toString().toLowerCase().replace(/\s+/g, '');
+          const lPhone = (l.phone || (l as any).Phone || (l as any).Mobile || (l as any).Contact || '').toString().replace(/\D/g, '').replace(/^91/, '').replace(/^0/, '');
+          return (email && email.length > 5 && lEmail === email) || (phone && lPhone === phone);
         });
-
-        if (userLeads.length > 0) {
-          lead = userLeads.sort((a, b) => new Date(b['Updated Time'] || (b as any).updated_at || 0).getTime() - new Date(a['Updated Time'] || (a as any).updated_at || 0).getTime())[0];
-        }
     }
 
     if (lead) {
-        // Bulletproof Case-Insensitive Extractor
-        const getVal = (obj: any, keys: string[], fallback: string = '') => {
-          const objKeys = Object.keys(obj);
-          for (const searchKey of keys) {
-            if (obj[searchKey] !== undefined && obj[searchKey] !== null && obj[searchKey] !== '' && obj[searchKey] !== 'undefined') return obj[searchKey];
-            const foundKey = objKeys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === searchKey.toLowerCase().replace(/[^a-z0-9]/g, ''));
-            if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== '' && obj[foundKey] !== 'undefined') return obj[foundKey];
-          }
-          return fallback;
-        };
-
-        const normalizeCommaStr = (val: any) => {
-          if (!val) return '';
-          return val.toString().split(',').map((s: string) => s.trim()).filter(Boolean).join(', ');
-        };
-
-        const foundId = getVal(lead, ['tutor_id', 'order_id', 'orderId', 'Order ID', 'id', 'ID']).toString();
-        const fullName = getVal(lead, ['name', 'Name', 'Full_Name', 'fullName']); 
-        const city = getVal(lead, ['city', 'City', 'Preferred_City']);
-        const phone = getVal(lead, ['phone', 'Phone', 'Mobile']).toString().replace('+91', '').trim();
-        const gender = getVal(lead, ['gender', 'Gender', 'Sex']) || 'Male';
-        const dob = getVal(lead, ['dob', 'DOB', 'Date_of_Birth', 'birth_date']);
-        const age = getVal(lead, ['age', 'Age']);
-        const qualification = parseMulti(getVal(lead, ['qualification', 'Qualification', 'qualifications']));
-        const experience = getVal(lead, ['experience', 'Experience']);
-        const subjects = parseMulti(getVal(lead, ['subjects', 'Subjects', 'subject', 'Subject'])); 
-        const aadhar = getVal(lead, ['aadhar', 'Aadhar', 'Aadhar_Number']);
-        const address = getVal(lead, ['address', 'Address', 'Full_Address']);
-        const communication = getVal(lead, ['communication', 'Communication']);
-        const vehicle = getVal(lead, ['have_vehicle', 'vehicle', 'Vehicle']);
-        const schoolExp = getVal(lead, ['school_teacher', 'school_exp', 'School_Teacher']);
-
-        const dbClassGrp = getVal(lead, ['class_group', 'Class', 'class', 'classGroup']);
-        const dbLocs = parseMulti(getVal(lead, ['location', 'locality', 'locations', 'Locality', 'Locations']));
-        const dbDays = normalizeCommaStr(getVal(lead, ['days', 'Days', 'Available_Day_s', 'weekly_days', 'Weekly Days']));
-        const dbTime = normalizeCommaStr(getVal(lead, ['time', 'Time', 'Available_Time_s', 'preferred_time', 'Preferred Time']));
-        const dbFee = getVal(lead, ['fee', 'Fee', 'Fee_hour', 'monthly_fee', 'budget']);
-        const dbAbout = getVal(lead, ['about', 'About', 'Notes', 'requirement', 'requirement_details']);
-        const dbResidency = getVal(lead, ['residency', 'Residency', 'society', 'Block', 'block', 'society_name']);
-        const dbDuration = getVal(lead, ['duration', 'Duration', 'avg_duration']);
-        const dbMode = getVal(lead, ['mode', 'Mode', 'Mode of Teaching']);
-
-        // BATCH UPDATE
-        const nextProfile: any = { ...profile };
-
-        if (foundId) { nextProfile.tutorId = foundId; localStorage.setItem('tutorId', foundId); }
-        if (fullName) {
-          const parts = fullName.trim().split(/\s+/);
-          nextProfile.userFirstName = parts[0] || '';
-          nextProfile.userLastName = parts.slice(1).join(' ') || '';
-          nextProfile.userName = fullName;
-          localStorage.setItem('userFirstName', nextProfile.userFirstName);
-          localStorage.setItem('userLastName', nextProfile.userLastName);
-          localStorage.setItem('userName', fullName);
-        }
-        if (city) { nextProfile.userCity = city; localStorage.setItem('userCity', city); }
-        if (phone) { nextProfile.userPhone = phone; localStorage.setItem('userPhone', phone); }
-        if (gender) { nextProfile.userGender = gender; localStorage.setItem('userGender', gender); }
-        if (dob) { nextProfile.userDob = dob; localStorage.setItem('userDob', dob); }
-        if (age) { nextProfile.userAge = age; localStorage.setItem('userAge', age); }
-        if (experience) { nextProfile.userExperience = experience; localStorage.setItem('userExperience', experience); }
-        if (qualification.length > 0) { nextProfile.userQualifications = qualification; localStorage.setItem('userQualifications', JSON.stringify(qualification)); }
-        if (subjects.length > 0) { nextProfile.userSubjects = subjects; localStorage.setItem('userSubjects', JSON.stringify(subjects)); }
-        if (aadhar) { nextProfile.userAadhar = aadhar; localStorage.setItem('userAadhar', aadhar); }
-        if (address) { nextProfile.userAddress = address; localStorage.setItem('userAddress', address); }
-        if (communication) { nextProfile.userCommunication = communication; localStorage.setItem('userCommunication', communication); }
-        if (vehicle) { nextProfile.hasVehicle = vehicle; localStorage.setItem('hasVehicle', vehicle); }
-        if (schoolExp) { nextProfile.isSchoolTeacher = schoolExp; localStorage.setItem('isSchoolTeacher', schoolExp); }
-        if (dbLocs.length > 0) { nextProfile.userLocalities = dbLocs; localStorage.setItem('userLocalities', JSON.stringify(dbLocs)); }
-        if (dbDays) { nextProfile.userDays = dbDays; localStorage.setItem('userDays', dbDays); }
-        if (dbTime) { nextProfile.userTime = dbTime; localStorage.setItem('userTime', dbTime); }
-        if (dbFee) { nextProfile.userFee = dbFee; localStorage.setItem('userFee', dbFee); }
-        if (dbAbout) { nextProfile.aboutMe = dbAbout; localStorage.setItem('aboutMe', dbAbout); }
-        if (dbResidency) { nextProfile.userResidency = dbResidency; localStorage.setItem('userResidency', dbResidency); }
-        if (dbDuration) { nextProfile.userDuration = dbDuration; localStorage.setItem('userDuration', dbDuration); }
-        if (dbMode) { nextProfile.userMode = dbMode; localStorage.setItem('userMode', dbMode); }
-
-        if (userType === 'teacher' && dbClassGrp) {
-          const groups = ['Class I to V', 'Class VI to VIII', 'Class IX to X', 'Class XI to XII', 'Entrance Exam & Specialization'];
-          const matched = groups.find(g => dbClassGrp.includes(g));
-          if (matched) { nextProfile.userClasses = [matched]; localStorage.setItem('userClasses', JSON.stringify([matched])); }
-          setIsTutorFetched(true);
-        } else if (userType === 'parent') {
-          let extractedClass = '';
-          if (dbClassGrp && dbClassGrp.includes('(')) {
-            extractedClass = dbClassGrp.split('(')[0].trim();
-            const board = dbClassGrp.match(/\((.*?)\)/)?.[1] || '';
-            if (board) { nextProfile.userBoard = board; localStorage.setItem('userBoard', board); }
-          } else if (dbClassGrp) extractedClass = dbClassGrp;
-          if (extractedClass) { nextProfile.userClasses = [extractedClass]; localStorage.setItem('userClasses', JSON.stringify([extractedClass])); }
-        }
-        
-        setProfile(nextProfile);
+        autoFillDone.current = true; // MARK AS DONE
+        autoFillProfile(lead, userType);
         setShowOnboarding(false);
-      } else {
-       const dataLoaded = (userType === 'teacher' && tutors.length > 0) || (userType === 'parent' && (leads.length > 0 || firestoreLeads.length > 0));
-       if (dataLoaded) {
-          setTutorId(null);
-          localStorage.removeItem('tutorId');
-          setIsTutorFetched(false);
-       }
     }
   }, [activeUser, userType, tutors, leads, firestoreLeads]);
   // -------------------------------------------------------------
@@ -1123,7 +1274,8 @@ export default function App() {
 
     const orderId = getSafe(['Order ID', 'order_id', 'id', 'ID']).toString();
     
-    const normalized: JobLead = {
+    const normalized: any = {
+      ...l, // Spread FIRST to allow explicit overrides
       'Order ID': orderId,
       id: orderId,
       order_id: orderId,
@@ -1145,10 +1297,20 @@ export default function App() {
       time: getSafe(['time', 'Time', 'Preferred Time', 'Available Time', 'Available time', 'preferred_time']),
       mode: getSafe(['mode', 'Mode', 'Mode of Teaching', 'Mode of teaching'], 'Home Tuition'),
       status: getSafe(['status', 'Internal Remark', 'internal_remark'], 'Active'),
-      email: getSafe(['email', 'Email']),
-      phone: getSafe(['phone', 'Phone']),
+      email: getSafe(['email', 'Email', 'email_id']),
+      phone: getSafe(['phone', 'Phone', 'Mobile', 'Mobile Number', 'Mobile_Number', 'Contact']),
       address: getSafe(['address', 'Address']),
-      locality: getSafe(['locality', 'Locality', 'location', 'locations'])
+      locality: getSafe(['locality', 'Locality', 'location', 'locations']),
+      
+      // Additional Profile Fields for Auto-fill
+      dob: getSafe(['dob', 'DOB', 'Date of Birth', 'birth_date', 'Date_of_Birth']),
+      age: getSafe(['age', 'Age', 'tutor_age', 'Tutor_Age']),
+      qualification: getSafe(['qualification', 'Qualification(s)', 'Qualification']),
+      experience: getSafe(['experience', 'Experience', 'Teaching Experience']),
+      school_teacher: getSafe(['school_teacher', 'School Exp.', 'school_exp'], 'No'),
+      have_vehicle: getSafe(['have_vehicle', 'Have own Vehicle', 'vehicle'], 'No'),
+      communication: getSafe(['communication', 'Communication']),
+      aadhar: getSafe(['aadhar', 'Aadhar', 'Aadhar Number', 'Aadhar_Number'])
     };
 
     // Fix Class / Board if it's just class_group
@@ -1237,8 +1399,9 @@ City: ${userCity}`;
       
       // Fix: Tutors see ALL jobs, Parents see only THEIR jobs
       const leadsEmailParam = (userType === 'parent' && activeUser?.email) ? `&email=${encodeURIComponent(activeUser.email.toLowerCase().replace(/\s+/g, ''))}` : '';
+      const leadsPhoneParam = (userType === 'parent' && userPhone) ? `&phone=${encodeURIComponent(userPhone.replace(/\s+/g, '').replace(/^\+91/, ''))}` : '';
       
-      const LEADS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_data.php?t=${ts}${leadsEmailParam}` : `/api/leads?t=${ts}${leadsEmailParam}`;
+      const LEADS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_data.php?t=${ts}${leadsEmailParam}${leadsPhoneParam}` : `/api/leads?t=${ts}${leadsEmailParam}${leadsPhoneParam}`;
       
       // Fix: Never filter Tutors list by email, otherwise 'Featured Tutors' and matching will break
       const TUTORS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_copy_data.php?force_refresh=${ts}` : `/api/tutors?t=${ts}`;
@@ -1266,12 +1429,16 @@ City: ${userCity}`;
            console.log('📡 RAW LEADS DATA:', data);
            if (data.status === 'success') {
              const normalized = data.data.map(normalizeLead);
-             setLeads(normalized);
-             localStorage.setItem('cachedLeads', JSON.stringify(normalized));
+             if (normalized.length > 0 || leads.length === 0) {
+               setLeads(normalized);
+               localStorage.setItem('cachedLeads', JSON.stringify(normalized));
+             }
            } else if (Array.isArray(data)) {
              const normalized = data.map(normalizeLead);
-             setLeads(normalized);
-             localStorage.setItem('cachedLeads', JSON.stringify(normalized));
+             if (normalized.length > 0 || leads.length === 0) {
+               setLeads(normalized);
+               localStorage.setItem('cachedLeads', JSON.stringify(normalized));
+             }
            }
         }
 
@@ -1310,10 +1477,14 @@ City: ${userCity}`;
         }
 
         if (leadsJson.status === 'success') {
-          const normalized = leadsJson.data.map(normalizeLead);
-          setLeads(normalized);
-          localStorage.setItem('cachedLeads', JSON.stringify(normalized));
-        } else if (Array.isArray(leadsJson)) {
+          if (leadsJson.data && leadsJson.data.length > 0) {
+            const normalized = leadsJson.data.map(normalizeLead);
+            setLeads(normalized);
+            localStorage.setItem('cachedLeads', JSON.stringify(normalized));
+          } else {
+            console.log('⚠️ [Network-Parent-Debug] Empty results from server, keeping existing leads pool.');
+          }
+        } else if (Array.isArray(leadsJson) && leadsJson.length > 0) {
           const normalized = leadsJson.map(normalizeLead);
           setLeads(normalized);
           localStorage.setItem('cachedLeads', JSON.stringify(normalized));
@@ -1378,62 +1549,6 @@ City: ${userCity}`;
     return () => { unsubscribeLeads(); unsubscribeAuth(); };
   }, []);
 
-  const handleGoogleSignIn = async () => {
-    try {
-      playTapSound();
-      console.log('🔄 handleGoogleSignIn started...');
-      
-      if (Capacitor.isNativePlatform()) {
-        console.log('📱 Native Platform: Initializing GoogleAuth.signIn()...');
-        const user = await GoogleAuth.signIn();
-        console.log('✅ GoogleAuth.signIn() Success:', JSON.stringify(user));
-        
-        if (!user.authentication.idToken) {
-          console.error('❌ No idToken in user.authentication');
-          setActiveToast({ title: 'Sign-in Error', body: 'idToken missing from Google response.' });
-    
-          return;
-        }
-
-        console.log('🔥 Firebase: signInWithCredential starting...');
-        const credential = GoogleAuthProvider.credential(user.authentication.idToken);
-        const result = await signInWithCredential(auth, credential);
-        console.log('🎉 Firebase: Login Success!', result.user.email);
-        if (userType) localStorage.setItem('userType', userType);
-        setShowOnboarding(false);
-        setShowSuccess(true);
-        setActiveToast({ title: 'Welcome! 👋', body: `Signed in as: ${result.user.email}` });
-
-      } else {
-        console.log('🌐 Web Platform: signInWithPopup starting...');
-        const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        console.log('🎉 Firebase: Web Login Success!', result.user.email);
-        if (userType) localStorage.setItem('userType', userType);
-        setShowOnboarding(false);
-        setShowSuccess(true);
-        setActiveToast({ title: 'Welcome! 👋', body: `Signed in as: ${result.user.email}` });
-
-      }
-    } catch (err: any) {
-      console.error('❌ Sign-in Error:', err);
-      let errorMsg = 'Unknown Error';
-      
-      if (typeof err === 'object') {
-        errorMsg = err.message || err.error || JSON.stringify(err);
-      } else {
-        errorMsg = String(err);
-      }
-      
-      setActiveToast({ title: 'Sign-in Failed', body: errorMsg });
-
-      
-      if (errorMsg.includes('10:') || errorMsg.includes('DEVELOPER_ERROR')) {
-        console.warn('DEBUG HINT: This is usually a SHA-1 or Client ID mismatch in Firebase/Google Console.');
-      }
-    }
-  };
-
   const isAdminUser = useMemo(() => {
     const email = activeUser?.email?.toLowerCase().trim();
     return email === 'd9717018219@gmail.com' || email === 'doableindia@gmail.com';
@@ -1441,33 +1556,33 @@ City: ${userCity}`;
 
   const profileCompletion = useMemo(() => {
     const userData = {
-      name: userName,
+      name: profile.userName,
       email: activeUser?.email,
-      city: userCity,
-      gender: userGender,
-      phone: userPhone,
-      dob: userDob,
-      age: userAge,
-      qualification: userQualifications,
-      experience: userExperience,
-      communication: userCommunication,
-      about: aboutMe,
-      classes: userClasses,
-      subjects: userSubjects,
-      photo: profilePhoto,
-      address: userAddress,
-      mode: userMode,
-      board: userBoard,
-      residency: userResidency,
-      localities: userLocalities,
-      days: userDays,
-      time: userTime,
-      duration: userDuration,
-      fee: userFee,
-      aadhar: userAadhar
+      city: profile.userCity,
+      gender: profile.userGender,
+      phone: profile.userPhone,
+      dob: profile.userDob,
+      age: profile.userAge,
+      qualification: profile.userQualifications,
+      experience: profile.userExperience,
+      communication: profile.userCommunication,
+      about: profile.aboutMe,
+      classes: profile.userClasses,
+      subjects: profile.userSubjects,
+      photo: profile.profilePhoto,
+      address: profile.userAddress,
+      mode: profile.userMode,
+      board: profile.userBoard,
+      residency: profile.userResidency,
+      localities: profile.userLocalities,
+      days: profile.userDays,
+      time: profile.userTime,
+      duration: profile.userDuration,
+      fee: profile.userFee,
+      aadhar: profile.userAadhar
     };
-    return calculateProfileCompletion(userData, userType);
-  }, [userName, activeUser, userCity, userGender, userPhone, userDob, userAge, userQualifications, userExperience, userCommunication, aboutMe, userClasses, userSubjects, profilePhoto, userAddress, userMode, userBoard, userResidency, userLocalities, userDays, userTime, userDuration, userFee, userAadhar, userType]);
+    return calculateProfileCompletion(userData, profile.userType);
+  }, [profile, activeUser]);
 
   const toggleShortlist = useCallback((id: string, e?: React.MouseEvent) => {
     if (e) { e.stopPropagation(); e.preventDefault(); }
@@ -1539,11 +1654,7 @@ City: ${userCity}`;
       // Localities Filter
       if (jobFilterLocalities.length > 0) {
         const jobLocs = (l.Locations || (l as any).location || (l as any).locations || '').toLowerCase();
-        const hasMatch = jobFilterLocalities.some(loc => {
-          const escapedLoc = loc.toLowerCase().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
-          return regex.test(jobLocs);
-        });
+        const hasMatch = jobFilterLocalities.some(loc => jobLocs.includes(loc.toLowerCase()));
         if (!hasMatch) return false;
       }
 
@@ -1644,11 +1755,7 @@ City: ${userCity}`;
       // Localities Filter
       if (tutorFilterLocalities.length > 0) {
         const tutorLocs = (Array.isArray(t.location) ? t.location.join(', ') : (t.location || '')).toString().toLowerCase();
-        const hasMatch = tutorFilterLocalities.some(loc => {
-          const escapedLoc = loc.toLowerCase().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
-          return regex.test(tutorLocs);
-        });
+        const hasMatch = tutorFilterLocalities.some(loc => tutorLocs.includes(loc.toLowerCase()));
         if (!hasMatch) return false;
       }
 
@@ -1750,11 +1857,10 @@ City: ${userCity}`;
       <audio ref={audioRef} preload="auto" />
 
       {/* Onboarding & Auth Flow Overlay */}
-      <AuthModal 
+      <AuthModal
         show={showOnboarding}
         onClose={() => setShowOnboarding(false)}
         onSuccess={handleAuthSuccess}
-        onGoogleSignIn={handleGoogleSignIn}
         playTapSound={playTapSound}
         setActiveToast={setActiveToast}
         userType={userType}
@@ -1765,14 +1871,14 @@ City: ${userCity}`;
       />
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap');
-        
+        @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&family=Outfit:wght@100..900&display=swap');
+
         :root {
           --safe-area-top: env(safe-area-inset-top, 0px);
           --safe-area-bottom: env(safe-area-inset-bottom, 0px);
         }
-        
-        .font-genz { font-family: 'Comfortaa', cursive; }
+
+        .font-genz { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif; }
 
         .no-line { border: none !important; box-shadow: none !important; outline: none !important; }
         .sticky-fix { background-color: rgba(255, 255, 255, 0.7) !important; backdrop-filter: blur(8px); }
@@ -2152,6 +2258,8 @@ City: ${userCity}`;
               setVisibleTutorsCount(10);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+            leadVisibility={leadVisibility}
+            setLeadVisibility={setLeadVisibility}
           />
         )}
        {activeTab === 'jobs' && (
@@ -2267,7 +2375,7 @@ City: ${userCity}`;
         onClose={() => setShowProfileSetup(false)} 
         profile={{ ...profile, email: activeUser?.email || '' }}
         updateField={updateField}
-        onUpdate={handleUpdateProfile}
+        onUpdate={() => handleUpdateProfile()}
         onDelete={handleDeleteProfile}
         onLogout={handleLogout}
         isUpdating={isUpdatingProfile}

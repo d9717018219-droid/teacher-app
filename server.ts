@@ -19,7 +19,7 @@ async function startServer() {
       testData.append('action', 'get');
       testData.append('email', 'd9711738891@gmail.com');
 
-      const response = await fetch('https://doableindia.com/app-sys/api.php', {
+      const response = await fetch('https://doableindia.com/app-sys/app_auth.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, X, LucideUser, Phone, GraduationCap, FileText, ShieldCheck, MapPin, BookOpen, Edit3, Sparkles, Clock, Camera, Trash2, Loader2, LogOut, Check } from 'lucide-react';
+import { Settings, X, LucideUser, Phone, GraduationCap, FileText, ShieldCheck, MapPin, BookOpen, Edit3, Sparkles, Clock, Camera, Trash2, Loader2, LogOut, Check, Mail } from 'lucide-react';
 import { ProfileState } from '../../hooks/useProfileState';
 import { UserType, TutorProfile } from '../../types';
 import { cn } from '../../utils';
@@ -50,7 +50,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
     userSubjects, userBoard, aboutMe, userCommunication, userMode,
     userCity, userLocalities, userResidency, userDays, userTime,
     userDuration, userQualifications, userExperience, userFee,
-    hasVehicle, userSelfie, profilePhoto, userName, tutorId, email
+    hasVehicle, userSelfie, profilePhoto, userName, tutorId, email, userEmail
   } = profile;
 
   const handleSelfieChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,10 +136,17 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       </div>
                     </div>
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Email Address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                      <input type="email" value={userEmail || ''} onChange={(e) => { updateField('userEmail', e.target.value); localStorage.setItem('userEmail', e.target.value); }} placeholder="rahul@example.com" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                    </div>
+                  </div>
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? 'Tutor Gender Preference' : 'Gender'}</label>
                     <div className="flex flex-wrap gap-2">
-                      {(userType === 'teacher' ? ['Male', 'Female', 'Transgender'] : ['Male', 'Female', 'All']).map(g => (
+                      {(userType === 'teacher' ? ['Male', 'Female', 'Transgender'] : ['Male', 'Female', 'Any']).map(g => (
                         <button key={g} onClick={() => { playTapSound(); updateField('userGender', g); localStorage.setItem('userGender', g); }} className={cn("flex-1 px-4 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", userGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{g}</button>
                       ))}
                     </div>
@@ -322,13 +329,16 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                   <div className="space-y-4">
                     <div className="space-y-3">
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of Learning</label>
-                      <div className="flex gap-2">
-                        {['Home Tuition', 'Online Class'].map(m => (
-                          <button key={m} onClick={() => { playTapSound(); updateField('userMode', m); localStorage.setItem('userMode', m); }} className={cn("flex-1 py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center gap-1", userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}><span>{m === 'Home Tuition' ? '🏠' : '💻'}</span><span>{m}</span></button>
+                      <div className="grid grid-cols-2 gap-2">
+                        {["At Student's Place", "At Tutor's Place", 'Online', 'At Institute'].map(m => (
+                          <button key={m} onClick={() => { playTapSound(); updateField('userMode', m); localStorage.setItem('userMode', m); }} className={cn("py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-1", userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>
+                            <span>{m.includes('Student') ? '🏠' : m.includes('Tutor') ? '👨‍🏫' : m === 'Online' ? '💻' : '🏢'}</span>
+                            <span className="text-center px-1">{m}</span>
+                          </button>
                         ))}
                       </div>
                     </div>
-                    {userMode !== 'Online Class' && (
+                    {userMode !== 'Online' && (
                       <div className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">City</label>
@@ -615,13 +625,18 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                     <div className="relative">{profilePhoto ? <img src={profilePhoto} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" /> : <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-white shadow-md"><LucideUser size={24} /></div>}</div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[12px] font-black text-slate-900 truncate">{userName || (userType === 'teacher' ? 'Tutor' : 'Parent')}</div>
-                      <div className="text-[10px] font-bold text-slate-400 truncate">{email}</div>
+                      <div className="text-[10px] font-bold text-slate-400 truncate">{userCountryCode} {userPhone}</div>
                       <div className="text-[9px] font-black text-primary uppercase tracking-widest mt-0.5">{userType === 'parent' ? 'Order ID' : 'Tutor ID'}: #{tutorId || 'Pending'}</div>
                     </div>
                   </div>
-                  <div className="pt-6 border-t border-slate-100/50">
+                  <div className="pt-6 border-t border-slate-100/50 space-y-3">
                     <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><ShieldCheck size={12} className="text-rose-500" /> Danger Zone</p>
-                    <button onClick={onDelete} disabled={isDeleting} className="w-full bg-rose-500 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-rose-200">{isDeleting ? <Loader2 size={16} className="animate-spin" /> : <><Trash2 size={16} /> Delete My Profile</>}</button>
+                    <button onClick={onDelete} disabled={isDeleting} className="w-full bg-rose-500 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-rose-200">
+                      {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <><Trash2 size={16} /> Delete My Profile</>}
+                    </button>
+                    <button onClick={onLogout} className="w-full bg-slate-100 text-slate-500 p-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-95 border border-slate-200">
+                      <LogOut size={16} /> Sign Out
+                    </button>
                   </div>
                 </div>
               </div>
@@ -630,15 +645,15 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
 
          <div className="p-6 border-t border-slate-50 bg-white flex items-center gap-3 shrink-0">
             <button 
-              onClick={onLogout}
-              className="flex-1 h-14 rounded-2xl bg-pink-500 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-pink-200 flex items-center justify-center gap-2"
+              onClick={onClose}
+              className="flex-1 h-14 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 border border-slate-200"
             >
-              <LogOut size={16} /> Sign Out
+              Close
             </button>
             <button 
               onClick={onUpdate}
               disabled={isUpdating}
-              className="flex-[1.5] h-14 rounded-2xl bg-sky-400 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-sky-100 flex items-center justify-center gap-2"
+              className="flex-[2] h-14 rounded-2xl bg-sky-50 text-sky-600 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 border-2 border-sky-100 shadow-sm"
             >
               {isUpdating ? <Loader2 size={16} className="animate-spin" /> : <>Save Details <Check size={16} strokeWidth={3} /></>}
             </button>

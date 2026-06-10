@@ -2,9 +2,13 @@ import { AuthService } from './auth.service';
 
 export interface AuthHandlerContext {
   email: string;
+  phone?: string;
+  countryCode?: string;
   password?: string;
   userType: 'teacher' | 'parent' | null;
   resetPin?: string;
+  generatedOtp?: string;
+  setGeneratedOtp?: (otp: string) => void;
   newPassword?: string;
   confirmPassword?: string;
   setIsAuthLoading: (loading: boolean) => void;
@@ -17,189 +21,127 @@ export interface AuthHandlerContext {
   onSuccess: (data: any) => void;
   setActiveToast: (toast: { title: string; body: string }) => void;
   playTapSound: () => void;
+  setPhone?: (phone: string) => void;
+  setUserName?: (name: string) => void;
+  isEmailExist?: boolean;
 }
 
 export const AuthHandlers = {
   handleEmailProceed: async (ctx: AuthHandlerContext) => {
-    const { email, userType, setIsAuthLoading, setAuthError, setEmailChecked, setEmailExist, setAuthMode, setAuthStep, setActiveToast, playTapSound } = ctx;
+    const { email, countryCode, userType, setIsAuthLoading, setAuthError, setEmailChecked, setEmailExist, setAuthMode, setAuthStep, setActiveToast, playTapSound, setPhone, setUserName, setGeneratedOtp } = ctx;
     
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      setAuthError('Please enter a valid email address.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const responseData = await AuthService.checkEmailExists(email, userType || 'teacher');
-
-      if (responseData.status === 'success' && responseData.data) {
-        const { exists, is_registered, user_type } = responseData.data;
+    // Check if input is a phone number (now also considering country code from ctx)
+    const isPhone = /^\d{7,15}$/.test(email.replace(/\D/g, ''));
+    
+    if (isPhone) {
+      const cleanPhone = email.replace(/\D/g, '');
+      const fullPhone = `${countryCode || '+91'}${cleanPhone}`;
+      if (setPhone) setPhone(cleanPhone);
+      
+      setIsAuthLoading(true);
+      setAuthError(null);
+      
+      try {
+        console.log(`[Phone-Auth] Checking if phone exists in DB: ${fullPhone}`);
+        // 1. Check if Phone Exists in DB
+        const responseData = await AuthService.checkPhoneExists(fullPhone, userType || 'teacher');
+        console.log(`[Phone-Auth] DB Response:`, responseData);
         
-        if (exists) {
-          // User exists in system
-          if (setEmailChecked) setEmailChecked(true);
-          if (setEmailExist) setEmailExist(true);
-          
-          if (is_registered) {
-            // Fully registered - Go to Sign In
+        if (responseData.status === 'success') {
+          if (responseData.data?.exists) {
+            console.log(`[Phone-Auth] Profile found in DB:`, responseData.data);
+            // EXISTING PHONE USER
+            if (setEmailChecked) setEmailChecked(true);
+            if (setEmailExist) setEmailExist(true);
             if (setAuthMode) setAuthMode('signin');
-            if (setAuthStep) setAuthStep('auth');
+            
+            // Set user name if available
+            if (setUserName && responseData.data.name) {
+              setUserName(responseData.data.name);
+            }
+            
+            // PRIORITY: If CRM says parent, they are a parent.
+            if (ctx.setUserType && responseData.data.user_type) {
+              const detectedType = responseData.data.user_type === 'parent' ? 'parent' : 'teacher';
+              ctx.setUserType(detectedType);
+              console.log(`[Phone-Auth] Setting UserType to: ${detectedType}`);
+            }
           } else {
-            // In CRM but no password - Inform and set context
-            if (setAuthMode) setAuthMode('signin');
-            if (setAuthStep) setAuthStep('auth');
-            setAuthError('We found your profile! Please use "Forgot Password" below to set your login password for the first time.');
-          }
-
-          if (user_type && ctx.setUserType) {
-            ctx.setUserType(user_type === 'parent' ? 'parent' : 'teacher');
+            console.log(`[Phone-Auth] New user (or not found). Marking as signup.`);
+            // NEW PHONE USER
+            if (setAuthMode) setAuthMode('signup');
+            if (setEmailExist) setEmailExist(false);
           }
         } else {
-          // Double check: if exists is explicitly false
-          playTapSound();
-          if (setAuthMode) setAuthMode('signup');
+          console.error(`[Phone-Auth] DB Error:`, responseData.message);
+          setAuthError(responseData.message || 'Database check failed. Please try again.');
+          setIsAuthLoading(false);
+          return;
+        }
+
+        console.log(`[Phone-Auth] Sending WhatsApp OTP to: ${fullPhone}`);
+        // 2. Send OTP
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+        const res = await AuthService.sendWhatsAppOTP(fullPhone, otp);
+        
+        if (res.result || res.status === 'success') {
+          if (setGeneratedOtp) setGeneratedOtp(otp);
+          if (setAuthStep) setAuthStep('otp');
+          setActiveToast({ title: 'OTP Sent! 📱', body: 'Check your WhatsApp for the login code.' });
+        } else {
+          setAuthError(res.message || 'Failed to send WhatsApp OTP. Please try Email.');
+        }
+      } catch (err) {
+        setAuthError('Connection error while sending OTP.');
+      } finally {
+        setIsAuthLoading(false);
+      }
+      return;
+    }
+
+    if (!email) {
+      setAuthError('Please enter your WhatsApp number.');
+      return;
+    }
+    setAuthError('Please enter a valid 10-digit phone number.');
+  },
+
+  handleVerifyOTP: async (ctx: AuthHandlerContext) => {
+    const { phone, resetPin, generatedOtp, userType, setIsAuthLoading, setAuthError, setAuthStep, onSuccess, setActiveToast, playTapSound, isEmailExist } = ctx;
+    
+    if (!resetPin || resetPin.length < 4) {
+      setAuthError('Please enter the 4-digit code.');
+      return;
+    }
+
+    setIsAuthLoading(true);
+    
+    // Simulate verification
+    setTimeout(async () => {
+      if (resetPin === generatedOtp) {
+        playTapSound();
+        
+        if (isEmailExist) {
+          // EXISTING USER -> Login immediately
+          const mockResponse = {
+            status: 'success',
+            user: {
+              email: `${phone}@whatsapp.com`, // Use phone as email identifier
+              phone: phone,
+              userType: userType || 'teacher'
+            }
+          };
+          onSuccess(mockResponse);
+          setActiveToast({ title: 'Verified! 🎉', body: 'Login successful via WhatsApp.' });
+        } else {
+          // NEW USER -> Must select role
           if (setAuthStep) setAuthStep('selection');
-          if (setEmailExist) setEmailExist(false);
-          setActiveToast({ title: 'New to DoAble? ✨', body: 'Please select your role to create an account.' });
+          setActiveToast({ title: 'Phone Verified! ✅', body: 'Please select your role to continue.' });
         }
       } else {
-        // New user - Route to Selection
-        playTapSound();
-        if (setAuthMode) setAuthMode('signup');
-        if (setAuthStep) setAuthStep('selection');
-        if (setEmailExist) setEmailExist(false);
-        setActiveToast({ title: 'New to DoAble? ✨', body: 'Please select your role to create an account.' });
+        setAuthError('Invalid OTP code. Please check your WhatsApp.');
       }
-    } catch (err) {
-      console.error('Email Check Error:', err);
-      setAuthError('Unable to connect to server. Please try again.');
-    } finally {
       setIsAuthLoading(false);
-    }
-  },
-
-  handleEmailSignIn: async (ctx: AuthHandlerContext) => {
-    const { email, password, userType, setIsAuthLoading, setAuthError, onSuccess } = ctx;
-    
-    if (!email || !password) {
-      setAuthError('Please enter both email and password.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const data = await AuthService.signIn(email, password, userType || 'teacher');
-      
-      if (data.status === 'success') {
-        onSuccess(data);
-      } else {
-        setAuthError(data.message || 'Invalid email or password.');
-      }
-    } catch (error: any) {
-      console.error('Sign In Error:', error);
-      setAuthError('Connection error. Please try again.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  },
-
-  handleEmailSignUp: async (ctx: AuthHandlerContext) => {
-    const { email, password, userType, setIsAuthLoading, setAuthError, onSuccess, playTapSound, setAuthMode, setEmailChecked, setActiveToast } = ctx;
-    
-    if (!email || !password) {
-      setAuthError('Please enter both email and password.');
-      return;
-    }
-    if (password.length < 6) {
-      setAuthError('Password should be at least 6 characters.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const checkData = await AuthService.checkEmailExists(email, userType || 'teacher');
-
-      if (checkData.status === 'success' && checkData.data) {
-        playTapSound();
-        if (setAuthMode) setAuthMode('signin');
-        if (setEmailChecked) setEmailChecked(true);
-        setActiveToast({ title: 'Already Registered 👋', body: 'This email is already registered. Please sign in.' });
-        setIsAuthLoading(false);
-        return;
-      }
-
-      const data = await AuthService.signUp(email, password, userType || 'teacher');
-
-      if (data.status === 'success') {
-        onSuccess(data);
-      } else {
-        setAuthError(data.message || 'Failed to sign up.');
-      }
-    } catch (error: any) {
-      console.error('Sign Up Error:', error);
-      setAuthError('Connection error. Please try again.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  },
-
-  handleForgotPassword: async (ctx: AuthHandlerContext) => {
-    const { email, setIsAuthLoading, setAuthError, setAuthMode } = ctx;
-    
-    if (!email) {
-      setAuthError('Please enter your email address.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const data = await AuthService.forgotPassword(email);
-      if (data.status === 'success') {
-        if (setAuthMode) setAuthMode('reset');
-        setAuthError(null);
-      } else {
-        setAuthError(data.message || 'Failed to send reset PIN.');
-      }
-    } catch (error: any) {
-      setAuthError('Connection error.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  },
-
-  handleResetPassword: async (ctx: AuthHandlerContext) => {
-    const { email, resetPin, newPassword, confirmPassword, setIsAuthLoading, setAuthError, setAuthMode, setEmailChecked, setAuthStep, setActiveToast, playTapSound } = ctx;
-    
-    if (!resetPin || !newPassword || !confirmPassword) {
-      setAuthError('Please fill all fields.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setAuthError('Passwords do not match.');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setAuthError('Password must be at least 6 characters.');
-      return;
-    }
-    setIsAuthLoading(true);
-    setAuthError(null);
-    try {
-      const data = await AuthService.resetPassword(email, resetPin, newPassword);
-
-      if (data.status === 'success') {
-        playTapSound();
-        if (setAuthMode) setAuthMode('signin');
-        if (setAuthStep) setAuthStep('auth');
-        if (setEmailChecked) setEmailChecked(true);
-        setActiveToast({ title: 'Password Reset! 🔐', body: 'You can now sign in with your new password.' });
-      } else {
-        setAuthError(data.message || 'Invalid PIN or error resetting password.');
-      }
-    } catch (error: any) {
-      setAuthError('Connection error.');
-    } finally {
-      setIsAuthLoading(false);
-    }
+    }, 1000);
   }
 };

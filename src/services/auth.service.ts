@@ -6,7 +6,17 @@ export const AuthService = {
     return apiClient({
       url: 'https://doableindia.com/app-sys/app_auth.php',
       method: 'POST',
-      data: { action: 'get', email, userType }
+      data: { action: 'get', email, userType },
+      isUrlEncoded: true
+    });
+  },
+
+  checkPhoneExists: async (phone: string, userType: string) => {
+    return apiClient({
+      url: 'https://doableindia.com/app-sys/app_auth.php',
+      method: 'POST',
+      data: { action: 'get', phone, userType },
+      isUrlEncoded: true
     });
   },
 
@@ -14,7 +24,8 @@ export const AuthService = {
     return apiClient({
       url: 'https://doableindia.com/app-sys/app_auth.php',
       method: 'POST',
-      data: { action: 'signin', email, password, userType }
+      data: { action: 'signin', email, password, userType },
+      isUrlEncoded: true
     });
   },
 
@@ -22,7 +33,8 @@ export const AuthService = {
     return apiClient({
       url: 'https://doableindia.com/app-sys/app_auth.php',
       method: 'POST',
-      data: { action: 'signup', email, password, userType }
+      data: { action: 'signup', email, password, userType },
+      isUrlEncoded: true
     });
   },
 
@@ -30,7 +42,8 @@ export const AuthService = {
     return apiClient({
       url: 'https://doableindia.com/app-sys/app_auth.php',
       method: 'POST',
-      data: { action: 'forgot_password', email }
+      data: { action: 'forgot_password', email },
+      isUrlEncoded: true
     });
   },
 
@@ -38,16 +51,63 @@ export const AuthService = {
     return apiClient({
       url: 'https://doableindia.com/app-sys/app_auth.php',
       method: 'POST',
-      data: { action: 'reset_password', email, pin, password }
+      data: { action: 'reset_password', email, pin, password },
+      isUrlEncoded: true
     });
   },
 
-  deleteProfile: async (email: string, tutorId: string | null) => {
+  updateType: async (email: string, phone: string, userType: string) => {
+    return apiClient({
+      url: 'https://doableindia.com/app-sys/app_auth.php',
+      method: 'POST',
+      data: { action: 'update_type', email, phone, userType },
+      isUrlEncoded: true
+    });
+  },
+
+  sendWhatsAppOTP: async (phone: string, otp: string) => {
+    // WATI API Integration
+    const cleanPhone = phone.replace(/\D/g, '');
+    const fullPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
+    
+    try {
+      const response = await fetch(`https://live-mt-server.wati.io/351284/api/v1/sendTemplateMessage?whatsappNumber=${fullPhone}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImluZm9AZG9hYmxlaW5kaWEuY29tIiwibmFtZWlkIjoiaW5mb0Bkb2FibGVpbmRpYS5jb20iLCJlbWFpbCI6ImluZm9AZG9hYmxlaW5kaWEuY29tIiwiYXV0aF90aW1lIjoiMDYvMDkvMjAyNiAxMToxMToyMiIsInRlbmFudF9pZCI6IjM1MTI4NCIsImRiX25hbWUiOiJtdC1wcm9kLVRlbmFudHMiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJBRE1JTklTVFJBVE9SIiwiZXhwIjoyNTM0MDIzMDA4MDAsImlzcyI6IkNsYXJlX0FJIiwiYXVkIjoiQ2xhcmVfQUkifQ.3PbOdbd354vOpu9BEbBdlNMc05PNHzrvSu2eh_rm3Rw',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          template_name: 'app_otp',
+          broadcast_name: 'app_otp',
+          parameters: [
+            {
+              name: '1', // Try standard positional parameter
+              value: otp
+            }
+          ]
+        })
+      });
+      
+      const result = await response.json();
+      if (!response.ok) {
+        console.error('WATI API Detailed Error:', result);
+      }
+      return result;
+    } catch (error) {
+      console.error('WATI OTP Network Error:', error);
+      return { result: false, message: 'Failed to connect to WhatsApp service.' };
+    }
+  },
+
+  deleteProfile: async (email: string, tutorId: string | null, phone?: string, userType?: string) => {
     const payload: any = { action: 'delete', email };
     if (tutorId) payload.tutor_id = tutorId;
+    if (phone) payload.phone = phone;
+    if (userType) payload.userType = userType;
 
     return apiClient({
-      url: 'https://doableindia.com/app-sys/api_copy.php',
+      url: 'https://doableindia.com/app-sys/api_delete.php',
       method: 'POST',
       data: payload
     });
@@ -96,7 +156,7 @@ export const AuthService = {
         monthly_earnings: tutors.find(t => t.email?.toLowerCase().trim() === profile.email?.toLowerCase().trim())?.monthly_earnings || 0,
         status: localStorage.getItem('tutorStatus') || 'Active',
         verified: localStorage.getItem('isVerified') || 'No',
-        created_time: new Date().toISOString().split('T')[0]
+        created_time: new Date().toISOString().slice(0, 19).replace('T', ' ')
       };
 
       return apiClient({

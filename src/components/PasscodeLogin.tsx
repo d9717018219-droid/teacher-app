@@ -68,7 +68,7 @@ const PasscodeLogin: React.FC<PasscodeLoginProps> = ({ onSuccess, adminEmail, ad
   }, [pin]);
 
   return (
-    <div className="flex flex-col items-center justify-center p-8 space-y-8 max-w-sm mx-auto bg-white rounded-[40px] shadow-2xl border border-slate-100">
+    <div className="flex flex-col items-center justify-center p-8 space-y-8 max-w-sm mx-auto bg-white rounded-[40px] shadow-2xl border border-slate-100 font-auth">
       <div className="w-20 h-20 bg-primary/10 rounded-[32px] flex items-center justify-center text-primary shadow-inner">
         <Lock size={36} strokeWidth={2.5} />
       </div>

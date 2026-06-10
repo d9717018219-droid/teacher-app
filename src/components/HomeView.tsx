@@ -67,6 +67,8 @@ interface HomeViewProps {
   onGenderClick?: (gender: 'Male' | 'Female') => void;
   onModeClick?: (mode: string) => void;
   onCityClick?: (city: string) => void;
+  leadVisibility?: boolean;
+  setLeadVisibility?: (visible: boolean) => void;
 }
 
 const CLASS_GROUP_MAPPING: Record<string, string[]> = {
@@ -106,7 +108,9 @@ export const HomeView = React.memo(({
   onLocalityClick,
   onGenderClick,
   onModeClick,
-  onCityClick
+  onCityClick,
+  leadVisibility,
+  setLeadVisibility
 }: HomeViewProps) => {
   const [currentBanner, setCurrentBanner] = React.useState(0);
 
@@ -352,6 +356,52 @@ export const HomeView = React.memo(({
           <ExploreCard icon={<MessageCircle size={14} fill="white" className="text-white" />} label="Help" sub="Care" onClick={() => setActiveTab('support')} iconBg="bg-[#347475]" />
         </div>
       </section>
+
+      {/* 4. Visibility Toggle (Parent & Tutor) */}
+      {(userType === 'parent' || userType === 'teacher') && (
+        <section className="px-5">
+          <div className="bg-slate-50 border border-slate-100 rounded-[24px] p-4 flex items-center justify-between shadow-sm">
+             <div className="flex flex-col gap-0.5">
+                <h4 className="text-[12px] font-black text-slate-900 tracking-tight">
+                  {userType === 'parent' ? 'Need Tutors to connect you?' : 'Go Live with your Profile?'}
+                </h4>
+                {leadVisibility && profileCompletion < 100 ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-black text-primary uppercase">Profile: {profileCompletion}%</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter italic">Please complete it first</span>
+                  </div>
+                ) : (
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                    Status: {leadVisibility ? (userType === 'parent' ? 'SEARCHING' : 'LIVE') : 'OFFLINE'}
+                  </p>
+                )}
+             </div>
+             
+             <div 
+               onClick={() => {
+                 playTapSound();
+                 if (setLeadVisibility) setLeadVisibility(!leadVisibility);
+               }}
+               className={cn(
+                 "w-20 h-9 rounded-full p-1 cursor-pointer transition-all duration-300 relative",
+                 leadVisibility ? "bg-emerald-500" : "bg-slate-200"
+               )}
+             >
+                <div className={cn(
+                  "absolute inset-0 flex items-center justify-between px-3 text-[9px] font-black uppercase tracking-widest",
+                  leadVisibility ? "text-white" : "text-slate-400"
+                )}>
+                  <span>{leadVisibility ? '' : 'NO'}</span>
+                  <span>{leadVisibility ? 'YES' : ''}</span>
+                </div>
+                <motion.div 
+                  animate={{ x: leadVisibility ? 44 : 0 }}
+                  className="w-7 h-7 bg-white rounded-full shadow-md z-10 relative"
+                />
+             </div>
+          </div>
+        </section>
+      )}
 
       {/* Conditional Rendering for Parents */}
       {userType === 'parent' && (

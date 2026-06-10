@@ -33,6 +33,8 @@ export interface ProfileState {
   userResidency: string;
   userAadhar: string;
   userSelfie: string | null;
+  userEmail: string;
+  leadVisibility?: boolean;
 }
 
 export function useProfileState() {
@@ -82,8 +84,10 @@ export function useProfileState() {
       userResidency: localStorage.getItem('userResidency') || '',
       userAadhar: localStorage.getItem('userAadhar') || '',
       userSelfie: localStorage.getItem('userSelfie'),
-    };
-  });
+      userEmail: localStorage.getItem('userEmail') || '',
+      leadVisibility: localStorage.getItem('leadVisibility') === 'true',
+      };
+      });
 
   const updateField = useCallback((field: keyof ProfileState, value: any) => {
     setProfile(prev => ({ ...prev, [field]: value }));

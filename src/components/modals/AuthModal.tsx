@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LucideUser, GraduationCap, Mail, Lock, Eye, EyeOff, Hash, AlertCircle, Loader2, ChevronLeft } from 'lucide-react';
+import { LucideUser, GraduationCap, Loader2, Smartphone } from 'lucide-react';
 import { useAuthState, AuthMode, AuthStep } from '../../hooks/useAuthState';
 import { AuthHandlers } from '../../services/auth.handlers';
 import { cn } from '../../utils';
@@ -10,7 +10,6 @@ interface AuthModalProps {
   show: boolean;
   onClose: () => void;
   onSuccess: (data: any) => void;
-  onGoogleSignIn: () => void;
   playTapSound: () => void;
   setActiveToast: (toast: { title: string; body: string }) => void;
   userType: UserType | null;
@@ -24,7 +23,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   show,
   onClose,
   onSuccess,
-  onGoogleSignIn,
   playTapSound,
   setActiveToast,
   userType,
@@ -32,313 +30,255 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   userName,
   initialMode,
   initialStep
-}) => {
+  }) => {
   const authState = useAuthState();
   const {
-    email, setEmail,
-    password, setPassword,
-    isAuthLoading, setIsAuthLoading,
-    authError, setAuthError,
-    resetPin, setResetPin,
-    newPassword, setNewPassword,
-    confirmPassword, setRetypePassword,
-    authMode, setAuthMode,
-    authStep, setAuthStep,
-    emailChecked, setEmailChecked,
-    isEmailExist, setEmailExist,
-    showPassword, setShowPassword,
-    resendTimer, setResendTimer
+  email, setEmail,
+  phone, setPhone,
+  userName: authUserName, setUserName: setAuthUserName,
+  loginMethod, setLoginMethod,
+  countryCode, setCountryCode,
+  password, setPassword,
+  isAuthLoading, setIsAuthLoading,
+  authError, setAuthError,
+  resetPin, setResetPin,
+  generatedOtp, setGeneratedOtp,
+  newPassword, setNewPassword,
+  confirmPassword, setRetypePassword,
+  authMode, setAuthMode,
+  authStep, setAuthStep,
+  emailChecked, setEmailChecked,
+  isEmailExist, setEmailExist,
+  showPassword, setShowPassword,
+  resendTimer, setResendTimer
   } = authState;
 
+  const countryCodes = [
+    { code: '+91', country: 'India', flag: '🇮🇳' },
+    { code: '+977', country: 'Nepal', flag: '🇳🇵' },
+    { code: '+880', country: 'Bangladesh', flag: '🇧🇩' },
+    { code: '+94', country: 'Sri Lanka', flag: '🇱🇰' },
+    { code: '+92', country: 'Pakistan', flag: '🇵🇰' },
+    { code: '+975', country: 'Bhutan', flag: '🇧🇹' },
+    { code: '+95', country: 'Myanmar', flag: '🇲🇲' },
+    { code: '+960', country: 'Maldives', flag: '🇲🇻' },
+    { code: '+93', country: 'Afghanistan', flag: '🇦🇫' },
+    { code: '+971', country: 'UAE', flag: '🇦🇪' },
+    { code: '+1', country: 'USA', flag: '🇺🇸' },
+    { code: '+44', country: 'UK', flag: '🇬🇧' },
+  ];
+
   React.useEffect(() => {
-    if (show) {
-      if (initialMode) setAuthMode(initialMode);
-      if (initialStep) setAuthStep(initialStep);
-    }
-  }, [show, initialMode, initialStep, setAuthMode, setAuthStep]);
+  if (show) {
+    if (initialMode) setAuthMode(initialMode);
+    if (initialStep) setAuthStep(initialStep);
+
+    // Simple auto-detection
+    const lang = navigator.language.toLowerCase();
+    if (lang.includes('ae')) setCountryCode('+971');
+    else if (lang.includes('us')) setCountryCode('+1');
+    else if (lang.includes('gb')) setCountryCode('+44');
+    else if (lang.includes('ca')) setCountryCode('+1');
+    else if (lang.includes('au')) setCountryCode('+61');
+    else if (lang.includes('sg')) setCountryCode('+65');
+    else if (lang.includes('sa')) setCountryCode('+966');
+    else setCountryCode('+91');
+  }
+  }, [show, initialMode, initialStep, setAuthMode, setAuthStep, setCountryCode]);
 
   // Countdown logic for Resend PIN
   React.useEffect(() => {
-    let interval: any;
-    if (resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
+  let interval: any;
+  if (resendTimer > 0) {
+    interval = setInterval(() => {
+      setResendTimer((prev) => prev - 1);
+    }, 1000);
+  }
+  return () => clearInterval(interval);
   }, [resendTimer, setResendTimer]);
 
   if (!show) return null;
 
   const handleSuccess = (data: any) => {
-    onSuccess({ ...data, email: email });
+    const userEmail = data.user?.email || (email.includes('@') ? email : (phone ? `${phone}@whatsapp.com` : (email ? `${email}@whatsapp.com` : '')));
+    onSuccess({ ...data, email: userEmail });
   };
 
   const ctx = {
-    email, password, userType, resetPin, newPassword, confirmPassword,
-    setIsAuthLoading, setAuthError, setEmailChecked, setEmailExist,
-    setAuthMode, setAuthStep, setUserType, onSuccess: handleSuccess, setActiveToast, playTapSound
+  email, phone, countryCode, password, userType, resetPin, generatedOtp, setGeneratedOtp, newPassword, confirmPassword,
+  setIsAuthLoading, setAuthError, setEmailChecked, setEmailExist,
+  setAuthMode, setAuthStep, setUserType, onSuccess: handleSuccess, setActiveToast, playTapSound, setPhone, 
+  setUserName: setAuthUserName, isEmailExist
   };
 
   const handleAction = () => {
     if (authStep === 'email') {
       AuthHandlers.handleEmailProceed(ctx);
-    } else if (authMode === 'signin') {
-      AuthHandlers.handleEmailSignIn(ctx);
-    } else if (authMode === 'signup') {
-      AuthHandlers.handleEmailSignUp(ctx);
-    } else if (authMode === 'forgot') {
-      setResendTimer(10); // Start timer when forgot password is first triggered
-      AuthHandlers.handleForgotPassword(ctx);
-    } else {
-      AuthHandlers.handleResetPassword(ctx);
+    } else if (authStep === 'otp') {
+      AuthHandlers.handleVerifyOTP(ctx);
     }
   };
 
-  const handleResendPIN = () => {
-    if (resendTimer > 0) return;
-    playTapSound();
-    setResendTimer(10);
-    AuthHandlers.handleForgotPassword(ctx);
-  };
-
   return (
-    <div className="fixed inset-0 z-[20000] flex items-center justify-center p-4 font-genz">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/95" onClick={onClose} />
-      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-full max-sm:max-w-sm max-w-sm">
-        <AnimatePresence mode="wait">
-          {authStep === 'email' ? (
-            <motion.div key="email" initial={{ x: 10, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -10, opacity: 0 }} className="bg-white rounded-[40px] p-8 shadow-2xl space-y-6">
-              <div className="space-y-2 text-center">
-                <h3 className="text-3xl font-black tracking-tighter text-slate-900 leading-tight">Welcome 👋</h3>
-                <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.1em]">Ready to find your perfect match?</p>
+  <div className="fixed inset-0 z-[20000] flex flex-col font-auth bg-[#F9FAFB] overflow-y-auto no-scrollbar">
+    <div className="min-h-full w-full flex flex-col items-center justify-center px-8 pb-10">
+
+      {/* Logo Section */}
+      <div className="mb-8 text-center w-full">
+        <h1 className="text-[24px] sm:text-[28px] font-black tracking-tighter bg-linear-to-r from-[#C82333] to-[#2563EB] bg-clip-text text-transparent whitespace-nowrap overflow-hidden">
+          DoAble India Enterprises
+        </h1>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">India's Leading Tuitions Network</p>
+      </div>
+
+      <AnimatePresence mode="wait">
+        {authStep === 'email' ? (
+          <motion.div key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex flex-col items-center space-y-8">
+            <div className="text-center space-y-3 px-4">
+              <h3 className="text-[20px] font-bold text-black leading-tight">Log in or Sign up</h3>
+              <p className="text-slate-600 text-[13px] font-medium">Enter your WhatsApp number</p>
+            </div>
+
+            <div className="w-full space-y-5">
+              <div className="relative flex items-center bg-slate-100/60 rounded-2xl px-5 focus-within:bg-white focus-within:ring-4 focus-within:ring-rose-50/50 transition-all duration-300 shadow-sm">
+                <div className="relative flex items-center mr-4 border-r border-slate-200/50 pr-4">
+                  <select 
+                    value={countryCode} 
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="appearance-none bg-transparent text-[17px] font-bold text-slate-700 outline-none pr-1 cursor-pointer"
+                  >
+                    {countryCodes.map(c => (
+                      <option key={`${c.country}-${c.code}`} value={c.code}>{c.flag} {c.code}</option>
+                    ))}
+                  </select>
+                </div>
+                <input 
+                  type="tel"
+                  maxLength={10}
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value.replace(/\D/g, ''))} 
+                  onKeyDown={(e) => e.key === 'Enter' && handleAction()}
+                  placeholder="9876543210" 
+                  className="w-full py-5 text-[17px] font-semibold text-slate-800 outline-none bg-transparent placeholder:text-slate-400/50" 
+                  autoFocus
+                />
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Email Address</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                    <input 
-                      type="email" 
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)} 
-                      onKeyDown={(e) => e.key === 'Enter' && handleAction()}
-                      placeholder="name@example.com" 
-                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" 
-                      autoFocus
-                    />
-                  </div>
-                </div>
+                {authError && <div className="text-rose-500 text-[11px] font-medium text-center">{authError}</div>}
 
-                {authError && <div className="text-rose-500 text-[10px] font-bold px-1 flex items-center gap-1.5"><AlertCircle size={12} /> {authError}</div>}
+                <div className="space-y-3">
+                <button 
+                  onClick={handleAction}
+                  disabled={isAuthLoading}
+                  className="w-full bg-linear-to-r from-[#C82333] to-[#2563EB] text-white py-3.5 rounded-xl font-bold text-[13px] uppercase tracking-wider shadow-md active:scale-[0.98] transition-all flex items-center justify-center"
+                >
+                  {isAuthLoading ? <Loader2 size={18} className="animate-spin" /> : 'REQUEST OTP'}
+                </button>
+                </div>
+              </div>
+            </motion.div>
+          ) : authStep === 'otp' ? (
+            <motion.div key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex flex-col items-center space-y-8">
+              <div className="text-center space-y-2">
+                <span className={cn(
+                  "text-[11px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full",
+                  isEmailExist ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"
+                )}>
+                  {isEmailExist ? `Welcome Back${authUserName ? ', ' + authUserName : ''}! 👋` : 'Creating New Account ✨'}
+                </span>
+                <h3 className="text-[20px] font-bold text-black uppercase tracking-tight pt-2">Verify Code</h3>
+                <p className="text-slate-500 text-[12px] font-medium">OTP sent to {countryCode} {phone || email}</p>
+              </div>
+
+              <div className="w-full space-y-5">
+                <input 
+                  type="text" 
+                  maxLength={4}
+                  value={resetPin} 
+                  onChange={(e) => setResetPin(e.target.value.replace(/\D/g, ''))} 
+                  onKeyDown={(e) => e.key === 'Enter' && handleAction()}
+                  placeholder="Enter OTP" 
+                  className="w-full bg-white border border-slate-200 rounded-xl py-4 text-center text-xl font-bold tracking-[0.5em] text-slate-800 outline-none focus:border-[#C82333] shadow-sm" 
+                  autoFocus
+                />
+
+                {authError && <div className="text-rose-500 text-[11px] font-medium text-center">{authError}</div>}
 
                 <button 
                   onClick={handleAction}
                   disabled={isAuthLoading}
-                  className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="w-full bg-linear-to-r from-[#C82333] to-[#2563EB] text-white py-3.5 rounded-xl font-bold text-[13px] uppercase tracking-wider shadow-md active:scale-[0.98] transition-all flex items-center justify-center"
                 >
-                  {isAuthLoading ? <Loader2 size={16} className="animate-spin" /> : 'Continue'}
+                  {isAuthLoading ? <Loader2 size={18} className="animate-spin" /> : 'VERIFY & SIGN IN'}
+                </button>
+
+                <button 
+                  onClick={() => setAuthStep('email')}
+                  className="w-full text-slate-500 py-1 text-[14px] font-normal hover:underline"
+                >
+                  Edit Number
                 </button>
               </div>
             </motion.div>
           ) : authStep === 'selection' ? (
-            <motion.div key="selection" initial={{ x: 10, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -10, opacity: 0 }} className="space-y-6 text-center">
-              <div className="flex justify-between items-center px-2">
-                <button onClick={() => { playTapSound(); setAuthStep('email'); }} className="text-slate-400 hover:text-white/50"><ChevronLeft size={20} /></button>
-                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Setup Role</p>
-                <div className="w-5" />
+            <motion.div key="selection" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex flex-col items-center space-y-8">
+              <div className="text-center space-y-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] bg-blue-50 text-blue-600 px-3 py-1 rounded-full">One Last Step ✨</span>
+                <h3 className="text-[20px] font-bold text-black pt-2">Join DoAble India as</h3>
+                <p className="text-slate-500 text-[12px] font-medium">Select your role to continue</p>
               </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Choose Your Path</h2>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">How would you like to proceed?</p>
-              </div>
-              <div className="grid grid-cols-1 gap-4">
-                <button 
-                  onClick={() => { 
-                    playTapSound(); 
-                    setUserType('parent'); 
-                    localStorage.setItem('userType', 'parent'); 
-                    setAuthStep('auth'); 
-                  }}
-                  className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
-                    <LucideUser size={24} strokeWidth={3} />
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">I'm a Parent</h4>
-                    <p className="text-[10px] font-bold text-slate-400">Looking for professional tutors</p>
-                  </div>
-                </button>
+
+              <div className="w-full grid grid-cols-1 gap-4">
                 <button 
                   onClick={() => { 
                     playTapSound(); 
                     setUserType('teacher'); 
-                    localStorage.setItem('userType', 'teacher'); 
-                    setAuthStep('auth'); 
+                    handleSuccess({ status: 'success', user: { email: `${phone}@whatsapp.com`, phone, userType: 'teacher' } }); 
                   }}
-                  className="group bg-white p-6 rounded-[32px] flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
+                  className="group relative flex flex-col items-center p-6 bg-white border-2 border-slate-100 rounded-2xl hover:border-[#C82333] transition-all"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
-                    <GraduationCap size={24} strokeWidth={3} />
+                  <div className="w-14 h-14 bg-rose-50 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <GraduationCap className="text-[#C82333]" size={28} />
                   </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">I'm a Tutor</h4>
-                    <p className="text-[10px] font-bold text-slate-400">Want to join the elite network</p>
-                  </div>
+                  <span className="text-[15px] font-bold text-slate-800">Teacher / Tutor</span>
+                  <span className="text-[11px] text-slate-400 mt-1">I want to teach students</span>
                 </button>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div key="auth" initial={{ x: 10, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -10, opacity: 0 }} className="bg-white rounded-[40px] p-8 shadow-2xl space-y-6">
-              <div className="flex justify-center items-center text-center relative">
-                <div className="space-y-1.5">
-                  <h3 className="text-2xl font-black tracking-tighter text-slate-900 leading-tight">
-                    {authMode === 'signin' ? 'Welcome Back' : authMode === 'signup' ? 'Create Account' : authMode === 'forgot' ? 'Forgot Password' : 'Reset Password'}
-                  </h3>
-                  {authMode === 'signin' && (
-                    <div className="flex flex-col items-center gap-1.5 animate-in fade-in slide-in-from-top-2 duration-500">
-                      <div className="px-4 py-1 bg-primary/10 rounded-full border border-primary/10">
-                        <span className="text-[11px] font-black text-primary uppercase tracking-widest">
-                          {userName ? `${userName} (${userType === 'teacher' ? 'Tutor' : 'Parent'})` : (userType === 'teacher' ? 'Tutor' : 'Parent')} 👋
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {authMode !== 'reset' ? (
-                  <>
-                    {emailChecked ? (
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 text-center relative overflow-hidden group">
-                         <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
-                         <p className="text-[11px] font-bold text-slate-800 break-all relative z-10">{email}</p>
-                         <button 
-                           onClick={() => { 
-                             playTapSound(); 
-                             setEmailChecked(false); 
-                             setEmailExist(false);
-                             setUserType(null);
-                             setPassword('');
-                             setAuthError(null);
-                             setAuthStep('email'); 
-                           }} 
-                           className="text-[9px] font-black text-primary uppercase tracking-widest relative z-10 hover:opacity-70 transition-opacity"
-                         >
-                           Not you? <span className="underline">Change Email</span>
-                         </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center ml-1">
-                           <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Email Address</label>
-                        </div>
-                        <div className="relative">
-                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                          <input 
-                            type="email" 
-                            value={email} 
-                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 opacity-50 outline-none" 
-                            readOnly
-                          />
-                          <button onClick={() => { setEmailChecked(false); setAuthStep('email'); setAuthError(null); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-primary uppercase tracking-widest">Change</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {authMode !== 'forgot' && (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-1.5 overflow-hidden">
-                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Password</label>
-                        <div className="relative">
-                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                          <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAction()} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" autoFocus />
-                          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                            {showPassword ? <Eye size={18} strokeWidth={2.5} /> : <EyeOff size={18} strokeWidth={2.5} />}
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </>
-                ) : (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                    <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
-                      <p className="text-[10px] font-bold text-primary text-center leading-relaxed">Enter the 6-digit PIN sent to <br/><span className="underline">{email}</span></p>
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Security PIN</label>
-                      <div className="relative">
-                        <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                        <input type="text" maxLength={6} value={resetPin} onChange={(e) => setResetPin(e.target.value)} placeholder="000000" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-center text-lg font-black tracking-[1em] text-slate-700 outline-none focus:border-primary transition-all" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">New Password</label>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                        <input type={showPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 chars" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                          {showPassword ? <Eye size={18} strokeWidth={2.5} /> : <EyeOff size={18} strokeWidth={2.5} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Confirm Password</label>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                        <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setRetypePassword(e.target.value)} placeholder="Repeat password" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
-                      </div>
-                    </div>
-
-                    <div className="text-center pt-2">
-                       <button 
-                         onClick={handleResendPIN}
-                         disabled={resendTimer > 0 || isAuthLoading}
-                         className={cn(
-                           "text-[10px] font-black uppercase tracking-widest transition-all",
-                           resendTimer > 0 ? "text-slate-300" : "text-primary hover:opacity-70"
-                         )}
-                       >
-                         {resendTimer > 0 ? `Resend PIN in ${resendTimer}s` : "Didn't get code? Resend PIN"}
-                       </button>
-                    </div>
-                  </div>
-                )}
-
-                {authError && <div className="text-rose-500 text-[10px] font-bold px-1 flex items-center gap-1.5"><AlertCircle size={12} /> {authError}</div>}
 
                 <button 
-                  onClick={handleAction}
-                  disabled={isAuthLoading}
-                  className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                  onClick={() => { 
+                    playTapSound(); 
+                    setUserType('parent'); 
+                    handleSuccess({ status: 'success', user: { email: `${phone}@whatsapp.com`, phone, userType: 'parent' } }); 
+                  }}
+                  className="group relative flex flex-col items-center p-6 bg-white border-2 border-slate-100 rounded-2xl hover:border-[#2563EB] transition-all"
                 >
-                  {isAuthLoading ? <Loader2 size={16} className="animate-spin" /> : (
-                    authMode === 'signin' 
-                      ? 'Sign In' 
-                      : authMode === 'signup' 
-                        ? 'Create Account' 
-                        : authMode === 'forgot' 
-                          ? 'Send PIN' 
-                          : 'Verify & Reset'
-                  )}
+                  <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <LucideUser className="text-[#2563EB]" size={28} />
+                  </div>
+                  <span className="text-[15px] font-bold text-slate-800">Parent / Student</span>
+                  <span className="text-[11px] text-slate-400 mt-1">I am looking for a tutor</span>
                 </button>
-
-                <div className="flex flex-col gap-3 pt-2">
-                  {authMode === 'signin' && (
-                    <button onClick={() => { setAuthMode('forgot'); setAuthError(null); }} className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest text-center">Forgot Password?</button>
-                  )}
-                  <button onClick={() => { playTapSound(); setAuthStep('email'); setEmailChecked(false); setAuthError(null); }} className="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest text-center">Back to <span className="text-primary underline">Start</span></button>
-                </div>
               </div>
+
+              <button 
+                onClick={() => setAuthStep('email')}
+                className="text-slate-400 text-[13px] font-medium hover:underline"
+              >
+                Back to Login
+              </button>
             </motion.div>
+          ) : (
+            <div className="w-full pt-8">
+              <button 
+                onClick={() => setAuthStep('email')}
+                className="w-full bg-linear-to-r from-[#C82333] to-[#2563EB] text-white py-3.5 rounded-xl font-bold text-[13px] uppercase tracking-wider shadow-md active:scale-[0.98] transition-all flex items-center justify-center"
+              >
+                Return to Mobile Login
+              </button>
+            </div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     </div>
   );
 };

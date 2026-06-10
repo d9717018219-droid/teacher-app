@@ -61,3 +61,4 @@ Thumbs.db
 # Backups
 src_backup*/
 *.backup
+geocode_cache.json
