@@ -73,8 +73,8 @@ const SupportView: React.FC<SupportViewProps> = ({
           showWelcomeScreen: false,
           webhookUrl: 'https://n8n.srv1497567.hstgr.cloud/webhook/a468d691-f1fd-4cb8-b259-3aba116f45b7/chat',
           initialMessages: [
-            'Hi! 👋 Welcome to DoAble India Support.',
-            'How can we help you today? Please type your query below.',
+            'Ram Ram! 🙏 Main Rahul hoon, DoAble India ka Senior Operations Coordinator.',
+            'Aapko kisi Job Order ka status jaanna hai ya koi aur help chahiye? Be-jhijhak batayein, main poori help karunga. 😊',
           ],
           i18n: {
             en: { 
@@ -319,22 +319,25 @@ City: ${userCity || 'N/A'}`;
                       <div className="flex items-center justify-center gap-3">
                          <button 
                             onClick={handleShare}
-                            className="bg-black text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all"
+                            className="bg-[#000000] text-white px-4 py-2 rounded-xl flex items-center gap-2.5 shadow-xl border border-white/10 active:scale-95 transition-all group relative overflow-hidden"
                          >
-                            <Play size={16} fill="white" className="text-white" />
-                            <div className="text-left leading-none">
-                               <p className="text-[7px] font-black uppercase opacity-60">Get it on</p>
-                               <p className="text-[11px] font-black">Google Play</p>
+                            <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-red-500/10 to-yellow-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.13L14.69,12L3.84,21.87C3.34,21.61 3,21.09 3,20.5M15.19,12.5L18.16,14.18L4.69,21.87L15.19,12.5M15.19,11.5L4.69,2.13L18.16,9.82L15.19,11.5M18.66,14.47L21.19,13.06C21.7,12.78 22,12.41 22,12C22,11.59 21.7,11.22 21.19,10.94L18.66,9.53L15.69,12L18.66,14.47Z" />
+                            </svg>
+                            <div className="text-left leading-tight">
+                               <p className="text-[7px] font-bold uppercase tracking-wider opacity-70">Get it on</p>
+                               <p className="text-[12px] font-[1000] tracking-tight">Google Play</p>
                             </div>
                          </button>
                          <button 
                             onClick={handleShare}
-                            className="bg-black text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all"
+                            className="bg-[#000000] text-white px-4 py-2 rounded-xl flex items-center gap-2.5 shadow-xl border border-white/10 active:scale-95 transition-all group"
                          >
-                            <Apple size={16} fill="white" className="text-white" />
-                            <div className="text-left leading-none">
-                               <p className="text-[7px] font-black uppercase opacity-60">Download on the</p>
-                               <p className="text-[11px] font-black">App Store</p>
+                            <Apple size={20} fill="white" className="text-white mb-0.5" />
+                            <div className="text-left leading-tight">
+                               <p className="text-[7px] font-bold uppercase tracking-wider opacity-70">Download on the</p>
+                               <p className="text-[12px] font-[1000] tracking-tight">App Store</p>
                             </div>
                          </button>
                       </div>

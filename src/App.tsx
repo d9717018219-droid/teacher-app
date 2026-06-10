@@ -1084,9 +1084,10 @@ export default function App() {
     const initializeAlertsFallback = async () => {
       try {
         const API_KEY = getFirebaseApiKey();
-        const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=50&key=${API_KEY}`;
+        // Updated URL to include ordering by timestamp descending
+        const REST_URL = `https://firestore.googleapis.com/v1/projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts?pageSize=100&orderBy=timestamp%20desc&key=${API_KEY}`;
         
-         // console.log('📡 Fetching alerts via REST Fallback...');
+         // console.log('📡 Fetching alerts via REST Fallback (Ordered)...');
         const response = await fetch(REST_URL);
         const data = await response.json();
         
@@ -1108,8 +1109,14 @@ export default function App() {
             };
           }) as Alert[];
           
-          setAlerts(initialData);
+          // Additional safety: Sort client-side too
+          const sorted = initialData.sort((a, b) => {
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+          });
+
+          setAlerts(sorted);
           setAlertsLoading(false);
+          setIsServerData(true);
         }
       } catch (e: any) {
         if (isMounted) {
@@ -1512,8 +1519,11 @@ City: ${userCity}`;
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
+      const isIos = Capacitor.getPlatform() === 'ios';
       GoogleAuth.initialize({
-        clientId: '237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com',
+        clientId: isIos 
+          ? '237759117673-s9ujpmq5o951otqn207i8b3bnbpiof46.apps.googleusercontent.com'
+          : '237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com',
         scopes: ['profile', 'email'],
       });
     }
