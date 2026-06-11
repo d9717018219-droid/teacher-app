@@ -315,7 +315,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
   setUserCity, setUserGender, setUserClasses, setUserType,
   userName, setUserName, initialTab = 'feed',
   alerts, loading, error, dbStatus,
-  leadsCount, authEmail, isServerData, onRefresh
+  leadsCount, authEmail, tutorId, isServerData, onRefresh
 }) => {
   const [activeTab, setActiveTab] = useState<'feed' | 'support' | 'setup'>(initialTab);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
@@ -347,6 +347,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all'>('all');
 
   const filterAlertsByDate = (items: Alert[]) => {
+    if (!Array.isArray(items)) return [];
     if (dateFilter === 'all') return items;
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -356,6 +357,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
     lastWeek.setDate(lastWeek.getDate() - 7);
 
     return items.filter(a => {
+      if (!a) return false;
       const t = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || Date.now());
       if (dateFilter === 'today') return t >= today;
       if (dateFilter === 'yesterday') return t >= yesterday && t < today;
@@ -365,14 +367,17 @@ const AlertsView: React.FC<AlertsViewProps> = ({
   };
 
   const filterAlertsByTargeting = (items: Alert[]) => {
+    if (!Array.isArray(items)) return [];
+    
     const userCityLower = (city || '').toString().toLowerCase().trim();
     const userTypeLower = (userType || '').toString().toLowerCase().trim();
     const userGenderLower = (userGender || '').toString().toLowerCase().trim();
     const userEmailLower = (authEmail || '').toString().toLowerCase().trim();
     const userTutorIdLower = (tutorId || '').toString().toLowerCase().trim();
-    const uLocs = (userLocalities || []).map(l => l.toLowerCase().trim());
+    const uLocs = (Array.isArray(userLocalities) ? userLocalities : []).map(l => (l || '').toString().toLowerCase().trim());
 
-    return (items || []).filter(a => {
+    return items.filter(a => {
+      if (!a) return false;
       if (showAllDebug) return true; // Show everything in debug/global mode
 
       const aData = a as any;
@@ -393,8 +398,9 @@ const AlertsView: React.FC<AlertsViewProps> = ({
       const targetLocs = (a.localities || aData.Localities || []);
       if (Array.isArray(targetLocs) && targetLocs.length > 0) {
         const hasLocMatch = targetLocs.some(l => {
-          const tLoc = l.toLowerCase().trim();
-          return uLocs.some(uLoc => uLoc === tLoc || uLoc.includes(tLoc) || uLoc.includes(tLoc));
+          if (!l) return false;
+          const tLoc = l.toString().toLowerCase().trim();
+          return uLocs.some(uLoc => uLoc === tLoc || uLoc.includes(tLoc) || tLoc.includes(uLoc));
         });
         if (!hasLocMatch) return false;
       }
@@ -406,9 +412,10 @@ const AlertsView: React.FC<AlertsViewProps> = ({
       if (targetGender !== 'any' && userGenderLower && userGenderLower !== targetGender) return false;
 
       const targetClassStr = (a.targetClass || aData.targetClass || 'All').toString().toLowerCase().trim();
-      if (targetClassStr !== 'all' && userClasses && userClasses.length > 0) {
+      if (targetClassStr !== 'all' && Array.isArray(userClasses) && userClasses.length > 0) {
         const matchesClass = userClasses.some(c => {
-          const uCls = c.toLowerCase().trim().replace('class ', '');
+          if (!c) return false;
+          const uCls = c.toString().toLowerCase().trim().replace('class ', '');
           const tCls = targetClassStr.toLowerCase().trim().replace('class ', '');
           return tCls.includes(uCls) || uCls.includes(tCls);
         });
