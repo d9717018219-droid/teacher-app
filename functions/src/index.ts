@@ -45,38 +45,46 @@ export const sendAlertNotification = onDocumentCreated({
         
         const registrationTokensSet = new Set<string>();
 
-        const targetCity = newValue.city || "All";
-        const targetUserType = newValue.targetUserType || "all";
-        const targetClass = newValue.targetClass || "All";
-        const targetGender = newValue.gender || "Any";
+        const targetCity = (newValue.city || "All").toString().toLowerCase().trim();
+        const targetUserType = (newValue.targetUserType || "all").toString().toLowerCase().trim();
+        const targetClass = (newValue.targetClass || "All").toString().toLowerCase().trim();
+        const targetGender = (newValue.gender || "Any").toString().toLowerCase().trim();
+        const targetTutorId = (newValue.targetTutorId || "all").toString().toLowerCase().trim();
 
         tokensSnap.forEach(doc => {
             const data = doc.data();
             const token = data.token || doc.id;
-            
-            if (!token || typeof token !== 'string' || token.length <= 20) return;
 
-            // City Filter
-            if (targetCity !== "All" && data.city && data.city !== targetCity) return;
+            // 0.1 Tutor ID Targeting
+            const userTutorId = (data.tutorId || data.targetTutorId || 'all').toString().toLowerCase().trim();
+            if (targetTutorId !== 'all' && userTutorId !== targetTutorId) return;
 
-            // User Type Filter
-            if (targetUserType !== "all" && data.userType && data.userType !== targetUserType) return;
+            // 1. City Filter
+            const userCity = (data.city || 'All').toString().toLowerCase().trim();
+            if (targetCity !== 'all' && userCity !== 'all' && targetCity !== userCity) return;
 
-            // Gender Filter
-            if (targetGender !== "Any" && data.gender && data.gender !== targetGender) return;
+            // 2. User Type Filter
+            const userType = (data.targetUserType || 'all').toString().toLowerCase().trim();
+            if (targetUserType !== 'all' && userType !== 'all' && targetUserType !== userType) return;
 
-            // Class Filter - Check if targetClass is in user's classes array
-            if (targetClass !== "All") {
-                const userClasses = data.classes || [];
-                // If targetClass is like "Class 10", and userClasses is ["Class 10", "Class 11"]
-                if (Array.isArray(userClasses)) {
-                    if (!userClasses.includes(targetClass)) return;
-                } else if (typeof userClasses === 'string') {
-                    if (userClasses !== targetClass) return;
-                }
+            // 3. Gender Filter
+            const userGender = (data.gender || 'Any').toString().toLowerCase().trim();
+            if (targetGender !== 'any' && userGender !== 'any' && targetGender !== userGender) return;
+
+            // 4. Class Filter
+            const userClasses = (data.targetClass || 'All').toString().toLowerCase().trim();
+            if (targetClass !== 'all' && userClasses !== 'all') {
+                const matches = userClasses.split(',').some((c: string) => {
+                    const uCls = c.trim().toLowerCase().replace('class ', '');
+                    const tCls = targetClass.toLowerCase().replace('class ', '');
+                    return tCls.includes(uCls) || uCls.includes(tCls);
+                });
+                if (!matches) return;
             }
 
-            registrationTokensSet.add(token);
+            if (token && typeof token === 'string' && token.length > 20) {
+                registrationTokensSet.add(token);
+            }
         });
 
         const registrationTokens = Array.from(registrationTokensSet);
@@ -98,8 +106,8 @@ export const sendAlertNotification = onDocumentCreated({
             android: {
                 priority: "high" as const,
                 notification: {
-                    channelId: "doable_channel_v6",
-                    sound: "default"
+                    channelId: "doable_channel_v10",
+                    sound: "blackberry"
                 }
             },
             apns: {

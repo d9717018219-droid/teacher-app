@@ -20,22 +20,24 @@ export const useNotifications = (
   userCity: string,
   userGender: string,
   userClasses: string[],
-  userType: string
+  userType: string,
+  tutorId?: string | null
 ) => {
   useEffect(() => {
+    console.log('🔔 Initializing Notifications with:', { userCity, userGender, userClasses, userType });
     const initializeNotifications = async () => {
       try {
         if (Capacitor.isNativePlatform()) {
           // 1. Setup Push Notifications
-          await setupCapacitorPushNotifications(userCity, userGender, userClasses, userType);
+          await setupCapacitorPushNotifications(userCity, userGender, userClasses, userType, tutorId);
           
           // 2. Setup Local Channels (Android focus)
           try {
             await LocalNotifications.createChannel({
-              id: 'doable_channel_v6',
+              id: 'doable_channel_v10',
               name: 'Tuition Alerts',
               description: 'Custom sound alerts for tuition jobs',
-              sound: 'blackberry.mp3',
+              sound: 'blackberry',
               importance: 5,
               visibility: 1,
               vibration: true,
@@ -58,7 +60,7 @@ export const useNotifications = (
     };
 
     initializeNotifications();
-  }, [userCity, userGender, userClasses, userType]);
+  }, [userCity, userGender, userClasses, userType, tutorId]);
 };
 
 async function saveTokenToFirestore(
@@ -67,7 +69,8 @@ async function saveTokenToFirestore(
   city: string,
   gender: string,
   classes: string[],
-  userType: string
+  userType: string,
+  tutorId?: string | null
 ) {
   try {
     const user = auth.currentUser;
@@ -78,6 +81,7 @@ async function saveTokenToFirestore(
       lastUpdated: timestamp,
       userId: user ? user.uid : 'anonymous',
       userEmail: user ? user.email : 'anonymous',
+      tutorId: tutorId || 'all',
       city: city || 'All',
       gender: gender || 'Any',
       targetClass: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All',
@@ -101,6 +105,7 @@ async function saveTokenToFirestore(
         lastUpdated: { timestampValue: timestamp },
         userId: { stringValue: user ? user.uid : 'anonymous' },
         userEmail: { stringValue: user ? user.email : 'anonymous' },
+        tutorId: { stringValue: tutorId || 'all' },
         city: { stringValue: city || 'All' },
         gender: { stringValue: gender || 'Any' },
         targetClass: { stringValue: Array.isArray(classes) && classes.length > 0 ? classes.join(', ') : 'All' },
@@ -132,7 +137,8 @@ async function setupCapacitorPushNotifications(
   city: string,
   gender: string,
   classes: string[],
-  userType: string
+  userType: string,
+  tutorId?: string | null
 ) {
   try {
     const result = await PushNotifications.requestPermissions();
@@ -167,7 +173,7 @@ async function setupCapacitorPushNotifications(
             console.log('✅ Valid Token Format');
             const platform = Capacitor.getPlatform();
             localStorage.setItem('fcmToken', fcmToken);
-            await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType);
+            await saveTokenToFirestore(fcmToken, platform, city, gender, classes, userType, tutorId);
           } else {
             console.error('❌ Invalid or empty token received');
           }
@@ -177,6 +183,7 @@ async function setupCapacitorPushNotifications(
       await PushNotifications.addListener(
         'pushNotificationReceived',
         (notification) => {
+          console.log('📬 PUSH RECEIVED IN HOOK:', notification);
           window.dispatchEvent(new CustomEvent('firebaseNotification', { detail: notification }));
           showLocalNotification(
             notification.title || 'New Job Alert 🆕',
@@ -208,8 +215,8 @@ async function showLocalNotification(title: string, body: string) {
           body,
           id: Math.floor(Math.random() * 10000),
           schedule: { at: new Date(Date.now() + 500) },
-          sound: 'blackberry.mp3',
-          channelId: 'doable_channel_v6'
+          sound: 'blackberry',
+          channelId: 'doable_channel_v10'
         }
       ]
     });

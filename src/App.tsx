@@ -998,7 +998,7 @@ export default function App() {
   }, []);
 
   // Notifications are handled by the useNotifications hook below
-  useNotifications(userCity, userGender || 'All', userClasses, userType || 'all');
+  useNotifications(userCity, userGender || 'All', userClasses, userType || 'all', tutorId);
 
   useEffect(() => {
     const handleNav = (e: any) => {
@@ -2337,7 +2337,7 @@ City: ${userCity}`;
           />
        )}
        {activeTab === 'alerts' && (
-          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userLocalities={userLocalities} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={activeUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={activeUser?.email} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
+          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userLocalities={userLocalities} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={activeUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={activeUser?.email} tutorId={tutorId} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
        )}
        {activeTab === 'support' && (<SupportView userName={userName} userFirstName={userFirstName} userType={userType} userCity={userCity} />)}
        {activeTab === 'post_need' && (

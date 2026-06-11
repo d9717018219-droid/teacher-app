@@ -36,6 +36,7 @@ interface AlertsViewProps {
   dbStatus?: string;
   leadsCount?: number;
   authEmail?: string | null;
+  tutorId?: string | null;
   isServerData?: boolean;
   onRefresh?: () => void;
 }
@@ -368,6 +369,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
     const userTypeLower = (userType || '').toString().toLowerCase().trim();
     const userGenderLower = (userGender || '').toString().toLowerCase().trim();
     const userEmailLower = (authEmail || '').toString().toLowerCase().trim();
+    const userTutorIdLower = (tutorId || '').toString().toLowerCase().trim();
     const uLocs = (userLocalities || []).map(l => l.toLowerCase().trim());
 
     return (items || []).filter(a => {
@@ -379,8 +381,14 @@ const AlertsView: React.FC<AlertsViewProps> = ({
       const targetEmail = (aData.targetEmail || 'all').toString().toLowerCase().trim();
       if (targetEmail !== 'all' && userEmailLower !== targetEmail) return false;
 
-      const targetCity = (a.city || aData.City || 'All').toString().toLowerCase().trim();
-      if (targetCity !== 'all' && userCityLower !== targetCity) return false;
+      // 0.1 Tutor ID Targeting
+      const targetTutorId = (aData.targetTutorId || 'all').toString().toLowerCase().trim();
+      if (targetTutorId !== 'all' && userTutorIdLower !== targetTutorId) return false;
+
+      const targetCity = (a.city || aData.City || aData.targetCity || 'All').toString().toLowerCase().trim();
+      // Strict Filter: If alert is for a specific city, user MUST match it exactly.
+      // If alert is 'all', everyone sees it.
+      if (targetCity !== 'all' && targetCity !== userCityLower) return false;
 
       const targetLocs = (a.localities || aData.Localities || []);
       if (Array.isArray(targetLocs) && targetLocs.length > 0) {
@@ -515,7 +523,10 @@ const AlertsView: React.FC<AlertsViewProps> = ({
                       <div className="flex gap-4">
                         <div className="shrink-0 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">{getIcon(alert.type)}</div>
                         <div className="flex-1">
-                          <div className="font-black text-[10px] uppercase mb-1 tracking-wider text-slate-500">{alert.sender || 'System Broadcast'}</div>
+                          <div className="font-black text-[10px] uppercase mb-1 tracking-wider text-slate-500 flex items-center justify-between">
+                          <span>{alert.sender || 'System Broadcast'}</span>
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[8px] opacity-70">Target: {alert.city || (alert as any).City || (alert as any).targetCity || 'All'}</span>
+                        </div>
                           <FormattedMessage text={msg} />
                           <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter"><Clock size={10} strokeWidth={3} />{formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
                         </div>

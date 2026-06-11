@@ -1,27 +1,34 @@
-const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const admin = require("firebase-admin");
+const path = require("path");
 
-const projectId = 'gen-lang-client-0533512936';
-const databaseId = 'ai-studio-c2dd7af9-dcc1-4c28-b5b9-2e1400ca3e28';
-
-initializeApp({ projectId: projectId });
-const db = getFirestore(databaseId);
-
-async function checkTokens() {
-  console.log("Checking fcm_tokens...");
-  try {
-    const snap = await db.collection('fcm_tokens').orderBy('lastUpdated', 'desc').limit(5).get();
-    if (snap.empty) {
-      console.log("No tokens found!");
-    } else {
-      snap.forEach(doc => {
-        const data = doc.data();
-        console.log(doc.id, data.platform, data.lastUpdated?.toDate?.() || data.lastUpdated);
-      });
-    }
-  } catch (e) {
-    console.error("Error:", e.message);
-  }
+const serviceAccountPath = path.join(__dirname, "service-account.json");
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccountPath)
+  });
+} catch (e) {
+  admin.initializeApp();
 }
 
-checkTokens();
+const db = admin.firestore();
+
+async function check() {
+  const snap = await db.collection("fcm_tokens").get();
+  console.log(`Total tokens: ${snap.size}`);
+  let found = false;
+  snap.forEach(doc => {
+    const data = doc.data();
+    if (String(data.tutorId) === "11599" || String(data.userEmail).includes("11599") || String(data.targetTutorId) === "11599") {
+      console.log("Found matching token:", data);
+      found = true;
+    }
+  });
+  if (!found) {
+    console.log("No token found with tutorId 11599. Let's see some samples:");
+    let count = 0;
+    snap.forEach(doc => {
+      if (count++ < 3) console.log(doc.id, doc.data());
+    });
+  }
+}
+check().catch(console.error);
