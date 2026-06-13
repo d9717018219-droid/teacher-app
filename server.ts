@@ -75,8 +75,11 @@ async function startServer() {
 
   app.get('/api/tutors', async (req, res) => {
     try {
-      console.log('Fetching tutors from Hostinger (api_copy_data.php)...');
-      const response = await fetch('https://doableindia.com/app-sys/api_copy_data.php', { 
+      console.log('Fetching tutors from Hostinger (api_copy_data.php) with query:', req.query);
+      const queryString = new URLSearchParams(req.query as any).toString();
+      const targetUrl = `https://doableindia.com/app-sys/api_copy_data.php${queryString ? '?' + queryString : ''}`;
+      
+      const response = await fetch(targetUrl, { 
         method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -168,6 +171,85 @@ async function startServer() {
       const data = await response.json();
       res.status(response.status).json(data);
     } catch (error: any) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  // Zoho Payment Session Creator
+  app.post('/api/payment/create-session', express.json(), async (req, res) => {
+    try {
+      const { amount, description, customer_name, customer_email, customer_phone } = req.body;
+      
+      console.log('Creating Zoho Payment Session for:', { amount, customer_name });
+
+      // 1. Get Zoho Access Token
+      const authRes = await fetch("https://accounts.zoho.in/oauth/v2/token", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          refresh_token: '1000.e05bd5af941dd508caef640d1e06d573.f64cee4d447f4e2a5843377e64ce2076',
+          client_id: '1000.VNNYQAYAKOUP2TNO97FIGD4RI41K1C',
+          client_secret: 'f6e379a5534faa80cc9f3294ee84d6860d31858886',
+          grant_type: 'refresh_token'
+        })
+      });
+
+      const authData: any = await authRes.json();
+      const accessToken = authData.access_token;
+
+      if (!accessToken) {
+        throw new Error('Zoho Auth Failed: ' + JSON.stringify(authData));
+      }
+
+      // 2. Create Payment Session
+      const sessionData: any = {
+        amount: Number(amount),
+        currency: 'INR',
+        description: (description || 'Premium Support Purchase').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 100),
+        customer_id: '5387000000750027',
+        configurations: {
+          hosted_checkout_parameters: {
+            name: customer_name || 'Customer',
+            email: customer_email || '',
+            phone: (customer_phone || '').replace(/[^0-9]/g, '').slice(-10),
+            phone_country_code: 'IN',
+            description: (description || 'Premium Support').slice(0, 50),
+            success_url: 'https://doableindia.com/payment-success',
+            failure_url: 'https://doableindia.com/payment-failure'
+          }
+        }
+      };
+
+      console.log('Sending Payload to Zoho:', JSON.stringify(sessionData, null, 2));
+
+      const payRes = await fetch("https://payments.zoho.in/api/v1/paymentsessions?account_id=60036233618", {
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(sessionData)
+      });
+
+      const payData: any = await payRes.json();
+      console.log('Zoho API Full Response:', JSON.stringify(payData, null, 2));
+
+      const sessionId = payData.payments_session?.payments_session_id;
+
+      if (sessionId) {
+        res.json({
+          status: 'success',
+          payment_session_id: sessionId
+        });
+      } else {
+        res.json({
+          status: 'error',
+          message: payData.message || 'Failed to create payment session',
+          debug: payData
+        });
+      }
+    } catch (error: any) {
+      console.error('Payment Session Error:', error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   });
