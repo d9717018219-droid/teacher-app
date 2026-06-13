@@ -97,6 +97,13 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
     handleFieldChange(field, value);
   }, [playTapSound, handleFieldChange]);
 
+  const handlePhoneChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    value = value.replace(/[^\d]/g, '');
+    value = value.slice(-10);
+    handleFieldChange('userPhone', value);
+  }, [handleFieldChange]);
+
   const subjectOptions = useMemo(() => {
     if (userClasses.includes('Entrance Exam & Specialization')) {
       const subjects = SPECIALIZED_SUBJECTS[userBoard];
@@ -167,7 +174,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       </div>
                       <div className="flex-1 relative">
                         <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                        <input type="tel" value={userPhone || ''} onChange={(e) => handleFieldChange('userPhone', e.target.value)} placeholder="9971XXXXXX" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                        <input type="tel" value={userPhone || ''} onChange={handlePhoneChange} placeholder="9971XXXXXX" maxLength={10} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                       </div>
                     </div>
                   </div>
