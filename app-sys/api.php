@@ -51,6 +51,13 @@ function pushToZohoCRM($token, $data) {
         return false;
     }
 
+    // Helper to convert comma-separated string to array
+    $toArray = function($val) {
+        if (empty($val)) return [];
+        if (is_array($val)) return $val;
+        return array_filter(array_map('trim', explode(',', $val)));
+    };
+
     $payload = [
         'data' => [[
             'Order_ID'       => $data['order_id'] ?? '',
@@ -61,16 +68,16 @@ function pushToZohoCRM($token, $data) {
             'Mailing_City'   => $data['city'] ?? '',
             'Mailing_Street' => $data['address'] ?? '',
             'Board'          => $data['board'] ?? '',
-            'classes'        => $data['class_group'] ?? '',
+            'classes'        => $toArray($data['class_group'] ?? ''),
             'Mode'           => $data['mode'] ?? '',
             'fee'            => $data['fee'] ?? '',
             'duration'       => $data['duration'] ?? '',
             'Gender'         => $data['gender'] ?? '',
             'Residency'      => $data['residency'] ?? '',
-            'days'           => $data['days'] ?? '',
-            'times'          => $data['time'] ?? '',
-            'subjects'       => $data['subjects'] ?? '',
-            'Locations'      => $data['location'] ?? '',
+            'days'           => $toArray($data['days'] ?? ''),
+            'times'          => $toArray($data['time'] ?? ''),
+            'subjects'       => $toArray($data['subjects'] ?? ''),
+            'Locations'      => $toArray($data['location'] ?? ''),
             'Campaign_Status'=> $data['status'] ?? 'Searching',
             'Internal_Remark'=> $data['follow_up'] ?? '',
             'Assign_Tutor'   => $data['assign_tutor'] ?? 'N/A'
