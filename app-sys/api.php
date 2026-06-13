@@ -88,9 +88,9 @@ function pushToZohoCRM($token, $data) {
             'Gender'         => $data['gender'] ?? '',
             'Residency'      => $data['residency'] ?? '',
             'days'           => $toArray($data['days'] ?? ''),
-            'times'          => $toArray($data['time'] ?? ''),
+            'times'          => $data['time'] ?? '',
             'subjects'       => $toArray($data['subjects'] ?? ''),
-            'Locations'      => $toArray($data['location'] ?? ''),
+            'Locations'      => $data['location'] ?? '',
             'Campaign_Status'=> $data['status'] ?? 'Searching',
             'Internal_Remark'=> $data['follow_up'] ?? '',
             'Assign_Tutor'   => $data['assign_tutor'] ?? 'N/A'
