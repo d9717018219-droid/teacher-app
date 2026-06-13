@@ -39,6 +39,23 @@ const debounce = (func: Function, delay: number) => {
   };
 };
 
+// Memoized Button Components (prevent unnecessary re-renders)
+const TimeButton = React.memo(({ time, isSelected, onClick }: { time: string; isSelected: boolean; onClick: () => void }) => (
+  <button key={time} onClick={onClick} className={cn("py-2 px-1 rounded-lg border font-bold text-[9px] text-center transition-all", isSelected ? "border-primary bg-primary/10 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{time}</button>
+));
+
+const DayButton = React.memo(({ day, isSelected, onClick }: { day: string; isSelected: boolean; onClick: () => void }) => (
+  <button key={day} onClick={onClick} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tight transition-all", isSelected ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{day}</button>
+));
+
+const ClassButton = React.memo(({ cls, isSelected, onClick }: { cls: string; isSelected: boolean; onClick: () => void }) => (
+  <button key={cls} onClick={onClick} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isSelected ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{cls}</button>
+));
+
+const SubjectButton = React.memo(({ subject, isSelected, onClick }: { subject: string; isSelected: boolean; onClick: () => void }) => (
+  <button key={subject} onClick={onClick} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", isSelected ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{subject}</button>
+));
+
 export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
   show,
   onClose,
@@ -103,6 +120,29 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
     value = value.slice(-10);
     handleFieldChange('userPhone', value);
   }, [handleFieldChange]);
+
+  // Memoized handlers for days
+  const handleDayToggle = useCallback((day: string) => {
+    playTapSound();
+    const currentDays = userDays ? userDays.split(', ') : [];
+    const next = currentDays.includes(day) ? currentDays.filter(v => v !== day) : [...currentDays, day];
+    handleFieldChange('userDays', next.join(', '));
+  }, [userDays, playTapSound, handleFieldChange]);
+
+  // Memoized handlers for time
+  const handleTimeToggle = useCallback((time: string) => {
+    playTapSound();
+    const currentTimes = userTime ? userTime.split(', ') : [];
+    const next = currentTimes.includes(time) ? currentTimes.filter(v => v !== time) : [...currentTimes, time];
+    handleFieldChange('userTime', next.join(', '));
+  }, [userTime, playTapSound, handleFieldChange]);
+
+  // Memoized handlers for class
+  const handleClassSelect = useCallback((className: string) => {
+    playTapSound();
+    handleFieldChange('userClasses', [className]);
+    handleFieldChange('userSubjects', []);
+  }, [playTapSound, handleFieldChange]);
 
   const subjectOptions = useMemo(() => {
     if (userClasses.includes('Entrance Exam & Specialization')) {
@@ -482,7 +522,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Days</label>
                       <div className="flex flex-wrap gap-2">
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                          <button key={day} onClick={() => { playTapSound(); const currentDays = userDays ? userDays.split(', ') : []; const next = currentDays.includes(day) ? currentDays.filter(v => v !== day) : [...currentDays, day]; updateField('userDays', next.join(', ')); localStorage.setItem('userDays', next.join(', ')); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tight transition-all", (userDays ? userDays.split(', ') : []).includes(day) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{day}</button>
+                          <DayButton key={day} day={day} isSelected={(userDays ? userDays.split(', ') : []).includes(day)} onClick={() => handleDayToggle(day)} />
                         ))}
                       </div>
                     </div>
@@ -490,7 +530,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Time</label>
                       <div className="grid grid-cols-3 gap-2 max-h-[180px] overflow-y-auto p-1 custom-scrollbar">
                         {TIME_LIST.map(time => (
-                          <button key={time} onClick={() => { playTapSound(); const currentTimes = userTime ? userTime.split(', ') : []; const next = currentTimes.includes(time) ? currentTimes.filter(v => v !== time) : [...currentTimes, time]; updateField('userTime', next.join(', ')); localStorage.setItem('userTime', next.join(', ')); }} className={cn("py-2 px-1 rounded-lg border font-bold text-[9px] text-center transition-all", (userTime ? userTime.split(', ') : []).includes(time) ? "border-primary bg-primary/10 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{time}</button>
+                          <TimeButton key={time} time={time} isSelected={(userTime ? userTime.split(', ') : []).includes(time)} onClick={() => handleTimeToggle(time)} />
                         ))}
                       </div>
                     </div>
@@ -584,7 +624,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Days</label>
                       <div className="flex flex-wrap gap-2">
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                          <button key={day} onClick={() => { playTapSound(); const currentDays = userDays ? userDays.split(', ') : []; const next = currentDays.includes(day) ? currentDays.filter(v => v !== day) : [...currentDays, day]; updateField('userDays', next.join(', ')); localStorage.setItem('userDays', next.join(', ')); }} className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tight transition-all", (userDays ? userDays.split(', ') : []).includes(day) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}>{day}</button>
+                          <DayButton key={day} day={day} isSelected={(userDays ? userDays.split(', ') : []).includes(day)} onClick={() => handleDayToggle(day)} />
                         ))}
                       </div>
                     </div>
@@ -592,7 +632,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Preferred Time</label>
                       <div className="grid grid-cols-3 gap-2 max-h-[180px] overflow-y-auto p-1 custom-scrollbar">
                         {TIME_LIST.map(time => (
-                          <button key={time} onClick={() => { playTapSound(); const currentTimes = userTime ? userTime.split(', ') : []; const next = currentTimes.includes(time) ? currentTimes.filter(v => v !== time) : [...currentTimes, time]; updateField('userTime', next.join(', ')); localStorage.setItem('userTime', next.join(', ')); }} className={cn("py-2 px-1 rounded-lg border font-bold text-[9px] text-center transition-all", (userTime ? userTime.split(', ') : []).includes(time) ? "border-primary bg-primary/10 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{time}</button>
+                          <TimeButton key={time} time={time} isSelected={(userTime ? userTime.split(', ') : []).includes(time)} onClick={() => handleTimeToggle(time)} />
                         ))}
                       </div>
                     </div>
