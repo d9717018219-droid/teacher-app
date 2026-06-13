@@ -15,7 +15,7 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSound }) => {
-  const [activeTab, setActiveTab] = useState<'broadcast' | 'tutors'>('broadcast');
+  const [activeTab, setActiveTab] = useState<'broadcast' | 'tutors' | 'reports'>('broadcast');
   
   // Broadcast State
   const [message, setMessage] = useState('');
@@ -23,16 +23,90 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
   const [targetGender, setTargetGender] = useState('Any');
   const [targetClass, setTargetClass] = useState('All');
   const [targetUserType, setTargetUserType] = useState<'parent' | 'teacher' | 'all'>('all');
+  const [targetTutorId, setTargetTutorId] = useState('');
   const [type, setType] = useState<'urgent' | 'info' | 'success' | 'broadcast'>('info');
+  const [template, setTemplate] = useState<'none' | 'booking' | 'job'>('none');
+  
+  // Professional Fields
+  const [orderId, setOrderId] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [studentPhone, setStudentPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [subjects, setSubjects] = useState('');
+  const [fee, setFee] = useState('');
+  const [days, setDays] = useState('');
+  const [time, setTime] = useState('');
+  const [duration, setDuration] = useState('');
+  const [demoTime, setDemoTime] = useState('');
+
   const [sending, setSending] = useState(false);
   const [testing, setTesting] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info', msg: string } | null>(null);
 
+  // Apply Template Logic
+  const applyTemplate = (t: 'none' | 'booking' | 'job') => {
+    setTemplate(t);
+    if (t === 'booking') {
+      setType('success');
+      setTargetUserType('teacher');
+      setMessage(`🎉 Congratulations! You are selected for Demo. \n\n📍 Address: ${address || '[Address]'} \n⏰ Demo Time: ${demoTime || '[Time]'} \n💰 Fee: ${fee || '[Fee]'} \n📅 Days: ${days || '[Days]'} \n⏳ Duration: ${duration || '[Duration]'}`);
+    } else if (t === 'job') {
+      setType('broadcast');
+      setMessage(`📢 New Tuition Job Alert! \n\n📚 Class: ${targetClass} \n📖 Subjects: ${subjects || '[Subjects]'} \n📍 Location: ${targetCity} \n💰 Monthly Fee: ${fee || '[Fee]'} \n⏰ Schedule: ${time || '[Time]'}`);
+    } else {
+      setMessage('');
+    }
+  };
+
+  // Update message when fields change if template is active
+  React.useEffect(() => {
+    if (template === 'booking') {
+       setMessage(`🎉 Congratulations! You are selected for Demo. \n\n📍 Address: ${address || '[Address]'} \n⏰ Demo Time: ${demoTime || '[Time]'} \n💰 Fee: ${fee || '[Fee]'} \n📅 Days: ${days || '[Days]'} \n⏳ Duration: ${duration || '[Duration]'}`);
+    } else if (template === 'job') {
+       setMessage(`📢 New Tuition Job Alert! \n\n📚 Class: ${targetClass} \n📖 Subjects: ${subjects || '[Subjects]'} \n📍 Location: ${targetCity} \n💰 Monthly Fee: ${fee || '[Fee]'} \n⏰ Schedule: ${time || '[Time]'}`);
+    }
+  }, [address, demoTime, fee, days, duration, subjects, targetClass, targetCity, template]);
+
   // Tutor Management State
   const [searchQuery, setSearchQuery] = useState('');
   const [editingTutor, setEditingTutor] = useState<any | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Reports State
+  const [reports, setReports] = useState<any[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+
+  React.useEffect(() => {
+    if (activeTab === 'reports') {
+      fetchReports();
+    }
+  }, [activeTab]);
+
+  const fetchReports = async () => {
+    setLoadingReports(true);
+    try {
+      const q = query(collection(db, 'reports'), orderBy('timestamp', 'desc'), limit(50));
+      const snapshot = await getDocs(q);
+      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setReports(docs);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const handleResolveReport = async (reportId: string) => {
+    playTapSound();
+    if (!window.confirm('Mark this report as resolved?')) return;
+    try {
+      await deleteDoc(doc(db, 'reports', reportId));
+      setReports(reports.filter(r => r.id !== reportId));
+    } catch (error) {
+      alert('Failed to resolve report.');
+    }
+  };
 
   const filteredTutors = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -138,11 +212,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
         gender: targetGender,
         targetClass: targetClass,
         targetUserType: targetUserType,
+        targetTutorId: targetTutorId || 'all',
         type,
-        sender: 'Notification 🔔',
+        sender: template === 'booking' ? 'Booking Confirmation' : 'Notification 🔔',
         timestamp: serverTimestamp(),
+        // New Professional Fields
+        orderId,
+        studentName,
+        studentPhone,
+        address,
+        subjects,
+        fee,
+        days,
+        time,
+        duration,
+        demoTime,
+        isBooking: template === 'booking'
       });
-      setMessage('');
+      
+      // Clear fields on success
+      if (template !== 'none') {
+        setMessage('');
+        setOrderId('');
+        setStudentName('');
+        setStudentPhone('');
+        setAddress('');
+        setSubjects('');
+        setFee('');
+        setDays('');
+        setTime('');
+        setDuration('');
+        setDemoTime('');
+        setTargetTutorId('');
+      } else {
+        setMessage('');
+      }
+
       setStatus({ type: 'success', msg: 'Broadcast Deployed Successfully! ✨🚀' });
     } catch (err: any) {
       let errorMsg = err.message || 'Check your permissions';
@@ -202,7 +307,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
             activeTab === 'tutors' ? "bg-white text-primary shadow-sm" : "text-slate-400"
           )}
         >
-          👤 Tutors DB
+          👤 Tutors
+        </button>
+        <button 
+          onClick={() => { playTapSound(); setActiveTab('reports'); }}
+          className={cn(
+            "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+            activeTab === 'reports' ? "bg-white text-primary shadow-sm" : "text-slate-400"
+          )}
+        >
+          🚩 Reports
         </button>
       </div>
 
@@ -236,6 +350,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
           </div>
             
           <div className="space-y-4 relative z-10">
+            {/* Template Selector */}
+            <div className="flex gap-2">
+              {[
+                { id: 'none', label: 'Plain Text', color: 'bg-slate-700' },
+                { id: 'job', label: 'Job Alert', color: 'bg-amber-600' },
+                { id: 'booking', label: 'Booking Details', color: 'bg-emerald-600' }
+              ].map(t => (
+                <button 
+                  key={t.id}
+                  onClick={() => applyTemplate(t.id as any)}
+                  className={cn(
+                    "flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all",
+                    template === t.id ? t.color + " ring-2 ring-white/20" : "bg-white/5 text-slate-400"
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">City</label>
@@ -247,6 +381,74 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
                       {['All', ...CITIES_LIST].map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)}
                   </select>
               </div>
+              <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Tutor ID (Target)</label>
+                  <input 
+                      type="text"
+                      value={targetTutorId}
+                      onChange={(e) => setTargetTutorId(e.target.value)}
+                      placeholder="e.g. T1025 (or leave empty)"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:border-primary placeholder:text-slate-700"
+                  />
+              </div>
+            </div>
+
+            {/* Conditional Detailed Fields */}
+            {(template === 'booking' || template === 'job') && (
+              <div className="bg-white/5 rounded-2xl p-4 space-y-3 border border-white/5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Order ID</label>
+                    <input type="text" value={orderId} onChange={(e) => setOrderId(e.target.value)} placeholder="#1234" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Fee / Amount</label>
+                    <input type="text" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="₹25,000" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                  </div>
+                  {template === 'booking' ? (
+                    <>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Student Name</label>
+                        <input type="text" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Rahul Sharma" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Student Phone</label>
+                        <input type="text" value={studentPhone} onChange={(e) => setStudentPhone(e.target.value)} placeholder="8182XXXXXX" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Demo Date/Time</label>
+                        <input type="text" value={demoTime} onChange={(e) => setDemoTime(e.target.value)} placeholder="15 June, 4:00 PM" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Duration</label>
+                        <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="1.5 Hours" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                      </div>
+                      <div className="col-span-2 space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Full Address</label>
+                        <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="House No. 123, Sector 5..." className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                      </div>
+                      <div className="col-span-2 space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Days (Schedule)</label>
+                        <input type="text" value={days} onChange={(e) => setDays(e.target.value)} placeholder="Mon, Wed, Fri" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="col-span-2 space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Subjects</label>
+                        <input type="text" value={subjects} onChange={(e) => setSubjects(e.target.value)} placeholder="Maths, Science" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                      </div>
+                      <div className="col-span-2 space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Time (Slot)</label>
+                        <input type="text" value={time} onChange={(e) => setTime(e.target.value)} placeholder="Evening slots after 5 PM" className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-bold outline-none" />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Gender</label>
                   <select 
@@ -267,18 +469,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:border-primary"
                   >
                       {['All', ...CLASSES_LIST].map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)}
-                  </select>
-              </div>
-              <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Role</label>
-                  <select 
-                      value={targetUserType}
-                      onChange={(e) => setTargetUserType(e.target.value as any)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:border-primary"
-                  >
-                      <option value="all" className="bg-slate-900">All Users</option>
-                      <option value="parent" className="bg-slate-900">Parents</option>
-                      <option value="teacher" className="bg-slate-900">Teachers</option>
                   </select>
               </div>
             </div>
@@ -307,7 +497,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Message</label>
+              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Message Preview</label>
               <textarea 
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -334,7 +524,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
             )}
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'tutors' ? (
         <div className="space-y-5">
           {/* Tutor Management Search */}
           <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm space-y-4">
@@ -410,6 +600,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentCity, tutors, playTapSou
               <div className="py-12 text-center bg-white rounded-[32px] border border-dashed border-slate-200">
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-widest italic">Start searching to manage database</p>
               </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Reports Tab Content */
+        <div className="space-y-5">
+          <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm flex justify-between items-center">
+             <div>
+               <h2 className="text-xl font-black tracking-tight text-slate-900">User Reports</h2>
+               <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Chat Safety & Violations</p>
+             </div>
+             <button onClick={fetchReports} className="p-2 text-primary active:rotate-180 transition-all duration-500">
+               <Zap size={20} />
+             </button>
+          </div>
+
+          <div className="space-y-3">
+            {loadingReports ? (
+              <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-primary" /></div>
+            ) : reports.length === 0 ? (
+              <div className="py-20 text-center bg-white rounded-[40px] border border-dashed border-slate-200">
+                <div className="text-4xl mb-3">✅</div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">All clear! No pending reports.</p>
+              </div>
+            ) : (
+              reports.map(report => (
+                <div key={report.id} className="bg-white rounded-[28px] p-5 border-l-4 border-l-rose-500 border-y border-r border-slate-100 shadow-sm space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-rose-500 uppercase tracking-[0.2em]">New Violation Report</p>
+                      <h4 className="text-[14px] font-black text-slate-900">Against: {toTitleCase(report.reportedName)}</h4>
+                    </div>
+                    <button 
+                      onClick={() => handleResolveReport(report.id)}
+                      className="p-2 bg-emerald-50 text-emerald-600 rounded-xl active:scale-90 transition-all"
+                    >
+                      <CheckCircle size={18} />
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+                    <p className="text-[12px] font-bold text-slate-700 leading-relaxed italic">"{report.reason}"</p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <User size={12} />
+                      <span>Reporter: {toTitleCase(report.reporterName)}</span>
+                    </div>
+                    <span>{report.timestamp?.toDate ? report.timestamp.toDate().toLocaleDateString() : 'Just now'}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 pt-2">
+                    <div className="px-3 py-1 bg-slate-100 rounded-full text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                      Conn ID: {report.connectionId?.slice(-6)}
+                    </div>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>

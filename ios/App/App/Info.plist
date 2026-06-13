@@ -67,6 +67,10 @@
 	<string>DoAble India uses the camera to allow tutors and parents to upload profile photos and verification selfies.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>DoAble India uses your photo library so you can select and upload profile photos and verification images.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>DoAble India requires access to your location to allow you to share your current position with tutors or parents in the chat.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>DoAble India requires access to your location to allow you to share your current position with tutors or parents in the chat.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

@@ -15,6 +15,7 @@ import AdminPanel from './components/AdminPanel';
 import PasscodeLogin from './components/PasscodeLogin';
 import SupportView from './components/SupportView';
 import HomeView from './components/HomeView';
+import MessagesView from './components/MessagesView';
 import { JobsView } from './components/JobsView';
 import { TutorsView } from './components/TutorsView';
 import { EarningsView } from './components/EarningsView';
@@ -36,6 +37,7 @@ import { AuthService } from './services/auth.service';
 import { requestNotificationPermission } from './firebase';
 import { useNotifications } from './hooks/useNotifications';
 import { useProfileState } from './hooks/useProfileState';
+import { useChat } from './hooks/useChat';
 import { cn, getCityTheme, formatCurrency, getCityPhone, toTitleCase, getJobId, getTutorId, openWhatsApp, cleanValue, saveToLargeStorage, getFromLargeStorage, calculateProfileCompletion } from './utils';
 import {
   CITIES_LIST,
@@ -829,7 +831,7 @@ export default function App() {
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [formType, setFormType] = useState<'teacher' | 'parent'>('teacher');
-  const [activeTab, setActiveTab] = useState<'home' | 'jobs' | 'tutors' | 'alerts' | 'support' | 'admin' | 'earnings' | 'post_need'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'jobs' | 'tutors' | 'alerts' | 'support' | 'admin' | 'earnings' | 'post_need' | 'messages'>('home');
   const [alertsInitialTab, setAlertsInitialTab] = useState<'feed' | 'support' | 'setup'>('feed');
   const [unseenAlertsCount, setUnseenAlertsCount] = useState(0);
   const [activeToast, setActiveToast] = useState<{ title: string, body: string } | null>(null);
@@ -1016,13 +1018,26 @@ export default function App() {
 
   // Notifications are handled by the useNotifications hook below
   useNotifications(userCity, userGender || 'All', userClasses, userType || 'all', tutorId);
+  
+  // Use email/uid for parents, but explicitly use tutorId for teachers if available
+  const chatIdentifier = userType === 'teacher' && tutorId ? tutorId : (activeUser?.email || activeUser?.uid || null);
+  const { connections, sendInterest, handleConnection, reportUser } = useChat(chatIdentifier);
 
   useEffect(() => {
     const handleNav = (e: any) => {
       if (e.detail) setActiveTab(e.detail);
     };
+    const handleAuth = () => {
+      setAuthModalMode('signin');
+      setAuthModalStep('email');
+      setShowOnboarding(true);
+    };
     window.addEventListener('navigateToTab', handleNav);
-    return () => window.removeEventListener('navigateToTab', handleNav);
+    window.addEventListener('openAuthModal', handleAuth);
+    return () => {
+      window.removeEventListener('navigateToTab', handleNav);
+      window.removeEventListener('openAuthModal', handleAuth);
+    };
   }, []);
 
   useEffect(() => {
@@ -2207,6 +2222,7 @@ City: ${userCity}`;
             profileCompletion={profileCompletion}
             setShowProfileSetup={setShowProfileSetup}
             localities={CITY_TO_LOCATIONS_DATA[userCity] || []}
+            isCityMatch={isCityMatch}
             onClassClick={(cls) => {
               playTapSound();
               if (userType === 'teacher') {
@@ -2363,7 +2379,47 @@ City: ${userCity}`;
           />
        )}
        {activeTab === 'alerts' && (
-          <div className="px-0"><AlertsView city={userCity} userGender={userGender} userClasses={userClasses} userLocalities={userLocalities} userType={userType} isAdminUser={isAdminUser} onAdminClick={() => setActiveTab('admin')} currentUser={activeUser} showFormModal={showFormModal} setShowFormModal={setShowFormModal} setUserCity={setUserCity} setUserGender={setUserGender} setUserClasses={setUserClasses} setUserType={setUserType} userName={userName} setUserName={setUserName} initialTab={alertsInitialTab} alerts={alerts} loading={alertsLoading} error={alertsError} dbStatus={dbStatus} leadsCount={firestoreLeads.length} authEmail={activeUser?.email} tutorId={tutorId} isServerData={isServerData} onRefresh={fetchAlertsFromServer} /></div>
+         <div className="px-0">
+           <AlertsView 
+             city={userCity} 
+             userGender={userGender} 
+             userClasses={userClasses} 
+             userLocalities={userLocalities} 
+             userType={userType} 
+             isAdminUser={isAdminUser} 
+             onAdminClick={() => setActiveTab('admin')} 
+             currentUser={activeUser} 
+             showFormModal={showFormModal} 
+             setShowFormModal={setShowFormModal} 
+             setUserCity={setUserCity} 
+             setUserGender={setUserGender} 
+             setUserClasses={setUserClasses} 
+             setUserType={setUserType} 
+             userName={userName} 
+             setUserName={setUserName} 
+             initialTab={alertsInitialTab} 
+             alerts={alerts} 
+             loading={alertsLoading} 
+             error={alertsError} 
+             dbStatus={dbStatus} 
+             leadsCount={firestoreLeads.length} 
+             authEmail={activeUser?.email} 
+             tutorId={tutorId} 
+             isServerData={isServerData} 
+             onRefresh={fetchAlertsFromServer}
+             onHandleConnection={handleConnection}
+           />
+         </div>
+       )}
+       {activeTab === 'messages' && (
+         <MessagesView 
+           connections={connections} 
+           loading={loading} 
+           currentUserId={chatIdentifier || ''} 
+           playTapSound={playTapSound}
+           onHandleConnection={handleConnection} 
+           onReportUser={reportUser}
+         />
        )}
        {activeTab === 'support' && (<SupportView userName={userName} userFirstName={userFirstName} userType={userType} userCity={userCity} />)}
        {activeTab === 'post_need' && (
@@ -2425,12 +2481,13 @@ City: ${userCity}`;
         onApply={handleApplyJob} 
       />
 
-      <TutorDetailModal 
-        tutor={selectedTutor} 
-        onClose={() => setSelectedTutor(null)} 
-        playTapSound={playTapSound} 
+      <TutorDetailModal
+        tutor={selectedTutor}
+        onClose={() => setSelectedTutor(null)}
+        playTapSound={playTapSound}
+        currentUser={activeUser}
+        sendInterest={sendInterest}
       />
-
       <SelectionDrawer
         config={showSelectionDrawer}
         onClose={() => setShowSelectionDrawer(null)}
@@ -2461,19 +2518,32 @@ City: ${userCity}`;
           </>
         )}
 
-        <NavButton 
-          active={activeTab === 'alerts'} 
-          onClick={() => { playTapSound(); setActiveTab('alerts'); setAlertsInitialTab('feed'); setUnseenAlertsCount(0); window.scrollTo(0,0); }} 
-          icon={<Bell className="w-[18px] h-[18px]" />} 
-          label="Alerts" 
+        <NavButton
+          active={activeTab === 'alerts'}
+          onClick={() => { playTapSound(); setActiveTab('alerts'); setAlertsInitialTab('feed'); setUnseenAlertsCount(0); window.scrollTo(0,0); }}
+          icon={<Bell className="w-[18px] h-[18px]" />}
+          label="Alerts"
           badge={unseenAlertsCount}
-          activeColor="text-white" 
-          activeBg="bg-rose-500" 
-          inactiveColor="text-rose-400" 
-          inactiveBg="bg-rose-50" 
+          activeColor="text-white"
+          activeBg="bg-rose-500"
+          inactiveColor="text-rose-400"
+          inactiveBg="bg-rose-50"
         />
 
-        <NavButton active={activeTab === 'support'} onClick={() => { playTapSound(); setActiveTab('support'); window.scrollTo(0,0); }} icon={<MessageSquare className="w-[18px] h-[18px]" />} label="Support" activeColor="text-white" activeBg="bg-[#347475]" inactiveColor="text-[#347475]" inactiveBg="bg-[#347475]/5" />
+        <NavButton
+          active={activeTab === 'messages'}
+          onClick={() => { playTapSound(); setActiveTab('messages'); window.scrollTo(0,0); }}
+          icon={<MessageSquare className="w-[18px] h-[18px]" />}
+          label="Messages"
+          badge={connections.length > 0 ? connections.length : undefined}
+          activeColor="text-white"
+          activeBg="bg-indigo-600"
+          inactiveColor="text-indigo-400"
+          inactiveBg="bg-indigo-50"
+        />
+
+        <NavButton active={activeTab === 'support'} onClick={() => { playTapSound(); setActiveTab('support'); window.scrollTo(0,0); }} icon={<MessageCircle className="w-[18px] h-[18px]" />} label="Support" activeColor="text-white" activeBg="bg-[#347475]" inactiveColor="text-[#347475]" inactiveBg="bg-[#347475]/5" />
+
       </nav>
         </>
       )}
