@@ -1376,8 +1376,9 @@ export default function App() {
   const handleApplyJob = async (job: any) => {
     try {
       playTapSound();
-      const currentTutorId = localStorage.getItem('tutorId');
+      const currentTutorId = tutorId || localStorage.getItem('tutorId');
       const orderId = getJobId(job);
+      const parentEmail = (job.email || job.Email || (job as any).email_id || '').toLowerCase().trim();
       
       if (!currentTutorId) {
         setActiveToast({ title: 'Profile Needed', body: 'Please complete your profile to apply for jobs.' });
@@ -1385,7 +1386,25 @@ export default function App() {
         return;
       }
 
-      // 1. Silent Background API Call to record application
+      // 1. App Chat Connection Logic (New)
+      if (parentEmail) {
+        setIsUpdatingProfile(true);
+        try {
+          await sendInterest(
+            { id: parentEmail, name: (job.Name || job.name || 'Parent'), city: job.City || 'India' },
+            { id: currentTutorId, name: userName }
+          );
+          setActiveToast({ title: 'Application Sent! 🚀', body: 'Connection request sent to parent. Check Messages tab.' });
+          setSelectedJob(null);
+          return; // Exit early to avoid WhatsApp double-action if chat is possible
+        } catch (err) {
+          console.error('Chat connection failed:', err);
+        } finally {
+          setIsUpdatingProfile(false);
+        }
+      }
+
+      // 2. Fallback to Legacy logic (API + WhatsApp)
       fetch('https://doableindia.com/app-sys/api_copy.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
