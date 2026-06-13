@@ -58,13 +58,26 @@ function pushToZohoCRM($token, $data) {
         return array_filter(array_map('trim', explode(',', $val)));
     };
 
+    // Helper to clean phone number
+    $cleanPhone = function($phone) {
+        if (empty($phone)) return '';
+        $phone = (string)$phone;
+        // Remove duplicate +91, spaces, hyphens
+        $phone = str_replace(['+91+91', '+91+', ' ', '-'], ['+91', '+', '', ''], $phone);
+        // If starts with +91, keep it; if 10 digits, add +91
+        if (strlen($phone) === 10 && is_numeric($phone)) {
+            $phone = '+91' . $phone;
+        }
+        return $phone;
+    };
+
     $payload = [
         'data' => [[
             'Order_ID'       => $data['order_id'] ?? '',
             'First_Name'     => explode(' ', $data['name'] ?? 'Parent')[0],
             'Last_Name'      => implode(' ', array_slice(explode(' ', $data['name'] ?? 'Parent'), 1)),
             'Email'          => $data['email'] ?? '',
-            'Phone'          => $data['phone'] ?? '',
+            'Phone'          => $cleanPhone($data['phone'] ?? ''),
             'Mailing_City'   => $data['city'] ?? '',
             'Mailing_Street' => $data['address'] ?? '',
             'Board'          => $data['board'] ?? '',
