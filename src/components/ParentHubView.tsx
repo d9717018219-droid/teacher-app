@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, ShieldCheck, Star, Users, Calendar, ArrowRight, MessageCircle, Search, CheckCircle2, Trophy, CreditCard } from 'lucide-react';
+import { Sparkles, ShieldCheck, Star, Users, Calendar, ArrowRight, MessageCircle, Search, CheckCircle2, Trophy, CreditCard, Zap } from 'lucide-react';
 import { cn } from '../utils';
 
 interface ParentHubViewProps {
@@ -9,6 +9,7 @@ interface ParentHubViewProps {
   setActiveTab: (tab: any) => void;
   onPostRequirement: () => void;
   onHideNeed: () => void;
+  onShowElite: () => void;
 }
 
 export const ParentHubView: React.FC<ParentHubViewProps> = ({ 
@@ -16,109 +17,70 @@ export const ParentHubView: React.FC<ParentHubViewProps> = ({
   playTapSound, 
   setActiveTab,
   onPostRequirement,
-  onHideNeed
+  onHideNeed,
+  onShowElite
 }) => {
   return (
-    <div className="flex flex-col p-5 pb-40 space-y-7 max-w-lg mx-auto font-sans bg-[#FAFBFF]">
+    <div className="h-screen max-h-screen flex flex-col p-5 pb-32 space-y-4 max-w-lg mx-auto font-sans bg-[#FAFBFF] overflow-hidden fixed inset-0">
       
-      {/* ─── POST MY NEED HEADER ─── */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-6 bg-[#572149] rounded-full" />
-            <h2 className="text-2xl font-[1000] text-slate-900 tracking-tighter">Post My Need</h2>
-          </div>
-          {userName && (
-            <div className="flex items-center gap-1.5 px-1 whitespace-nowrap">
-              <Star size={9} className="text-amber-500 fill-amber-500" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Parent Portal: {userName}</span>
+      {/* ─── HEADER ─── */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-center shrink-0">
+        <div className="space-y-0.5">
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Parent Portal</h2>
+          {userName && <span className="text-[10px] font-semibold text-slate-400">Welcome, {userName}</span>}
+        </div>
+        <div className="bg-[#572149]/5 px-2.5 py-1 rounded-full border border-[#572149]/10">
+           <span className="text-[9px] font-bold text-[#572149]">Verified</span>
+        </div>
+      </motion.div>
+
+      {/* ─── ACTION BOXES ─── */}
+      <div className="flex-1 flex flex-col gap-4 min-h-0 py-2">
+        
+        {/* BOX 1: SELF POST */}
+        <motion.button 
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { playTapSound(); onPostRequirement(); }}
+          className="flex-1 bg-gradient-to-br from-[#572149] to-[#3a1532] rounded-[32px] p-6 text-left relative overflow-hidden shadow-xl group border-2 border-white/10"
+        >
+          <div className="absolute top-[-20%] right-[-10%] w-40 h-40 bg-white/5 blur-3xl rounded-full" />
+          <div className="relative z-10 h-full flex flex-col justify-between">
+            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+              <Calendar className="text-white" size={24} />
             </div>
-          )}
-        </div>
-        <div className="bg-[#572149]/5 px-2 py-1 rounded-full border border-[#572149]/10 shrink-0 whitespace-nowrap">
-           <span className="text-[8.5px] font-black text-[#572149] uppercase tracking-tight">Verified Parent</span>
-        </div>
-      </motion.div>
+            <div className="space-y-1">
+              <h3 className="text-2xl font-bold text-white leading-tight">Post a<br/>Requirement</h3>
+              <p className="text-white/40 text-[11px] font-medium tracking-wide">Post manually & wait for replies</p>
+            </div>
+          </div>
+          <ArrowRight className="absolute bottom-6 right-6 text-white/20 group-hover:text-white/60 transition-all" size={28} />
+        </motion.button>
 
-      {/* ─── HERO ACTION CARD ─── */}
-      <motion.div layout className="bg-gradient-to-r from-[#FF8C00] to-[#EC4899] rounded-[36px] p-8 relative overflow-hidden shadow-[0_30px_60px_-12px_rgba(249,115,22,0.3)] group">
-        <div className="absolute top-[-20%] right-[-10%] w-[200px] h-[200px] bg-[#572149]/30 blur-[60px] rounded-full group-hover:scale-125 transition-transform duration-1000" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-[150px] h-[150px] bg-blue-500/20 blur-[50px] rounded-full group-hover:scale-125 transition-transform duration-1000" />
-        
-        <div className="relative z-10 space-y-7">
-           <div className="space-y-2">
-             <div className="flex items-center gap-2">
-                <Trophy size={16} className="text-amber-400" />
-                <p className="text-[10px] font-black text-white/40 tracking-[0.3em] uppercase">Elite Tutor Matching</p>
-             </div>
-             <h3 className="text-3xl font-[1000] text-white tracking-tighter leading-tight">Your Child Deserves<br/>the Absolute Best.</h3>
-           </div>
+        {/* BOX 2: COORDINATOR ASSIST */}
+        <motion.button 
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { playTapSound(); onShowElite(); }}
+          className="flex-1 bg-white rounded-[32px] p-6 text-left relative overflow-hidden border border-slate-100 shadow-2xl group"
+        >
+          <div className="absolute top-[-20%] right-[-10%] w-40 h-40 bg-[#572149]/5 blur-3xl rounded-full" />
+          <div className="relative z-10 h-full flex flex-col justify-between">
+            <div className="w-12 h-12 bg-[#572149]/5 rounded-2xl flex items-center justify-center">
+              <Users className="text-[#572149]" size={24} />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-2xl font-bold text-slate-900 leading-tight">Expert<br/>Coordinator Support</h3>
+              <p className="text-slate-400 text-[11px] font-medium tracking-wide">Guaranteed tutor matching</p>
+            </div>
+          </div>
+          <Zap className="absolute bottom-6 right-6 text-[#572149]/10 group-hover:text-[#572149]/30 transition-all" size={28} />
+        </motion.button>
 
-           <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => { playTapSound(); onPostRequirement(); }}
-                className="w-full bg-[#572149] hover:bg-[#572149]/90 text-white py-5 rounded-2xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-black/40 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-              >
-                <Calendar size={20} strokeWidth={3} /> Post a Requirement
-              </button>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => { playTapSound(); onHideNeed(); }}
-                  className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center justify-center gap-2 hover:bg-white/10 transition-all"
-                >
-                  <Search className="text-white/60" size={18} />
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Hide My Need</span>
-                </button>
-                <a 
-                  href="tel:9717018219"
-                  onClick={() => playTapSound()}
-                  className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center justify-center gap-2 hover:bg-white/10 transition-all"
-                >
-                  <MessageCircle className="text-white/60" size={18} />
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Talk to Expert</span>
-                </a>
-              </div>
-           </div>
-        </div>
-      </motion.div>
-
-      {/* ─── MATCHING SERVICES ─── */}
-      <div className="space-y-4">
-        <div className="px-1 flex items-center gap-2">
-           <Sparkles size={14} className="text-[#572149]" />
-           <h3 className="text-[12px] font-extrabold text-slate-900 tracking-tight">Premium Matching Benefits</h3>
-        </div>
-        
-        <div className="grid grid-cols-1 gap-3">
-           {[
-             { title: 'Identity Verified Tutors', desc: 'We verify Aadhaar, Qualifications, and Address for your peace of mind.', icon: <CheckCircle2 size={18} />, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-             { title: 'Collaborative Success Group', desc: 'A dedicated group with Tutor & RMN for daily attendance, curriculum tracking, and PTM feedback.', icon: <Users size={18} />, color: 'text-blue-500', bg: 'bg-blue-50' },
-             { title: 'Flexible Payment Methods', desc: 'Pay via UPI, Cards, Netbanking, or Cash. Payments are due 1 week after trial confirmation.', icon: <CreditCard size={18} />, color: 'text-[#572149]', bg: 'bg-[#572149]/5' },
-             { title: 'Priority Matching', desc: 'Get your demo session scheduled within 24 hours of posting.', icon: <Clock size={18} />, color: 'text-amber-500', bg: 'bg-amber-50' }
-           ].map((item, i) => (
-             <div key={i} className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex items-start gap-4 hover:border-[#572149]/20 transition-colors">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", item.bg, item.color)}>
-                  {item.icon}
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-[13px] font-black text-slate-900 leading-none">{item.title}</h4>
-                  <p className="text-[10px] font-medium text-slate-500 leading-relaxed">{item.desc}</p>
-                </div>
-             </div>
-           ))}
-        </div>
       </div>
 
       {/* ─── TRUST BADGE ─── */}
-      <div className="bg-emerald-50 rounded-[32px] p-6 border border-emerald-100 flex items-center gap-4">
-         <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-200">
-            <ShieldCheck size={24} />
-         </div>
-         <div className="space-y-0.5">
-            <h4 className="text-[13px] font-black text-emerald-900 uppercase tracking-tight">Zero Platform Fees</h4>
-            <p className="text-[10px] font-medium text-emerald-700/70 leading-snug">Our matching service is 100% free for parents. You only pay the tutor after successful trials.</p>
-         </div>
+      <div className="bg-slate-50/80 rounded-2xl p-4 flex items-center gap-3 border border-slate-100 shrink-0">
+         <ShieldCheck size={18} className="text-emerald-500 shrink-0" />
+         <p className="text-[10px] font-medium text-slate-500 leading-tight">Verified profiles and secure payments guaranteed.</p>
       </div>
     </div>
   );

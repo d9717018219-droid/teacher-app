@@ -28,6 +28,7 @@ export function formatPostedDate(dateStr: string | undefined) {
 }
 
 export function formatWhatsAppStyle(date: Date) {
+  if (!date || isNaN(date.getTime())) return 'Recently';
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today);

@@ -2,54 +2,46 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper Functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-
-    // ALERTS COLLECTION (Temporarily Open for Debugging)
+    // Allow read/write for all main collections
     match /alerts/{alertId} {
-      allow read, write: if true; 
+      allow read, write: if true;
     }
 
-    // LEADS COLLECTION
     match /leads/{leadId} {
-      allow read: if true;
-      allow create, update, delete: if true; // Temporarily open
+      allow read, write: if true;
     }
 
-    // ADMINS COLLECTION
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /fcm_tokens/{tokenId} {
+      allow read, write: if true;
+    }
+
+    match /assigned_bookings/{bookingId} {
+      allow read, write: if true;
+    }
+
+    match /user_notifications/{deviceId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    // Chat Connections & Messages
+    match /connections/{connectionId} {
+      allow read, write: if true;
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Admins - Read only
     match /admins/{adminUid} {
       allow read: if true;
       allow write: if false;
     }
 
-    // USERS COLLECTION
-    match /users/{userId} {
-      allow read, write: if true;
-    }
-
-    // FCM TOKENS COLLECTION
-    match /fcm_tokens/{tokenId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // ASSIGNED BOOKINGS
-    match /assigned_bookings/{bookingId} {
-      allow read, write: if true; 
-    }
-
-    // USER NOTIFICATIONS
-    match /user_notifications/{deviceId}/{document=**} {
-      allow read, write: if true; 
-    }
-
-    // Global Deny (Default)
+    // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;
     }

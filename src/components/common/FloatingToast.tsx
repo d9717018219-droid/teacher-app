@@ -6,7 +6,7 @@ import { cn } from '../../utils';
 export function FloatingToast({ toast, onClear }: { toast: { title: string, body: string } | null, onClear: () => void }) {
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(onClear, 2000);
+      const timer = setTimeout(onClear, 4000);
       return () => clearTimeout(timer);
     }
   }, [toast, onClear]);
@@ -23,13 +23,13 @@ export function FloatingToast({ toast, onClear }: { toast: { title: string, body
           >
             <div className={cn(
               "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0",
-              toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') ? "bg-rose-500/20 text-rose-500" : "bg-emerald-500/20 text-emerald-500"
+              toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') || toast.title.toLowerCase().includes('incomplete') ? "bg-rose-500/20 text-rose-500" : "bg-emerald-500/20 text-emerald-500"
             )}>
-              {toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+              {toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error') || toast.title.toLowerCase().includes('incomplete') ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
             </div>
-            <div className="flex-1 min-w-0 pr-4">
+            <div className="flex-1 min-w-0 pr-2 py-1">
               <h4 className="text-[11px] font-black uppercase tracking-widest leading-none">{toast.title}</h4>
-              <p className="text-[10px] font-bold text-slate-400 truncate mt-1.5">{toast.body}</p>
+              <p className="text-[10px] font-bold text-slate-400 mt-1.5 leading-relaxed whitespace-normal break-words">{toast.body}</p>
             </div>
           </motion.div>
         </div>

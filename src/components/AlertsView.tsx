@@ -4,7 +4,7 @@ import { db, forceResetFirestore } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, UserType } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Info, AlertTriangle, CheckCircle, Zap, ExternalLink, Clock, X, MessageSquare, Phone, Mail, ChevronRight, Settings, User as UserIcon, CreditCard, Play, Volume2, Instagram, Facebook, Linkedin, Twitter, Calendar, Filter, ChevronDown } from 'lucide-react';
+import { Bell, Info, AlertTriangle, CheckCircle, Zap, ExternalLink, Clock, X, MessageSquare, Phone, Mail, ChevronRight, Settings, Edit3, User as UserIcon, CreditCard, Play, Volume2, Instagram, Facebook, Linkedin, Twitter, Calendar, Filter, ChevronDown, ArrowRight, Heart } from 'lucide-react';
 import { cn, getCityPhone, formatCurrency, openWhatsApp, formatWhatsAppStyle } from '../utils';
 
 import { createChat } from '@n8n/chat';
@@ -20,6 +20,7 @@ interface AlertsViewProps {
   userType?: UserType | null;
   isAdminUser?: boolean;
   onAdminClick?: () => void;
+  onUpdateProfile?: () => void;
   currentUser?: any;
   showFormModal: boolean;
   setShowFormModal: (show: boolean) => void;
@@ -39,6 +40,7 @@ interface AlertsViewProps {
   tutorId?: string | null;
   isServerData?: boolean;
   onRefresh?: () => void;
+  onHandleConnection?: (id: string, status: 'accepted' | 'rejected') => Promise<void>;
 }
 
 const TAP_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
@@ -78,10 +80,11 @@ const DetailItem = React.memo(({ emoji, label, text }: { emoji: string; label: s
 
 const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () => void }) => {
   const msg = (alert.message || (alert as any).Message || '').toString();
+  const isBooking = msg.toLowerCase().includes('booking');
   
   // ─── ROBUST MAPPING LOGIC ───
   // Order ID: Handles "Order ID: 123", "#123", "ID 123", etc.
-  const orderIdMatch = msg.match(/(?:Order ID|ID|#)\s*:?\s*#?(\d+)/i);
+  const orderIdMatch = msg.match(/(?:Order ID|ID|#|Booking ID)\s*:?\s*#?(\d+)/i);
   const orderId = orderIdMatch ? orderIdMatch[1] : '';
   
   // Class & Subjects: Find the line starting with 📚 or Class:
@@ -95,6 +98,10 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
     classInfo = sp ? `${cp} – ${sp}` : cp;
   }
   
+  // Booking Specifics
+  const studentInfo = msg.match(/(?:Student|Name|Booking|Tutor):?\s*([^\n🆔📍⏰💰👉⏳🌐]+)/i)?.[1]?.trim() || '';
+  const subjectsInfo = msg.match(/(?:Subjects|Sub|Class|Qualification):?\s*([^\n🆔📍⏰💰👉⏳🌐]+)/i)?.[1]?.trim() || '';
+
   // Gender: Handles emojis and "Tutor Required"
   const genderMatch = msg.match(/(?:👩‍🏫|👨‍🏫|👩|👤|Gender:?)\s*([^\n|]+)/i);
   let genderInfo = (genderMatch && genderMatch[1]) ? genderMatch[1].trim() : 'Any';
@@ -103,10 +110,10 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
   if (!genderInfo || genderInfo.toLowerCase() === 'any') genderInfo = 'Any';
 
   // Location: Handles "📍 Area", "Location: Area"
-  const locationInfo = msg.match(/(?:📍|Location:?)\s*([^\n🆔⏰💰👉⏳🌐]+)/i)?.[1]?.trim() || '';
+  const locationInfo = msg.match(/(?:📍|Location|Address|Experience):?\s*([^\n🆔⏰💰👉⏳🌐]+)/i)?.[1]?.trim() || '';
   
   // Schedule: Handles "⏰ Time", "Schedule: Time"
-  const scheduleInfo = msg.match(/(?:⏰|Schedule:?|Time:?)\s*([^\n🆔📍💰👉⏳🌐]+)/i)?.[1]?.trim() || '';
+  const scheduleInfo = msg.match(/(?:⏰|Schedule|Time|Status):?\s*([^\n🆔📍💰👉⏳🌐]+)/i)?.[1]?.trim() || '';
   
   // Fee: Handles "💰 25000", "Fee: 25,000"
   const feeMatch = msg.match(/(?:💰|Fee:?)\D*([0-9,]+)/i);
@@ -144,7 +151,10 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
     e.preventDefault();
     if (isExpired) return;
     playTapSound();
-    openWhatsApp(`Hi, I am interested in Job Order ID: #${orderId || 'N/A'}. Please provide more details.`);
+    const waMsg = isBooking 
+      ? `Hi, I am reaching out regarding Booking ID: #${orderId || 'N/A'}.`
+      : `Hi, I am interested in Job Order ID: #${orderId || 'N/A'}. Please provide more details.`;
+    openWhatsApp(waMsg);
   };
 
   const openInMaps = (e: React.MouseEvent) => {
@@ -170,20 +180,20 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
       {/* Premium Header */}
       <div className={cn(
         "p-5 text-white relative overflow-hidden transition-colors",
-        isExpired ? "bg-slate-500" : "bg-[#1E293B]"
+        isExpired ? "bg-slate-500" : isBooking ? "bg-indigo-600" : "bg-[#1E293B]"
       )}>
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-2xl rounded-full" />
         <div className="flex items-start justify-between gap-3 relative z-10">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-2xl shrink-0">
-              {isExpired ? '⌛' : msg.includes('🚨') ? '🚨' : '📢'}
+              {isExpired ? '⌛' : isBooking ? '✅' : msg.includes('🚨') ? '🚨' : '📢'}
             </div>
             <div className="flex flex-col">
               <h3 className="text-[14px] font-black text-white uppercase tracking-wider mb-1">
-                {isExpired ? 'Application Closed' : 'Tuition Job Alert'}
+                {isExpired ? 'Application Closed' : isBooking ? 'Booking Details' : 'Tuition Job Alert'}
               </h3>
-              <div className="text-[12px] font-bold text-slate-400">
-                Order ID: <span className="text-[#FFD166]">{orderId || 'PENDING'}</span>
+              <div className="text-[12px] font-bold text-white/60">
+                {isBooking ? 'Booking ID' : 'Order ID'}: <span className="text-[#FFD166]">{orderId || 'PENDING'}</span>
                 {isNew && !isExpired && (
                   <span className="ml-3 bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-lg shadow-emerald-500/20">
                     Live
@@ -201,8 +211,10 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
       <div className="p-4 space-y-3">
         {/* Info Grid */}
         <div className="grid grid-cols-1 gap-2.5">
-          <DetailItem emoji="📚" label="Class & Subjects" text={classInfo} />
-          <DetailItem emoji="👤" label="Gender Pref." text={genderInfo} />
+          {isBooking && studentInfo && <DetailItem emoji="👶" label="Student Name" text={studentInfo} />}
+          {isBooking && subjectsInfo && <DetailItem emoji="📖" label="Subjects" text={subjectsInfo} />}
+          {!isBooking && classInfo && <DetailItem emoji="📚" label="Class & Subjects" text={classInfo} />}
+          {!isBooking && genderInfo && <DetailItem emoji="👤" label="Gender Pref." text={genderInfo} />}
           
           {/* Clickable Location */}
           <button 
@@ -229,16 +241,18 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
         </div>
 
         {/* Fee Highlight */}
-        <div className="p-4 rounded-2xl bg-emerald-50/30 border border-emerald-100 flex items-center justify-between group overflow-hidden relative mt-1">
-           <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-xl text-white shrink-0 font-black shadow-lg shadow-emerald-500/20">₹</div>
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black uppercase text-emerald-600/60 tracking-wider mb-0.5">Monthly Tuition Fee</span>
-                <span className="text-[18px] font-black text-slate-900 tracking-tighter leading-none">₹{feeInfo}/month</span>
-              </div>
-           </div>
-           <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight shadow-md">Verified</div>
-        </div>
+        {feeInfo && (
+          <div className="p-4 rounded-2xl bg-emerald-50/30 border border-emerald-100 flex items-center justify-between group overflow-hidden relative mt-1">
+            <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-xl text-white shrink-0 font-black shadow-lg shadow-emerald-500/20">₹</div>
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase text-emerald-600/60 tracking-wider mb-0.5">{isBooking ? 'Amount' : 'Monthly Tuition Fee'}</span>
+                  <span className="text-[18px] font-black text-slate-900 tracking-tighter leading-none">₹{feeInfo}{!isBooking && '/month'}</span>
+                </div>
+            </div>
+            <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight shadow-md">Verified</div>
+          </div>
+        )}
 
         {/* Action Button */}
         <button 
@@ -252,9 +266,9 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
           )}
         >
           <MessageSquare size={20} fill="currentColor" />
-          <div className="flex flex-col items-start">
-            <span className="text-[15px] font-bold tracking-wide leading-none">{isExpired ? 'Expired' : 'Apply Now'}</span>
-            <span className="text-[9.5px] font-medium opacity-80 mt-1">{isExpired ? 'This job is no longer accepting replies' : 'Fast reply before expiry via WhatsApp'}</span>
+          <div className="flex flex-col items-start text-left">
+            <span className="text-[15px] font-bold tracking-wide leading-none">{isExpired ? 'Expired' : isBooking ? 'WhatsApp Chat' : 'Apply Now'}</span>
+            <span className="text-[9.5px] font-medium opacity-80 mt-1">{isExpired ? 'This alert is no longer active' : isBooking ? 'Chat regarding this booking details' : 'Fast reply before expiry via WhatsApp'}</span>
           </div>
         </button>
 
@@ -262,13 +276,13 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
         <div className="flex items-center justify-between px-1 pt-3 border-t border-slate-200/40">
            <div className="flex items-center gap-2">
              <div className="flex flex-col gap-1">
-               <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Deadline</span>
+               <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider">{isBooking ? 'Booking Date' : 'Deadline'}</span>
                <div className="flex items-center gap-2">
                   <span className={cn(
                     "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tight",
-                    isExpired ? "bg-slate-100 text-slate-400" : "bg-rose-500 text-white shadow-md shadow-rose-500/20"
+                    isExpired ? "bg-slate-100 text-slate-400" : isBooking ? "bg-indigo-100 text-indigo-600" : "bg-rose-500 text-white shadow-md shadow-rose-500/20"
                   )}>
-                    {lastDateStr || 'ASAP'}
+                    {lastDateStr || (isBooking ? 'Confirmed' : 'ASAP')}
                   </span>
                   {isExpired && (
                     <span className="bg-rose-100 text-rose-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tight border border-rose-200">
@@ -280,7 +294,7 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
            </div>
            
            <div className="flex flex-col items-end">
-             <span className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Posted</span>
+             <span className="text-[8px] font-black uppercase text-slate-300 tracking-wider">Received</span>
              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400/80 uppercase">
                 <Clock size={12} strokeWidth={3} /> {formatWhatsAppStyle(timestampDate)}
              </div>
@@ -296,14 +310,17 @@ const JobAlertCard = React.memo(({ alert, onHide }: { alert: Alert; onHide: () =
  */
 const FormattedMessage: React.FC<{ text: string }> = ({ text }) => {
   if (!text) return null;
-  const parts = text.split(/(\*[^*]+\*)/g);
+  // Ensure text is a string
+  const str = String(text);
+  const parts = str.split(/(\*[^*]+\*)/g);
   return (
     <div className="text-[15px] font-bold text-slate-800 leading-snug whitespace-pre-wrap">
       {parts.map((part, i) => {
+        if (!part) return null;
         if (part.startsWith('*') && part.endsWith('*')) {
           return <span key={i} className="font-[900] text-slate-900">{part.slice(1, -1)}</span>;
         }
-        return part;
+        return <span key={i}>{part}</span>;
       })}
     </div>
   );
@@ -311,7 +328,7 @@ const FormattedMessage: React.FC<{ text: string }> = ({ text }) => {
 
 const AlertsView: React.FC<AlertsViewProps> = ({ 
   city, userGender, userClasses, userLocalities, userType, 
-  isAdminUser, onAdminClick, currentUser, showFormModal, setShowFormModal,
+  isAdminUser, onAdminClick, onUpdateProfile, currentUser, showFormModal, setShowFormModal,
   setUserCity, setUserGender, setUserClasses, setUserType,
   userName, setUserName, initialTab = 'feed',
   alerts, loading, error, dbStatus,
@@ -373,7 +390,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
     const userTypeLower = (userType || '').toString().toLowerCase().trim();
     const userGenderLower = (userGender || '').toString().toLowerCase().trim();
     const userEmailLower = (authEmail || '').toString().toLowerCase().trim();
-    const userTutorIdLower = (tutorId || '').toString().toLowerCase().trim();
+    const userTutorIdLower = (tutorId || '').toString().toLowerCase().trim().replace('#', '');
     const uLocs = (Array.isArray(userLocalities) ? userLocalities : []).map(l => (l || '').toString().toLowerCase().trim());
 
     return items.filter(a => {
@@ -387,7 +404,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
       if (targetEmail !== 'all' && userEmailLower !== targetEmail) return false;
 
       // 0.1 Tutor ID Targeting
-      const targetTutorId = (aData.targetTutorId || 'all').toString().toLowerCase().trim();
+      const targetTutorId = (aData.targetTutorId || 'all').toString().toLowerCase().trim().replace('#', '');
       if (targetTutorId !== 'all' && userTutorIdLower !== targetTutorId) return false;
 
       const targetCity = (a.city || aData.City || aData.targetCity || 'All').toString().toLowerCase().trim();
@@ -453,6 +470,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
       case 'urgent': return <AlertTriangle className="w-5 h-5 text-rose-500" />;
       case 'success': return <CheckCircle className="w-5 h-5 text-emerald-500" />;
       case 'broadcast': return <Zap className="w-5 h-5 text-amber-500" />;
+      case 'interest': return <Heart className="w-5 h-5 text-pink-500" fill="currentColor" />;
       default: return <Info className="w-5 h-5 text-blue-500" />;
     }
   };
@@ -462,6 +480,7 @@ const AlertsView: React.FC<AlertsViewProps> = ({
       case 'urgent': return 'bg-rose-50 border-rose-200';
       case 'success': return 'bg-emerald-50 border-emerald-200';
       case 'broadcast': return 'bg-amber-50 border-amber-200';
+      case 'interest': return 'bg-pink-50 border-pink-200';
       default: return 'bg-blue-50 border-blue-200';
     }
   };
@@ -522,22 +541,196 @@ const AlertsView: React.FC<AlertsViewProps> = ({
               ) : 
                 filteredAlerts.filter(a => !hiddenAlertIds.includes(a.id)).map((alert) => {
                   const msg = (alert.message || (alert as any).Message || '').toString();
-                  const isJobAlert = msg.includes('📢') || msg.includes('🚨') || msg.toLowerCase().includes('tuition job alert');
-                  const timestampDate = alert.timestamp?.toDate ? alert.timestamp.toDate() : new Date(alert.timestamp || Date.now());
-                  if (isJobAlert) return <JobAlertCard key={alert.id} alert={alert} onHide={() => hideAlert(alert.id)} />;
+                  let timestampDate = alert.timestamp?.toDate ? alert.timestamp.toDate() : new Date(alert.timestamp || Date.now());
+                  
+                  // Safety: Fix Invalid Date
+                  if (isNaN(timestampDate.getTime())) {
+                    timestampDate = new Date();
+                  }
+
+                  const aData = alert as any;
+                  const targetCity = (alert.city || aData.City || aData.targetCity || 'All');
+                  const targetUser = aData.targetUserType || 'All';
+                  const targetGender = aData.gender || aData.Gender || 'Any';
+                  const targetClass = aData.targetClass || 'All';
+                  
+                  // New logic for professional templates
+                  const isBooking = aData.isBooking === true || msg.includes('🎉 Congratulations');
+                  const isJob = msg.includes('📢 New Tuition Job Alert');
+                  
+                  // Fix repetitive sender name logic
+                  let sender = alert.sender || 'Tuition Alerts';
+                  const displaySender = sender.toLowerCase().startsWith('doable') 
+                    ? sender 
+                    : `DoAble | ${sender}`;
+                  
+                  const hasSpecificTarget = (targetCity !== 'All' && targetCity !== 'all') || 
+                                           (targetUser !== 'All' && targetUser !== 'all') || 
+                                           (targetGender !== 'Any' && targetGender !== 'any') || 
+                                           (targetClass !== 'All' && targetClass !== 'all');
+
                   return (
-                    <div key={alert.id} className={cn("p-6 rounded-[32px] border-2 shadow-sm relative transition-all hover:scale-[1.01]", getBg(alert.type))}>
-                      <div className="flex gap-4">
-                        <div className="shrink-0 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">{getIcon(alert.type)}</div>
-                        <div className="flex-1">
-                          <div className="font-black text-[10px] uppercase mb-1 tracking-wider text-slate-500 flex items-center justify-between">
-                          <span>{alert.sender || 'System Broadcast'}</span>
-                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[8px] opacity-70">Target: {alert.city || (alert as any).City || (alert as any).targetCity || 'All'}</span>
+                    <div key={alert.id} className="relative group px-2 mb-6">
+                      <div className="flex flex-col max-w-[95%]">
+                        {/* Header: Sender + Time */}
+                        <div className="flex items-center justify-between mb-1.5 ml-3 pr-2">
+                           <div className="flex items-center gap-2">
+                             <span className="text-[11px] font-bold text-indigo-600 tracking-tight">{displaySender}</span>
+                             <div className="w-1 h-1 rounded-full bg-slate-200" />
+                             <span className="text-[10px] font-medium text-slate-400">
+                               {formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()}
+                             </span>
+                           </div>
                         </div>
-                          <FormattedMessage text={msg} />
-                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400/60 uppercase tracking-tighter"><Clock size={10} strokeWidth={3} />{formatWhatsAppStyle(timestampDate)} • {timestampDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
+
+                        {/* Message Bubble container */}
+                        <div className={cn(
+                          "relative p-4 rounded-[20px] rounded-tl-none shadow-sm border border-slate-100 transition-all hover:shadow-md",
+                          "bg-white",
+                          getBg(alert.type),
+                          isBooking && "border-l-4 border-l-emerald-500 bg-emerald-50/10",
+                          isJob && "border-l-4 border-l-amber-500 bg-amber-50/10"
+                        )}>
+                          {/* Message Body */}
+                          <div className="space-y-3">
+                            {/* Congratulations / Header for Booking */}
+                            {isBooking && (
+                              <div className="flex items-center gap-2 text-emerald-600 font-black text-[13px] uppercase tracking-tighter">
+                                <Zap size={14} fill="currentColor" />
+                                Booking Confirmation
+                              </div>
+                            )}
+
+                            <div className="text-[14px] font-medium text-slate-800 leading-relaxed pr-1">
+                               <FormattedMessage text={msg} />
+                            </div>
+
+                            {/* Professional Detail Grid (if fields exist) */}
+                            {(aData.orderId || aData.fee || aData.address || aData.days) && (
+                              <div className="bg-white/50 border border-slate-100 rounded-xl p-3 grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
+                                {aData.orderId && (
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase">Order ID</span>
+                                    <span className="text-[11px] font-bold text-indigo-600">#{aData.orderId}</span>
+                                  </div>
+                                )}
+                                {aData.fee && (
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase">Fee Amount</span>
+                                    <span className="text-[11px] font-bold text-emerald-600">{aData.fee}</span>
+                                  </div>
+                                )}
+                                {aData.studentName && (
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase">Student Name</span>
+                                    <span className="text-[11px] font-bold text-slate-800">{aData.studentName}</span>
+                                  </div>
+                                )}
+                                {aData.demoTime && (
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase">Demo Time</span>
+                                    <span className="text-[11px] font-bold text-amber-600">{aData.demoTime}</span>
+                                  </div>
+                                )}
+                                {aData.days && (
+                                  <div className="flex flex-col col-span-2 mt-1">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase">Schedule (Days)</span>
+                                    <span className="text-[11px] font-bold text-slate-800">{aData.days}</span>
+                                  </div>
+                                )}
+                                {aData.address && (
+                                  <div className="flex flex-col col-span-2 mt-1 pt-1 border-t border-slate-50">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase">Full Address</span>
+                                    <span className="text-[11px] font-bold text-slate-700 leading-tight">{aData.address}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {alert.type === 'interest' && (alert as any).connectionId && (
+                              <div className="space-y-2 mt-4 pt-4 border-t border-slate-100">
+                                <button
+                                  onClick={() => {
+                                    playTapSound();
+                                    window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'messages' }));
+                                  }}
+                                  className="w-full bg-slate-900 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                  <MessageSquare size={14} /> Open in Messages
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                                {/* Footer Meta: Why reached you + Double ticks */}
+
+                          <div className="mt-4 pt-3 border-t border-slate-50 flex flex-col gap-2">
+                             {hasSpecificTarget ? (
+                               <div className="space-y-1.5">
+                                 <span className="text-[9px] font-bold text-slate-500 block">This message reached you because your profile matches:</span>
+                                 <div className="flex flex-wrap gap-1.5">
+                                   {targetCity !== 'All' && targetCity !== 'all' && (
+                                     <span className="text-[8px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{targetCity}</span>
+                                   )}
+                                   {targetUser !== 'All' && targetUser !== 'all' && (
+                                     <span className="text-[8px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{targetUser}</span>
+                                   )}
+                                   {targetGender !== 'Any' && targetGender !== 'any' && (
+                                     <span className="text-[8px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{targetGender}</span>
+                                   )}
+                                   {targetClass !== 'All' && targetClass !== 'all' && (
+                                     <span className="text-[8px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{targetClass}</span>
+                                   )}
+                                 </div>
+                               </div>
+                             ) : (
+                               <span className="text-[9px] font-bold text-slate-400">This is a global broadcast from DoAble Network.</span>
+                             )}
+
+                             <div className="flex items-center justify-between">
+                               <div className="flex items-center gap-2">
+                                  <div className="text-[9px] font-bold text-rose-400">Not as per matches? Update your profile</div>
+                                  <button 
+                                    onClick={() => { playTapSound(); onUpdateProfile?.(); }}
+                                    className="p-1 bg-rose-50 text-rose-500 rounded-md border border-rose-100 active:scale-90 transition-all"
+                                  >
+                                    <Edit3 size={10} strokeWidth={3} />
+                                  </button>
+                               </div>
+                               <div className="flex items-center">
+                                 <CheckCircle size={10} className="text-blue-500 -mr-1" />
+                                 <CheckCircle size={10} className="text-blue-500" />
+                               </div>
+                             </div>
+                          </div>
+
+                          {/* Integrated Action for Job Alerts */}
+                          {(msg.includes('📢') || msg.includes('🚨') || msg.toLowerCase().includes('order id')) && (
+                            <div className="mt-3 pt-3 border-t border-slate-50">
+                               <button 
+                                onClick={() => {
+                                  playTapSound();
+                                  const orderIdMatch = msg.match(/(?:Order ID|ID|#|Booking ID)\s*:?\s*#?(\d+)/i);
+                                  const orderId = orderIdMatch ? orderIdMatch[1] : '';
+                                  const waMsg = `Hi, I am interested in Job Alert ${orderId ? 'ID: #' + orderId : ''}. Please share details.`;
+                                  openWhatsApp(waMsg);
+                                }}
+                                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center gap-2 text-[12px] font-bold transition-all active:scale-95 shadow-sm"
+                              >
+                                <MessageSquare size={14} fill="currentColor" />
+                                Apply on WhatsApp
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <button onClick={() => hideAlert(alert.id)} className="text-slate-400 hover:text-slate-600 transition-colors shrink-0"><X size={18} /></button>
+
+                        {/* Hover-only Dismiss Button */}
+                        <button 
+                          onClick={() => hideAlert(alert.id)} 
+                          className="absolute -right-4 top-8 w-8 h-8 flex items-center justify-center bg-white border border-slate-100 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all shadow-sm opacity-0 group-hover:opacity-100 z-10"
+                        >
+                          <X size={14} />
+                        </button>
                       </div>
                     </div>
                   );

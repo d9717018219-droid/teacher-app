@@ -5,7 +5,14 @@ const config: CapacitorConfig = {
   appName: 'DoAble India',
   webDir: 'dist',
   server: {
-    hostname: 'localhost'
+    hostname: 'localhost',
+    allowNavigation: [
+      'checkout.razorpay.com',
+      'api.razorpay.com'
+    ]
+  },
+  android: {
+    allowMixedContent: true
   },
   plugins: {
     GoogleAuth: {

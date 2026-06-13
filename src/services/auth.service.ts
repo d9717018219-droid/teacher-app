@@ -124,7 +124,7 @@ export const AuthService = {
         last_name: profile.userLastName,
         name: `${profile.userFirstName} ${profile.userLastName}`.trim() || profile.userName || 'Tutor',
         email: profile.email,
-        phone: profile.userPhone,
+        phone: profile.userPhone.replace(/\D/g, ''),
         gender: profile.userGender,
         age: profile.userAge,
         dob: profile.userDob,
@@ -166,7 +166,8 @@ export const AuthService = {
         isUrlEncoded: !isNative // Match App.tsx: native uses JSON, web uses URLEncoded
       });
     } else {
-      const fullPhone = (profile.userCountryCode + profile.userPhone).replace(/\s+/g, '');
+      const cleanPhone = profile.userPhone.replace(/\D/g, '').slice(-10);
+      const fullPhone = (profile.userCountryCode + cleanPhone).replace(/\s+/g, '');
       const parentData: any = {
         action: 'upsert',
         order_id: profile.tutorId,

@@ -84,3 +84,25 @@ export interface Alert {
 
 export type UserType = 'parent' | 'teacher';
 export type UserGender = 'Male' | 'Female' | 'All';
+
+export interface ConnectionRequest {
+  id: string;
+  parentId: string;
+  tutorId: string;
+  parentName: string;
+  tutorName: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'blocked';
+  createdAt: any;
+  updatedAt: any;
+  lastMessage?: string;
+  lastMessageTime?: any;
+  unreadCount?: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  text: string;
+  timestamp: any;
+  read: boolean;
+}

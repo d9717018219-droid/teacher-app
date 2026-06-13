@@ -187,7 +187,8 @@ async function setupCapacitorPushNotifications(
           window.dispatchEvent(new CustomEvent('firebaseNotification', { detail: notification }));
           showLocalNotification(
             notification.title || 'New Job Alert 🆕',
-            notification.body || 'Check the latest tuition requirements!'
+            notification.body || 'Check the latest tuition requirements!',
+            notification.data
           );
         }
       );
@@ -195,7 +196,17 @@ async function setupCapacitorPushNotifications(
       await PushNotifications.addListener(
         'pushNotificationActionPerformed',
         (notification) => {
+          console.log('🔔 Push Action Performed:', notification);
           handleNotificationAction(notification.notification.data);
+        }
+      );
+
+      // Build 346: Add listener for Local Notifications (Foreground push clicks)
+      await LocalNotifications.addListener(
+        'localNotificationActionPerformed',
+        (notification) => {
+          console.log('🔔 Local Action Performed:', notification);
+          handleNotificationAction(notification.notification.extra);
         }
       );
 
@@ -206,7 +217,7 @@ async function setupCapacitorPushNotifications(
   }
 }
 
-async function showLocalNotification(title: string, body: string) {
+async function showLocalNotification(title: string, body: string, data?: any) {
   try {
     await LocalNotifications.schedule({
       notifications: [
@@ -216,7 +227,8 @@ async function showLocalNotification(title: string, body: string) {
           id: Math.floor(Math.random() * 10000),
           schedule: { at: new Date(Date.now() + 500) },
           sound: 'blackberry',
-          channelId: 'doable_channel_v10'
+          channelId: 'doable_channel_v10',
+          extra: data || {}
         }
       ]
     });
@@ -224,12 +236,14 @@ async function showLocalNotification(title: string, body: string) {
 }
 
 function handleNotificationAction(data: any) {
+  console.log('🚀 Handling Notification Action with data:', data);
   if (data?.type === 'job' || data?.jobId) {
     window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'jobs' }));
   } else if (data?.type === 'alert' || data?.type === 'support') {
     window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'alerts' }));
   } else {
-    window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'home' }));
+    // Default to alerts tab as requested by user (Build 346.2)
+    window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'alerts' }));
   }
 }
 

@@ -53,7 +53,11 @@ export const useChat = (userId: string | null) => {
     return () => unsubscribe();
   }, [userId]);
 
-  const sendInterest = async (parent: { id: string, name: string, city: string }, tutor: { id: string, name: string }) => {
+  const sendInterest = async (
+    parent: { id: string, name: string, city: string }, 
+    tutor: { id: string, name: string },
+    senderType: 'parent' | 'teacher' = 'parent'
+  ) => {
     if (!parent.id || !tutor.id || tutor.id === 'N/A') return;
 
     // Check if connection already exists
@@ -73,7 +77,7 @@ export const useChat = (userId: string | null) => {
       await updateDoc(doc(db, 'connections', connectionId), {
         status: 'pending',
         updatedAt: serverTimestamp(),
-        lastMessage: 'Sent a connection request',
+        lastMessage: senderType === 'parent' ? 'Parent sent a connection request' : 'Tutor applied for job',
         lastMessageTime: serverTimestamp()
       });
     } else {
@@ -86,30 +90,39 @@ export const useChat = (userId: string | null) => {
         members: [parent.id, tutor.id],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        lastMessage: 'Sent a connection request',
+        lastMessage: senderType === 'parent' ? 'Parent sent a connection request' : 'Tutor applied for job',
         lastMessageTime: serverTimestamp()
       });
       connectionId = docRef.id;
     }
 
     // Add first message to the chat room
+    const senderId = senderType === 'parent' ? parent.id : tutor.id;
+    const messageText = senderType === 'parent' 
+      ? `Hi ${tutor.name}, I am interested in your profile. Let's discuss further!`
+      : `Hi, I am interested in your job posting (Order ID: #${parent.id}). Let's discuss further!`;
+
     await addDoc(collection(db, `connections/${connectionId}/messages`), {
-      senderId: parent.id,
-      text: `Hi ${tutor.name}, I am interested in your profile. Let's discuss further!`,
+      senderId: senderId,
+      text: messageText,
       timestamp: serverTimestamp(),
       read: false,
       isSystem: false
     });
 
-    // Create a simplified alert for the tutor (just for push/badge notification)
+    // Create a simplified alert for the receiver (just for push/badge notification)
+    const targetId = senderType === 'parent' ? tutor.id : parent.id;
+    const targetEmail = (targetId.includes('@') || isNaN(Number(targetId))) ? targetId : 'all';
+    const targetTutorId = targetEmail === 'all' ? targetId : 'all';
+
     await addDoc(collection(db, 'alerts'), {
-      message: `💬 New Message Request from ${parent.name}! Check your Messages tab.`,
+      message: `💬 New Message Request from ${senderType === 'parent' ? parent.name : tutor.name}! Check your Messages tab.`,
       type: 'interest',
-      targetUserType: 'teacher',
-      targetTutorId: String(tutor.id),
-      targetEmail: 'all',
+      targetUserType: senderType === 'parent' ? 'teacher' : 'parent',
+      targetTutorId: targetTutorId,
+      targetEmail: targetEmail,
       city: 'all',
-      sender: parent.name,
+      sender: senderType === 'parent' ? parent.name : tutor.name,
       timestamp: serverTimestamp(),
       connectionId: connectionId
     });

@@ -26,7 +26,7 @@ function log_debug($msg) {
 // Zoho Credentials
 define('ZOHO_CLIENT_ID',     '1000.VNNYQAYAKOUP2TNO97FIGD4RI41K1C');
 define('ZOHO_CLIENT_SECRET', 'f6e379a5534faa80cc9f3294ee84d6860d31858886');
-define('ZOHO_REFRESH_TOKEN', '1000.19f6842a0833112342fe593d19f214a1.4d2efa10a1290154d54b0763be468053');
+define('ZOHO_REFRESH_TOKEN', '1000.cc39d105d023ccee61215822a2e66058.9292cbbb3ce9d48a51eef7b2f826683c');
 
 function getZohoAccessToken() {
     $ch = curl_init();

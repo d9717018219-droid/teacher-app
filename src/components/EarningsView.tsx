@@ -35,7 +35,8 @@ import {
   Loader2,
   Check,
   X,
-  Hash
+  Hash,
+  ChevronRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TutorProfile } from '../types';
@@ -49,9 +50,19 @@ interface EarningsViewProps {
   playTapSound: () => void;
   onEditProfile: () => void;
   onRequestApproval: () => void;
+  onVerifyClick?: () => void;
 }
 
-export const EarningsView: React.FC<EarningsViewProps> = ({ tutorProfile, allTutors = [], userCity, profilePhoto, playTapSound, onEditProfile, onRequestApproval }) => {
+export const EarningsView: React.FC<EarningsViewProps> = ({ 
+  tutorProfile, 
+  allTutors = [], 
+  userCity, 
+  profilePhoto, 
+  playTapSound, 
+  onEditProfile, 
+  onRequestApproval,
+  onVerifyClick
+}) => {
   
   // DEBUG LOG
   React.useEffect(() => {
@@ -205,6 +216,51 @@ export const EarningsView: React.FC<EarningsViewProps> = ({ tutorProfile, allTut
           </div>
         </div>
       </div>
+
+      {/* SECTION 1: VERIFICATION PROMO */}
+      {tutorProfile.verified !== 'Yes' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-100 border border-white">
+                  <ShieldCheck size={20} strokeWidth={3} />
+               </div>
+               <div className="flex flex-col">
+                  <h3 className="text-[14px] font-[1000] text-slate-900 tracking-tight leading-none">Profile Verification</h3>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Trust & Visibility</span>
+               </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => { playTapSound(); onVerifyClick?.(); }}
+            className="w-full bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[32px] p-[1px] shadow-2xl shadow-blue-500/20 relative overflow-hidden group active:scale-[0.98] transition-all text-left"
+          >
+            <div className="bg-white rounded-[31px] p-5 flex items-center gap-4 relative z-10">
+               <div className="w-14 h-14 rounded-[22px] bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-110 transition-transform duration-500 shadow-inner">
+                  <BadgeCheck size={32} strokeWidth={2.5} />
+               </div>
+               <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-[16px] font-[1000] text-slate-900 leading-none tracking-tight">Be a Verified Tutor</h4>
+                    <span className="bg-blue-100 text-blue-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">Elite</span>
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-500 leading-relaxed">Trusted Seal • Top Visibility • 5x Leads</p>
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-black text-blue-600">₹99</span>
+                      <span className="text-[8px] font-bold text-slate-300 line-through">₹199</span>
+                    </div>
+                    <div className="h-3 w-px bg-slate-100" />
+                    <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1">Upgrade Now <ChevronRight size={10} strokeWidth={3} /></span>
+                  </div>
+               </div>
+            </div>
+            {/* Animated Glow on hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+          </button>
+        </div>
+      )}
       
       {/* SECTION 3: TOP CITY EARNERS (TABULAR VIEW) */}
       <div className="space-y-6 pb-20">

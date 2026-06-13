@@ -23,8 +23,6 @@ import {
   Clock,
   ShieldCheck,
   TrendingUp,
-  Venus,
-  Mars,
   LayoutGrid,
   Building,
   CheckCircle2,
@@ -35,6 +33,7 @@ import {
 } from 'lucide-react';
 import { JobLead, TutorProfile, UserType } from '../types';
 import { cn, formatCurrency, getJobId, getTutorId, toTitleCase } from '../utils';
+import { CLASS_GROUP_MAPPING } from '../utils/constants';
 import { JobCard } from './JobCard';
 import { TutorCard } from './TutorCard';
 
@@ -50,7 +49,7 @@ interface HomeViewProps {
   setFormType: (type: 'parent' | 'teacher') => void;
   setShowFormModal: (show: boolean) => void;
   onSignUpClick: () => void;
-  setActiveTab: (tab: 'home' | 'jobs' | 'tutors' | 'alerts' | 'admin' | 'support' | 'shortlist' | 'payments') => void;
+  setActiveTab: (tab: 'home' | 'jobs' | 'tutors' | 'alerts' | 'admin' | 'support' | 'shortlist' | 'payments' | 'messages') => void;
   getDynamicGreeting: () => string;
   setShowFilterDrawer: (show: boolean) => void;
   onJobClick: (job: JobLead) => void;
@@ -69,16 +68,9 @@ interface HomeViewProps {
   onCityClick?: (city: string) => void;
   leadVisibility?: boolean;
   setLeadVisibility?: (visible: boolean) => void;
+  playGoLiveSound?: () => void;
+  isCityMatch?: (city: string | undefined, filter: string) => boolean;
 }
-
-const CLASS_GROUP_MAPPING: Record<string, string[]> = {
-  'Class I to V': ['Class I to V', 'Primary', 'Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th'],
-  'Class VI to VIII': ['Class VI to VIII', 'Middle', '6th', '7th', '8th'],
-  'Class IX to X': ['Class IX to X', 'Secondary', '9th', '10th'],
-  'Class XI to XII': ['Class XI to XII', 'Sr. Secondary', '11th', '12th'],
-  'Competitive': ['NEET', 'JEE', 'Entrance', 'Competitive', 'UPSC', 'SSC'],
-  'Language': ['Languages', 'IELTS', 'French', 'German', 'Spanish', 'Spoken English']
-};
 
 export const HomeView = React.memo(({
   userName,
@@ -110,9 +102,43 @@ export const HomeView = React.memo(({
   onModeClick,
   onCityClick,
   leadVisibility,
-  setLeadVisibility
+  setLeadVisibility,
+  playGoLiveSound,
+  isCityMatch
 }: HomeViewProps) => {
   const [currentBanner, setCurrentBanner] = React.useState(0);
+
+  const cityFilteredJobs = React.useMemo(() => {
+    const filterCity = (userCity || '').toLowerCase().trim();
+    if (!filterCity || filterCity === 'india' || filterCity === 'all') return allJobs || [];
+    
+    const cityMatchFn = isCityMatch || ((c: string | undefined, f: string) => {
+      if (!c) return false;
+      const cv = c.toLowerCase().trim();
+      const fv = f.toLowerCase().trim();
+      if (fv === 'noida' && cv === 'greater noida') return false;
+      if (fv === 'greater noida' && cv === 'noida') return false;
+      return cv === fv || cv.includes(fv) || fv.includes(cv);
+    });
+    
+    return (allJobs || []).filter(l => cityMatchFn(l.City || (l as any).city, filterCity));
+  }, [allJobs, userCity, isCityMatch]);
+
+  const cityFilteredTutors = React.useMemo(() => {
+    const filterCity = (userCity || '').toLowerCase().trim();
+    if (!filterCity || filterCity === 'india' || filterCity === 'all') return allTutors || [];
+
+    const cityMatchFn = isCityMatch || ((c: string | undefined, f: string) => {
+      if (!c) return false;
+      const cv = c.toLowerCase().trim();
+      const fv = f.toLowerCase().trim();
+      if (fv === 'noida' && cv === 'greater noida') return false;
+      if (fv === 'greater noida' && cv === 'noida') return false;
+      return cv === fv || cv.includes(fv) || fv.includes(cv);
+    });
+
+    return (allTutors || []).filter(t => cityMatchFn(t.city || (t as any).City, filterCity));
+  }, [allTutors, userCity, isCityMatch]);
 
   // Pre-calculate counts to avoid expensive filtering inside loops
   const counts = React.useMemo(() => {
@@ -122,25 +148,25 @@ export const HomeView = React.memo(({
     // Class Counts
     Object.keys(CLASS_GROUP_MAPPING).forEach(group => {
       const mapped = CLASS_GROUP_MAPPING[group];
-      jobCounts[`job_class_${group}`] = allJobs.filter(l => {
+      jobCounts[`job_class_${group}`] = cityFilteredJobs.filter(l => {
         const jc = (l.Class || l['Class / Board'] || (l as any).class_group || '').toLowerCase();
         return jc.includes(group.toLowerCase()) || (mapped && mapped.some(m => jc.includes(m.toLowerCase())));
       }).length;
       
-      tutorCounts[`tutor_class_${group}`] = allTutors.filter(t => {
+      tutorCounts[`tutor_class_${group}`] = cityFilteredTutors.filter(t => {
         const classes = Array.isArray(t.class_group) ? t.class_group : [];
         return classes.some(c => (c || '').toLowerCase().includes(group.toLowerCase()));
       }).length;
     });
 
     // Mode Counts
-    ['Home Tuition', 'Online Class'].forEach(mode => {
+    ["At Student's Place", "At Tutor's Place", 'Online', 'At Institute', 'At School'].forEach(mode => {
       const m = mode.toLowerCase().trim();
-      jobCounts[`job_mode_${mode}`] = allJobs.filter(l => {
+      jobCounts[`job_mode_${mode}`] = cityFilteredJobs.filter(l => {
         const jm = ((l as any).Mode || (l as any).mode || (l as any)['Mode of Teaching'] || (l as any)['Mode of teaching'] || '').toLowerCase().trim();
         if (jm.includes('any') || jm.includes('both')) return true;
-        if (m.includes('online')) return jm.includes('online');
-        if (m.includes('home')) return jm.includes('home') || jm.includes('offline') || jm === '';
+        if (m === 'online' || m.includes('online')) return jm.includes('online');
+        if (m.includes('student') || m.includes('home')) return jm.includes('home') || jm.includes('offline') || jm.includes('student') || jm === '';
         return jm.includes(m);
       }).length;
     });
@@ -151,42 +177,43 @@ export const HomeView = React.memo(({
       const escapedLoc = searchLoc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`\\b${escapedLoc}\\b`, 'i');
       
-      jobCounts[`job_loc_${loc}`] = allJobs.filter(l => regex.test((l.Locations || (l as any).location || '').toString().toLowerCase())).length;
-      tutorCounts[`tutor_loc_${loc}`] = allTutors.filter(t => (Array.isArray(t.location) ? t.location.join(', ') : String(t.location || '')).toLowerCase().includes(searchLoc)).length;
+      jobCounts[`job_loc_${loc}`] = cityFilteredJobs.filter(l => regex.test((l.Locations || (l as any).location || '').toString().toLowerCase())).length;
+      tutorCounts[`tutor_loc_${loc}`] = cityFilteredTutors.filter(t => (Array.isArray(t.location) ? t.location.join(', ') : String(t.location || '')).toLowerCase().includes(searchLoc)).length;
     });
 
     return { jobCounts, tutorCounts };
-  }, [allJobs, allTutors, localities]);
+  }, [cityFilteredJobs, cityFilteredTutors, localities]);
 
   // Dynamic Count Calculations (Tutors)
   const femaleExpertCount = React.useMemo(() => 
-    (allTutors || []).filter(t => (t.gender || '').toLowerCase() === 'female').length, 
-  [allTutors]);
+    cityFilteredTutors.filter(t => (t.gender || '').toLowerCase() === 'female').length, 
+  [cityFilteredTutors]);
   
   const maleExpertCount = React.useMemo(() => 
-    (allTutors || []).filter(t => (t.gender || '').toLowerCase() === 'male').length, 
-  [allTutors]);
+    cityFilteredTutors.filter(t => (t.gender || '').toLowerCase() === 'male').length, 
+  [cityFilteredTutors]);
 
   // Dynamic Count Calculations (Jobs)
   const femaleJobCount = React.useMemo(() => 
-    (allJobs || []).filter(l => {
+    cityFilteredJobs.filter(l => {
       const g = ((l as any).gender || l.Gender || (l as any).preferred_gender || (l as any).requiredGender || '').toLowerCase().trim();
       const hasFemale = /female/i.test(g);
       const hasMale = /\bmale\b/i.test(g);
       const isAny = g === '' || /any/i.test(g) || /both/i.test(g) || g.includes('/') || (hasFemale && hasMale);
       return hasFemale || isAny;
     }).length, 
-  [allJobs]);
+  [cityFilteredJobs]);
   
   const maleJobCount = React.useMemo(() => 
-    (allJobs || []).filter(l => {
+    cityFilteredJobs.filter(l => {
       const g = ((l as any).gender || l.Gender || (l as any).preferred_gender || (l as any).requiredGender || '').toLowerCase().trim();
       const hasFemale = /female/i.test(g);
       const hasMale = /\bmale\b/i.test(g);
       const isAny = g === '' || /any/i.test(g) || /both/i.test(g) || g.includes('/') || (hasFemale && hasMale);
       return hasMale || isAny;
     }).length, 
-  [allJobs]);
+  [cityFilteredJobs]);
+
 
   const banners = [
     {
@@ -262,7 +289,7 @@ export const HomeView = React.memo(({
     <div className="space-y-4 pb-24">
       {/* 1. Header Section */}
       <section className="px-5 pt-4">
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-center">
           <div className="flex flex-col gap-0.5 overflow-hidden flex-1 text-left">
             <h1 className="text-[18px] font-[900] text-[#0F172A] tracking-tighter whitespace-nowrap truncate">
               Welcome, <span className="text-primary">{userName ? toTitleCase(userName).split(' ')[0] : (userType === 'teacher' ? 'Educator' : 'Parent')}</span> <span className="text-amber-400">👋</span>
@@ -271,14 +298,56 @@ export const HomeView = React.memo(({
               {getDynamicGreeting()}! Let's create impact today.
             </p>
           </div>
-          <button 
-            onClick={() => { playTapSound(); setShowFilterDrawer(true); }}
-            className="flex items-center gap-1 bg-white px-2 py-1 rounded-full border border-slate-100 text-[#0F172A] text-[9px] font-bold shadow-sm active:scale-95 transition-all shrink-0 ml-1.5"
-          >
-            <MapPin size={10} className="text-[#2563EB]" />
-            <span className="tracking-tight uppercase max-w-[65px] truncate">{userCity || 'City'}</span>
-            <ChevronDown size={9} className="text-slate-300" />
-          </button>
+          
+          {(userType === 'parent' || userType === 'teacher') && (
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest text-right leading-none">
+                {userType === 'teacher' ? 'Get\nJobs' : 'Get\nTutors'}
+              </span>
+              <div className="relative">
+                <AnimatePresence>
+                {leadVisibility && profileCompletion < 100 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 5, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 5, scale: 0.9 }}
+                    className="absolute bottom-full right-0 mb-3 bg-slate-900/95 backdrop-blur-md text-white py-2 px-4 rounded-2xl shadow-2xl z-50 flex flex-col items-center min-w-[160px] border border-white/10"
+                  >
+                    <div className="absolute -bottom-1 right-5 w-2 h-2 bg-slate-900/95 rotate-45 border-r border-b border-white/10" />
+                    <span className="text-[9px] font-black text-primary uppercase whitespace-nowrap">Profile: {profileCompletion}% Complete</span>
+                    <span className="text-[7.5px] font-bold text-slate-300 uppercase tracking-tighter whitespace-nowrap">Complete profile to stay live</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div 
+                onClick={() => {
+                  playTapSound();
+                  if (setLeadVisibility) {
+                    if (!leadVisibility && playGoLiveSound) playGoLiveSound();
+                    setLeadVisibility(!leadVisibility);
+                  }
+                }}
+                className={cn(
+                  "w-14 h-7 rounded-full p-1 cursor-pointer transition-all duration-300 relative shadow-sm border border-slate-100",
+                  leadVisibility ? "bg-emerald-500 border-emerald-400" : "bg-slate-200"
+                )}
+              >
+                <div className={cn(
+                  "absolute inset-0 flex items-center justify-between px-2 text-[7px] font-black uppercase tracking-widest",
+                  leadVisibility ? "text-white" : "text-slate-400"
+                )}>
+                  <span>{leadVisibility ? '' : 'OFF'}</span>
+                  <span>{leadVisibility ? 'LIVE' : ''}</span>
+                </div>
+                <motion.div 
+                  animate={{ x: leadVisibility ? 28 : 0 }}
+                  className="w-5 h-5 bg-white rounded-full shadow-md z-10 relative"
+                />
+              </div>
+            </div>
+          </div>
+          )}
         </div>
       </section>
 
@@ -357,48 +426,27 @@ export const HomeView = React.memo(({
         </div>
       </section>
 
-      {/* 4. Visibility Toggle (Parent & Tutor) */}
+      {/* 4. Preferred City Section (Replaced Go Live Card) */}
       {(userType === 'parent' || userType === 'teacher') && (
         <section className="px-5">
           <div className="bg-slate-50 border border-slate-100 rounded-[24px] p-4 flex items-center justify-between shadow-sm">
              <div className="flex flex-col gap-0.5">
-                <h4 className="text-[12px] font-black text-slate-900 tracking-tight">
-                  {userType === 'parent' ? 'Need Tutors to connect you?' : 'Go Live with your Profile?'}
+                <h4 className="text-[12px] font-black text-slate-900 tracking-tight uppercase">
+                  Preferred City
                 </h4>
-                {leadVisibility && profileCompletion < 100 ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] font-black text-primary uppercase">Profile: {profileCompletion}%</span>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter italic">Please complete it first</span>
-                  </div>
-                ) : (
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                    Status: {leadVisibility ? (userType === 'parent' ? 'SEARCHING' : 'LIVE') : 'OFFLINE'}
-                  </p>
-                )}
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  Active in: {userCity || 'India'}
+                </p>
              </div>
              
-             <div 
-               onClick={() => {
-                 playTapSound();
-                 if (setLeadVisibility) setLeadVisibility(!leadVisibility);
-               }}
-               className={cn(
-                 "w-20 h-9 rounded-full p-1 cursor-pointer transition-all duration-300 relative",
-                 leadVisibility ? "bg-emerald-500" : "bg-slate-200"
-               )}
-             >
-                <div className={cn(
-                  "absolute inset-0 flex items-center justify-between px-3 text-[9px] font-black uppercase tracking-widest",
-                  leadVisibility ? "text-white" : "text-slate-400"
-                )}>
-                  <span>{leadVisibility ? '' : 'NO'}</span>
-                  <span>{leadVisibility ? 'YES' : ''}</span>
-                </div>
-                <motion.div 
-                  animate={{ x: leadVisibility ? 44 : 0 }}
-                  className="w-7 h-7 bg-white rounded-full shadow-md z-10 relative"
-                />
-             </div>
+             <button 
+                onClick={() => { playTapSound(); setShowFilterDrawer(true); }}
+                className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-100 text-[#0F172A] text-[9.5px] font-black shadow-sm active:scale-95 transition-all shrink-0 uppercase tracking-wider"
+              >
+                <MapPin size={11} className="text-primary" />
+                <span className="truncate max-w-[80px]">{userCity || 'City'}</span>
+                <ChevronDown size={10} className="text-slate-300" />
+              </button>
           </div>
         </section>
       )}
@@ -426,7 +474,7 @@ export const HomeView = React.memo(({
                 <div className="absolute -top-10 -right-10 w-24 h-24 bg-rose-50 rounded-full group-hover:scale-150 transition-transform duration-500" />
                 <div className="relative z-10 flex flex-col gap-2">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-200">
-                    <Venus size={24} strokeWidth={2.5} />
+                    <User size={24} strokeWidth={2.5} />
                   </div>
                   <div>
                     <div className="text-[14px] font-[900] text-rose-950 tracking-tight leading-tight">Female Tutors</div>
@@ -453,7 +501,7 @@ export const HomeView = React.memo(({
                 <div className="absolute -top-10 -right-10 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-150 transition-transform duration-500" />
                 <div className="relative z-10 flex flex-col gap-2">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                    <Mars size={24} strokeWidth={2.5} />
+                    <User size={24} strokeWidth={2.5} />
                   </div>
                   <div>
                     <div className="text-[14px] font-[900] text-blue-950 tracking-tight leading-tight">Male Tutors</div>
@@ -483,10 +531,10 @@ export const HomeView = React.memo(({
             
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'Class I to V', sub: 'Primary', match: 'I to V', color: 'bg-amber-500', bg: 'bg-amber-50/30', border: 'border-amber-100' },
-                { label: 'Class VI to VIII', sub: 'Middle', match: 'VI to VIII', color: 'bg-indigo-500', bg: 'bg-indigo-50/30', border: 'border-indigo-100' },
-                { label: 'Class IX to X', sub: 'Secondary', match: 'IX to X', color: 'bg-blue-500', bg: 'bg-blue-50/30', border: 'border-blue-100' },
-                { label: 'Class XI to XII', sub: 'Sr. Secondary', match: 'XI to XII', color: 'bg-emerald-500', bg: 'bg-emerald-50/30', border: 'border-emerald-100' },
+                { label: 'Class I to V', sub: 'Primary', match: 'Class I to V', color: 'bg-amber-500', bg: 'bg-amber-50/30', border: 'border-amber-100' },
+                { label: 'Class VI to VIII', sub: 'Middle', match: 'Class VI to VIII', color: 'bg-indigo-500', bg: 'bg-indigo-50/30', border: 'border-indigo-100' },
+                { label: 'Class IX to X', sub: 'Secondary', match: 'Class IX to X', color: 'bg-blue-500', bg: 'bg-blue-50/30', border: 'border-blue-100' },
+                { label: 'Class XI to XII', sub: 'Sr. Secondary', match: 'Class XI to XII', color: 'bg-emerald-500', bg: 'bg-emerald-50/30', border: 'border-emerald-100' },
                 { label: 'NEET/JEE', sub: 'Entrance', match: 'Competitive', color: 'bg-rose-500', bg: 'bg-rose-50/30', border: 'border-rose-100' },
                 { label: 'Languages', sub: 'IELTS/French', match: 'Language', color: 'bg-purple-500', bg: 'bg-rose-50/30', border: 'border-purple-100' }
               ].map((group, i) => {
@@ -612,7 +660,7 @@ export const HomeView = React.memo(({
                 <div className="absolute -top-10 -right-10 w-24 h-24 bg-rose-50 rounded-full group-hover:scale-150 transition-transform duration-500" />
                 <div className="relative z-10 flex flex-col gap-2">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-200">
-                    <Venus size={24} strokeWidth={2.5} />
+                    <Users size={24} strokeWidth={2.5} />
                   </div>
                   <div>
                     <div className="text-[13px] font-[900] text-rose-950 tracking-tight leading-tight font-black">Female Teachers</div>
@@ -632,7 +680,7 @@ export const HomeView = React.memo(({
                 <div className="absolute -top-10 -right-10 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-150 transition-transform duration-500" />
                 <div className="relative z-10 flex flex-col gap-2">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                    <Mars size={24} strokeWidth={2.5} />
+                    <Users size={24} strokeWidth={2.5} />
                   </div>
                   <div>
                     <div className="text-[13px] font-[900] text-blue-950 tracking-tight leading-tight font-black">Male Teachers</div>
@@ -702,11 +750,11 @@ export const HomeView = React.memo(({
             </div>
             <div className="grid grid-cols-3 gap-2">
                {[
-                 { label: "Student's Place", match: 'Home Tuition', color: 'text-indigo-600', gradient: 'from-indigo-400 to-indigo-600', bg: 'bg-indigo-50', icon: <HomeIcon size={16} /> },
+                 { label: "Student's Place", match: "At Student's Place", color: 'text-indigo-600', gradient: 'from-indigo-400 to-indigo-600', bg: 'bg-indigo-50', icon: <HomeIcon size={16} /> },
                  { label: "Tutor's Place", match: "At Tutor's Place", color: 'text-emerald-600', gradient: 'from-emerald-400 to-emerald-600', bg: 'bg-emerald-50', icon: <User size={16} /> },
-                 { label: "Online Class", match: 'Online Class', color: 'text-purple-600', gradient: 'from-purple-400 to-purple-600', bg: 'bg-purple-50', icon: <Laptop size={16} /> },
-                 { label: "At Institute", match: 'At Institute', color: 'text-orange-600', gradient: 'from-orange-400 to-orange-600', bg: 'bg-orange-50', icon: <Monitor size={16} /> },
-                 { label: "At School", match: 'At School', color: 'text-rose-600', gradient: 'from-rose-400 to-rose-600', bg: 'bg-rose-50', icon: <Briefcase size={16} /> },
+                 { label: "Online Class", match: 'Online', color: 'text-purple-600', gradient: 'from-purple-400 to-purple-600', bg: 'bg-purple-50', icon: <Laptop size={16} /> },
+                 { label: "At Institute", match: 'At Institute', color: 'text-orange-600', gradient: 'from-orange-400 to-orange-600', bg: 'bg-orange-50', icon: <Building size={16} /> },
+                 { label: "At School", match: 'At School', color: 'text-rose-600', gradient: 'from-rose-400 to-rose-600', bg: 'bg-rose-50', icon: <School size={16} /> },
                  { label: "All Modes", match: 'All', color: 'text-slate-600', gradient: 'from-slate-500 to-slate-700', bg: 'bg-slate-50', icon: <Sparkles size={16} /> }
                ].map((mode, i) => {
                  const count = counts.jobCounts[`job_mode_${mode.match}`] || 0;
@@ -715,8 +763,8 @@ export const HomeView = React.memo(({
                      key={i}
                      onClick={() => { playTapSound(); onModeClick?.(mode.match); }}
                      className={cn(
-                       "group relative bg-white border rounded-[24px] p-3 overflow-hidden active:scale-95 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 text-center flex flex-col items-center gap-2",
-                       mode.bg.replace('50', '100/50') // Light border matching theme
+                       "group relative bg-white border border-slate-100 rounded-[24px] p-3 overflow-hidden active:scale-95 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 text-center flex flex-col items-center gap-2",
+                       mode.bg.replace('50', '100/30') // Very light background tint for border if needed
                      )}
                    >
                      <div className={cn("absolute -top-6 -right-6 w-16 h-16 rounded-full group-hover:scale-150 transition-transform duration-500 opacity-50", mode.bg)} />

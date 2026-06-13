@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Settings, X, LucideUser, Phone, GraduationCap, FileText, ShieldCheck, MapPin, BookOpen, Edit3, Sparkles, Clock, Camera, Trash2, Loader2, LogOut, Check, Mail } from 'lucide-react';
+import { Settings, X, LucideUser, Phone, GraduationCap, FileText, ShieldCheck, MapPin, BookOpen, Edit3, Sparkles, Clock, Camera, Trash2, Loader2, LogOut, Check, Mail, Home as HomeIcon, Building, School } from 'lucide-react';
 import { ProfileState } from '../../hooks/useProfileState';
 import { UserType, TutorProfile } from '../../types';
 import { cn } from '../../utils';
@@ -76,13 +76,9 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
     hasVehicle, userSelfie, profilePhoto, userName, tutorId, email, userEmail
   } = profile;
 
-  const debouncedUpdateField = useMemo(
-    () => debounce((field: string, value: any) => {
-      updateField(field, value);
-      localStorage.setItem(field, typeof value === 'string' ? value : JSON.stringify(value));
-    }, 400),
-    [updateField]
-  );
+  const handleFieldChange = useCallback((field: keyof ProfileState, value: any) => {
+    updateField(field, value);
+  }, [updateField]);
 
   const handleSelfieChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -95,22 +91,16 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
       reader.onloadend = () => {
         const base64String = reader.result as string;
         updateField('userSelfie', base64String);
-        localStorage.setItem('userSelfie', base64String);
         updateField('profilePhoto', base64String);
-        localStorage.setItem('userPhoto', base64String);
       };
       reader.readAsDataURL(file);
     }
   }, [updateField]);
 
-  const handleFieldChange = useCallback((field: string, value: any) => {
-    debouncedUpdateField(field, value);
-  }, [debouncedUpdateField]);
-
-  const handleTapAndUpdate = useCallback((field: string, value: any) => {
+  const handleTapAndUpdate = useCallback((field: keyof ProfileState, value: any) => {
     playTapSound();
-    handleFieldChange(field, value);
-  }, [playTapSound, handleFieldChange]);
+    updateField(field, value);
+  }, [playTapSound, updateField]);
 
   const handlePhoneChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
@@ -220,14 +210,14 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Email Address</label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                      <input type="email" value={userEmail || ''} onChange={(e) => { updateField('userEmail', e.target.value); localStorage.setItem('userEmail', e.target.value); }} placeholder="rahul@example.com" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                      <input type="email" value={userEmail || ''} onChange={(e) => { updateField('userEmail', e.target.value); }} placeholder="rahul@example.com" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                     </div>
                   </div>
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{userType === 'parent' ? 'Tutor Gender Preference' : 'Gender'}</label>
                     <div className="flex flex-wrap gap-2">
                       {(userType === 'teacher' ? ['Male', 'Female', 'Transgender'] : ['Male', 'Female', 'Any']).map(g => (
-                        <button key={g} onClick={() => { playTapSound(); updateField('userGender', g); localStorage.setItem('userGender', g); }} className={cn("flex-1 px-4 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", userGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{g}</button>
+                        <button key={g} onClick={() => { playTapSound(); updateField('userGender', g); }} className={cn("flex-1 px-4 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all", userGender === g ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{g}</button>
                       ))}
                     </div>
                   </div>
@@ -245,7 +235,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Date of Birth</label>
-                        <input type="date" value={userDob} onChange={(e) => { updateField('userDob', e.target.value); localStorage.setItem('userDob', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                        <input type="date" value={userDob} onChange={(e) => { updateField('userDob', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Age</label>
@@ -256,14 +246,14 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Aadhar Number</label>
                       <div className="relative">
                         <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                        <input type="text" maxLength={12} value={userAadhar} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); updateField('userAadhar', val); localStorage.setItem('userAadhar', val); }} placeholder="12-digit Aadhar Number" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                        <input type="text" maxLength={12} value={userAadhar} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); updateField('userAadhar', val); }} placeholder="12-digit Aadhar Number" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Full Address</label>
                       <div className="relative">
                         <MapPin className="absolute left-4 top-4 text-slate-300" size={16} />
-                        <textarea value={userAddress} onChange={(e) => { updateField('userAddress', e.target.value); localStorage.setItem('userAddress', e.target.value); }} placeholder="House No, Street, Landmark..." rows={3} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all resize-none" />
+                        <textarea value={userAddress} onChange={(e) => { updateField('userAddress', e.target.value); }} placeholder="House No, Street, Landmark..." rows={3} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all resize-none" />
                       </div>
                     </div>
                   </div>
@@ -281,7 +271,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                         {CLASSES_LIST.map(c => {
                           const isGroupActive = userClasses.includes(c) || (CLASS_GROUP_MAPPING[c] || []).some(sub => userClasses.includes(sub));
                           return (
-                            <button key={c} onClick={() => { playTapSound(); updateField('userClasses', [c]); localStorage.setItem('userClasses', JSON.stringify([c])); updateField('userSubjects', []); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
+                            <button key={c} onClick={() => { playTapSound(); updateField('userClasses', [c]); updateField('userSubjects', []); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
                           );
                         })}
                       </div>
@@ -302,7 +292,6 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                                     ? userClasses.filter(c => c !== sub) 
                                     : [...userClasses.filter(c => CLASSES_LIST.includes(c)), sub]; 
                                   updateField('userClasses', next); 
-                                  localStorage.setItem('userClasses', JSON.stringify(next)); 
                                 }} 
                                 className={cn("px-4 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter transition-all", userClasses.includes(sub) ? "border-primary bg-primary text-white" : "border-slate-100 text-slate-400 bg-white")}
                               >
@@ -322,7 +311,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                           ? (SPECIALIZED_SUB_CATEGORIES['Entrance Exam & Specialization'] || [])
                           : ['CBSE', 'ICSE', 'State Board', 'IB/IGCSE']
                         ).map(b => (
-                          <button key={b} onClick={() => { playTapSound(); updateField('userBoard', b); localStorage.setItem('userBoard', b); updateField('userSubjects', []); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
+                          <button key={b} onClick={() => { playTapSound(); updateField('userBoard', b); updateField('userSubjects', []); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
                         ))}
                       </div>
                     </div>
@@ -337,7 +326,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                             
                             if (Array.isArray(subjects)) {
                               return subjects.map(s => (
-                                <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                                <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
                               ));
                             } else {
                               // Grouped Subjects (Languages)
@@ -346,7 +335,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                                   <div className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest border-l-2 border-primary/30 pl-2">{group}</div>
                                   <div className="flex flex-wrap gap-2">
                                     {subjs.map((s: string) => (
-                                      <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                                      <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
                                     ))}
                                   </div>
                                 </div>
@@ -355,7 +344,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                           }
                           const groupName = userClasses[0];
                           return (groupName ? CLASS_SUBJECTS_DATA[groupName] || [] : []).map(s => (
-                            <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                            <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
                           ));
                         })()}
                       </div>
@@ -391,7 +380,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                           { label: 'Intermediate', desc: 'Speaks/Explains in English', value: 'Intermediate: Speaks comfortably explains concepts in English.' },
                           { label: 'Fluent', desc: 'Strictly English sessions', value: 'Fluent: Teaches the entire session strictly in English.' }
                         ].map(item => (
-                          <button key={item.label} onClick={() => { playTapSound(); updateField('userCommunication', item.value); localStorage.setItem('userCommunication', item.value); }} className={cn("w-full p-4 rounded-2xl border-2 text-left transition-all", userCommunication === item.value ? "border-primary bg-primary/5 shadow-md" : "border-slate-100 bg-white")}>
+                          <button key={item.label} onClick={() => { playTapSound(); updateField('userCommunication', item.value); }} className={cn("w-full p-4 rounded-2xl border-2 text-left transition-all", userCommunication === item.value ? "border-primary bg-primary/5 shadow-md" : "border-slate-100 bg-white")}>
                             <span className={cn("text-[11px] font-black uppercase tracking-wider block", userCommunication === item.value ? "text-primary" : "text-slate-700")}>{item.label}</span>
                             <p className="text-[9px] font-bold text-slate-400 leading-tight">{item.desc}</p>
                           </button>
@@ -410,10 +399,16 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                     <div className="space-y-3">
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of Learning</label>
                       <div className="grid grid-cols-2 gap-2">
-                        {["At Student's Place", "At Tutor's Place", 'Online', 'At Institute'].map(m => (
-                          <button key={m} onClick={() => { playTapSound(); updateField('userMode', m); localStorage.setItem('userMode', m); }} className={cn("py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-1", userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>
-                            <span>{m.includes('Student') ? '🏠' : m.includes('Tutor') ? '👨‍🏫' : m === 'Online' ? '💻' : '🏢'}</span>
-                            <span className="text-center px-1">{m}</span>
+                        {[
+                          { label: "At Student's Place", icon: <HomeIcon size={16} /> },
+                          { label: "At Tutor's Place", icon: <LucideUser size={16} /> },
+                          { label: "Online", icon: <Clock size={16} /> },
+                          { label: "At Institute", icon: <Building size={16} /> },
+                          { label: "At School", icon: <School size={16} /> }
+                        ].map(m => (
+                          <button key={m.label} onClick={() => { playTapSound(); updateField('userMode', m.label); }} className={cn("py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-1", userMode === m.label ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>
+                            <span>{m.icon}</span>
+                            <span className="text-center px-1">{m.label}</span>
                           </button>
                         ))}
                       </div>
@@ -422,11 +417,11 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       <div className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">City</label>
-                          <select value={userCity} onChange={(e) => { updateField('userCity', e.target.value); localStorage.setItem('userCity', e.target.value); updateField('userLocalities', []); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">{CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                          <select value={userCity} onChange={(e) => { updateField('userCity', e.target.value); updateField('userLocalities', []); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">{CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Locality</label>
-                          <select value={userLocalities[0] || ''} onChange={(e) => { updateField('userLocalities', [e.target.value]); localStorage.setItem('userLocalities', JSON.stringify([e.target.value])); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"><option value="">Select Locality</option>{(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => <option key={l} value={l}>{l}</option>)}</select>
+                          <select value={userLocalities[0] || ''} onChange={(e) => { updateField('userLocalities', [e.target.value]); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none"><option value="">Select Locality</option>{(CITY_TO_LOCATIONS_DATA[userCity] || []).map(l => <option key={l} value={l}>{l}</option>)}</select>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Society / Block</label>
@@ -452,7 +447,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                         {CLASSES_LIST.map(c => {
                           const isGroupActive = userClasses.includes(c) || (CLASS_GROUP_MAPPING[c] || []).some(sub => userClasses.includes(sub));
                           return (
-                            <button key={c} onClick={() => { playTapSound(); updateField('userClasses', [c]); localStorage.setItem('userClasses', JSON.stringify([c])); updateField('userSubjects', []); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
+                            <button key={c} onClick={() => { playTapSound(); updateField('userClasses', [c]); updateField('userSubjects', []); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", isGroupActive ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{c}</button>
                           );
                         })}
                       </div>
@@ -466,7 +461,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                           ? (SPECIALIZED_SUB_CATEGORIES['Entrance Exam & Specialization'] || [])
                           : ['CBSE', 'ICSE', 'State Board', 'IB/IGCSE']
                         ).map(b => (
-                          <button key={b} onClick={() => { playTapSound(); updateField('userBoard', b); localStorage.setItem('userBoard', b); updateField('userSubjects', []); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
+                          <button key={b} onClick={() => { playTapSound(); updateField('userBoard', b); updateField('userSubjects', []); }} className={cn("p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-tighter text-center transition-all", userBoard === b ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>{b}</button>
                         ))}
                       </div>
                     </div>
@@ -480,7 +475,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                             
                             if (Array.isArray(subjects)) {
                               return subjects.map(s => (
-                                <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                                <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
                               ));
                             } else {
                               // Grouped Subjects (Languages)
@@ -489,7 +484,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                                   <div className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest border-l-2 border-primary/30 pl-2">{group}</div>
                                   <div className="flex flex-wrap gap-2">
                                     {subjs.map((s: string) => (
-                                      <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                                      <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
                                     ))}
                                   </div>
                                 </div>
@@ -502,7 +497,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                             (CLASS_SUBJECTS_DATA[c] || []).forEach(s => { if (!allSubjects.includes(s)) allSubjects.push(s); });
                           });
                           return (allSubjects.length > 0 ? allSubjects : (userClasses[0] ? CLASS_SUBJECTS_DATA[userClasses[0]] || [] : [])).map(s => (
-                            <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); localStorage.setItem('userSubjects', JSON.stringify(next)); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
+                            <button key={s} onClick={() => { playTapSound(); const next = userSubjects.includes(s) ? userSubjects.filter(v => v !== s) : [...userSubjects, s]; updateField('userSubjects', next); }} className={cn("px-4 py-2 rounded-full border-2 font-black text-[9px] uppercase tracking-widest transition-all whitespace-normal text-left", userSubjects.includes(s) ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" : "border-slate-100 text-slate-400 bg-white")}>{s}</button>
                           ));
                         })()}
                       </div>
@@ -578,17 +573,26 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                   <div className="space-y-4">
                     <div className="space-y-3">
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Mode of Teaching</label>
-                      <div className="flex gap-2">
-                        {['Home Tuition', 'Online Class'].map(m => (
-                          <button key={m} onClick={() => { playTapSound(); updateField('userMode', m); localStorage.setItem('userMode', m); }} className={cn("flex-1 py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center gap-1", userMode === m ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}><span>{m === 'Home Tuition' ? '🏠' : '💻'}</span><span>{m}</span></button>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { label: "At Student's Place", icon: <HomeIcon size={16} /> },
+                          { label: "At Tutor's Place", icon: <LucideUser size={16} /> },
+                          { label: "Online", icon: <Clock size={16} /> },
+                          { label: "At Institute", icon: <Building size={16} /> },
+                          { label: "At School", icon: <School size={16} /> }
+                        ].map(m => (
+                          <button key={m.label} onClick={() => { playTapSound(); updateField('userMode', m.label); }} className={cn("py-4 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-1", userMode === m.label ? "border-primary bg-primary/5 text-primary" : "border-slate-100 text-slate-400 bg-white")}>
+                            <span>{m.icon}</span>
+                            <span className="text-center px-1">{m.label}</span>
+                          </button>
                         ))}
                       </div>
                     </div>
-                    {userMode !== 'Online Class' && (
+                    {userMode !== 'Online' && (
                       <div className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">City</label>
-                          <select value={userCity} onChange={(e) => { updateField('userCity', e.target.value); localStorage.setItem('userCity', e.target.value); updateField('userLocalities', []); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">{CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                          <select value={userCity} onChange={(e) => { updateField('userCity', e.target.value); updateField('userLocalities', []); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">{CITIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Localities (Select Multiple)</label>

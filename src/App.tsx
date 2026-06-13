@@ -20,6 +20,8 @@ import { JobsView } from './components/JobsView';
 import { TutorsView } from './components/TutorsView';
 import { EarningsView } from './components/EarningsView';
 import { ParentHubView } from './components/ParentHubView';
+import { EliteBuyerFlow } from './components/EliteBuyerFlow';
+import { TutorVerificationFlow } from './components/TutorVerificationFlow';
 import { SuccessPop } from './components/common/SuccessPop';
 import { FloatingToast } from './components/common/FloatingToast';
 import { DetailItem } from './components/common/DetailItem';
@@ -229,6 +231,12 @@ export default function App() {
       const val = getV(vals);
       if (val !== null) {
         let finalVal = String(val);
+        
+        // Clean phone number to 10 digits
+        if (key === 'userPhone') {
+          finalVal = finalVal.replace(/\D/g, '').slice(-10);
+        }
+
         // Special case for comma separated days/time to ensure space consistency
         if ((key === 'userDays' || key === 'userTime') && finalVal.includes(',')) {
           finalVal = finalVal.split(',').map(s => s.trim()).join(', ');
@@ -241,6 +249,7 @@ export default function App() {
         if (key === 'userCity') setUserCity(finalVal);
         if (key === 'userGender') setUserGender(finalVal as any);
         if (key === 'aboutMe') setAboutMe(finalVal);
+        if (key === 'userPhone') setUserPhone(finalVal);
       }
     });
 
@@ -291,7 +300,7 @@ export default function App() {
     let finalUserType = serverDetectedType || userType || 'teacher';
     
     const finalEmail = (data.user?.email || data.email || '').toLowerCase().trim();
-    const finalPhone = (data.user?.phone || data.phone || '').replace(/\D/g, '');
+    const finalPhone = (data.user?.phone || data.phone || '').replace(/\D/g, '').slice(-10);
     
     console.log(`[Auth-Success] Server Detected Type: ${serverDetectedType}, Current State Type: ${userType}`);
     console.log(`[Auth-Logic] Pool Sizes - Tutors: ${tutors.length}, Leads: ${leads.length}, FirestoreLeads: ${firestoreLeads.length}`);
@@ -838,6 +847,8 @@ export default function App() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [shortlistedIds, setShortlistedIds] = useState<string[]>(JSON.parse(localStorage.getItem('shortlistedIds') || '[]'));
   const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [showEliteFlow, setShowEliteFlow] = useState(false);
+  const [showTutorVerificationFlow, setShowTutorVerificationFlow] = useState(false);
   
   const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('customUser'));
 
@@ -1019,8 +1030,8 @@ export default function App() {
   // Notifications are handled by the useNotifications hook below
   useNotifications(userCity, userGender || 'All', userClasses, userType || 'all', tutorId);
   
-  // Use email/uid for parents, but explicitly use tutorId for teachers if available
-  const chatIdentifier = userType === 'teacher' && tutorId ? tutorId : (activeUser?.email || activeUser?.uid || null);
+  // Use tutorId (tutor_id for teachers, order_id for parents) as primary chat identifier
+  const chatIdentifier = tutorId || (activeUser?.email || activeUser?.uid || null);
   const { connections, sendInterest, handleConnection, reportUser } = useChat(chatIdentifier);
 
   useEffect(() => {
@@ -1386,49 +1397,49 @@ export default function App() {
         return;
       }
 
-      // 1. App Chat Connection Logic (New)
-      if (parentEmail) {
+      // App Chat Connection Logic
+      // Priority: use orderId as the primary identifier for Jobs as requested
+      const parentId = orderId || parentEmail;
+      
+      if (parentId) {
         setIsUpdatingProfile(true);
         try {
           await sendInterest(
-            { id: parentEmail, name: (job.Name || job.name || 'Parent'), city: job.City || 'India' },
-            { id: currentTutorId, name: userName }
+            { id: parentId, name: (job.Name || job.name || 'Parent'), city: job.City || 'India' },
+            { id: currentTutorId, name: userName },
+            'teacher'
           );
           setActiveToast({ title: 'Application Sent! 🚀', body: 'Connection request sent to parent. Check Messages tab.' });
-          setSelectedJob(null);
-          return; // Exit early to avoid WhatsApp double-action if chat is possible
+          
+          // Silent API record for tracking
+          fetch('https://doableindia.com/app-sys/api_copy.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'apply_job',
+              order_id: orderId,
+              tutor_id: currentTutorId
+            })
+          }).catch(e => console.warn('Silent apply tracking failed:', e));
+
+          return;
         } catch (err) {
           console.error('Chat connection failed:', err);
+          throw err;
         } finally {
           setIsUpdatingProfile(false);
         }
+      } else {
+        setActiveToast({ 
+          title: 'Connection Unavailable', 
+          body: 'This lead doesn\'t support direct messages yet. Please contact support.' 
+        });
+        throw new Error('No parent identifier (orderId or email) for chat');
       }
-
-      // 2. Fallback to Legacy logic (API + WhatsApp)
-      fetch('https://doableindia.com/app-sys/api_copy.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'apply_job',
-          order_id: orderId,
-          tutor_id: currentTutorId
-        })
-      }).catch(e => console.warn('Silent apply failed:', e));
-
-      // 2. Immediate WhatsApp Redirection
-      const whatsappMsg = `Hi, I am interested in Job Order ID: #${orderId}.
-Subjects: ${job.subjects || 'General'}
-
-Regards,
-${userName || 'Tutor'}
-Tutor ID: #${currentTutorId}
-Phone: ${userPhone}
-City: ${userCity}`;
-
-      openWhatsApp(whatsappMsg);
       
     } catch (error) {
       console.error('Apply Job Error:', error);
+      throw error;
     }
   };
 
@@ -1762,10 +1773,10 @@ City: ${userCity}`;
         const fMode = jobFilterMode.toLowerCase().trim();
         
         const isOnlineFilter = fMode.includes('online');
-        const isHomeFilter = fMode.includes('home');
+        const isHomeFilter = fMode.includes('home') || fMode.includes('student');
         
         const isOnlineJob = jobMode.includes('online');
-        const isHomeJob = jobMode.includes('home') || jobMode.includes('offline') || jobMode === '';
+        const isHomeJob = jobMode.includes('home') || jobMode.includes('offline') || jobMode.includes('student') || jobMode === '';
         const isAny = jobMode.includes('any') || jobMode.includes('both');
         
         if (!isAny) {
@@ -2172,7 +2183,22 @@ City: ${userCity}`;
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3 relative z-10">
+        <div className="flex items-center gap-2 relative z-10">
+             <button
+               onClick={() => { playTapSound(); setActiveTab('alerts'); setAlertsInitialTab('feed'); setUnseenAlertsCount(0); window.scrollTo(0,0); }}
+               className={cn(
+                 "p-2.5 rounded-2xl transition-all active:scale-90 relative",
+                 activeTab === 'alerts' ? "bg-white text-rose-500 shadow-lg" : "bg-white/10 text-white border border-white/10"
+               )}
+             >
+               <Bell size={18} strokeWidth={2.5} />
+               {unseenAlertsCount > 0 && (
+                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-[#F97316]">
+                   {unseenAlertsCount}
+                 </span>
+               )}
+             </button>
+
              <div className="flex items-center gap-1.5 bg-white/10 p-0.5 rounded-2xl border border-white/10">
                 <button
                   onClick={() => { 
@@ -2373,6 +2399,10 @@ City: ${userCity}`;
               playTapSound();
               openWhatsApp(`Hi RMN Support, my profile is 100% complete (Tutor ID: #${tutorId}). Please verify and make it live for parents.`);
             }}
+            onVerifyClick={() => {
+              playTapSound();
+              setShowTutorVerificationFlow(true);
+            }}
           />
        )}
        {activeTab === 'tutors' && (
@@ -2442,11 +2472,12 @@ City: ${userCity}`;
        )}
        {activeTab === 'support' && (<SupportView userName={userName} userFirstName={userFirstName} userType={userType} userCity={userCity} />)}
        {activeTab === 'post_need' && (
-          <ParentHubView 
-            userName={userName} 
-            playTapSound={playTapSound} 
-            setActiveTab={setActiveTab} 
+          <ParentHubView
+            userName={userName}
+            playTapSound={playTapSound}
+            setActiveTab={setActiveTab}
             onHideNeed={handleHideNeed}
+            onShowElite={() => setShowEliteFlow(true)}
             onPostRequirement={() => {
               if (profileCompletion < 1) {
                 setActiveToast({ title: 'Profile Incomplete', body: 'Please complete your profile to post a requirement.' });
@@ -2457,7 +2488,28 @@ City: ${userCity}`;
             }}
           />
        )}
-      </main>
+       </main>
+
+       <AnimatePresence>
+       {showEliteFlow && (
+         <EliteBuyerFlow 
+           userName={userName} 
+           userCity={userCity}
+           userLocalities={userLocalities}
+           userPhone={userPhone}
+           onClose={() => setShowEliteFlow(false)} 
+         />
+       )}
+       {showTutorVerificationFlow && (
+         <TutorVerificationFlow
+           tutorName={userName}
+           tutorPhone={userPhone}
+           tutorId={tutorId}
+           playTapSound={playTapSound}
+           onClose={() => setShowTutorVerificationFlow(false)}
+         />
+       )}
+       </AnimatePresence>
 
       {/* Post Requirement Confirmation Modal */}
       <ConfirmPostJobModal
@@ -2498,6 +2550,8 @@ City: ${userCity}`;
         job={selectedJob} 
         onClose={() => setSelectedJob(null)} 
         onApply={handleApplyJob} 
+        playTapSound={playTapSound}
+        currentUser={activeUser}
       />
 
       <TutorDetailModal
@@ -2505,6 +2559,7 @@ City: ${userCity}`;
         onClose={() => setSelectedTutor(null)}
         playTapSound={playTapSound}
         currentUser={activeUser}
+        parentId={tutorId}
         sendInterest={sendInterest}
       />
       <SelectionDrawer
@@ -2536,18 +2591,6 @@ City: ${userCity}`;
             <NavButton active={activeTab === 'post_need'} onClick={() => { playTapSound(); setActiveTab('post_need'); window.scrollTo(0,0); }} icon={<Sparkles className="w-[18px] h-[18px]" />} label="Post Need" activeColor="text-white" activeBg="bg-[#572149]" inactiveColor="text-[#572149]" inactiveBg="bg-[#572149]/5" />
           </>
         )}
-
-        <NavButton
-          active={activeTab === 'alerts'}
-          onClick={() => { playTapSound(); setActiveTab('alerts'); setAlertsInitialTab('feed'); setUnseenAlertsCount(0); window.scrollTo(0,0); }}
-          icon={<Bell className="w-[18px] h-[18px]" />}
-          label="Alerts"
-          badge={unseenAlertsCount}
-          activeColor="text-white"
-          activeBg="bg-rose-500"
-          inactiveColor="text-rose-400"
-          inactiveBg="bg-rose-50"
-        />
 
         <NavButton
           active={activeTab === 'messages'}

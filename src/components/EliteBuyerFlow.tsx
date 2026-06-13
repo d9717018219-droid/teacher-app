@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -82,8 +83,12 @@ export const EliteBuyerFlow: React.FC<EliteBuyerFlowProps> = ({
           return;
         }
 
-        // 2. Create Payment Session via Local API
-        const sessionRes = await fetch('/api/payment/create-session', {
+        // 2. Create Payment Session via API
+        const API_URL = Capacitor.isNativePlatform() 
+          ? 'https://doableindia.com/app-sys/api_create_session.php' 
+          : '/api/payment/create-session';
+
+        const sessionRes = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -293,28 +298,6 @@ const LandingStep = ({ onNext, city, localities }: { onNext: () => void, city: s
   </div>
 );
 
-const BenefitItem = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
-  <div className="flex items-center justify-between gap-4">
-    <div className="space-y-1">
-      <h3 className="text-sm font-black text-white tracking-tight">{title}</h3>
-      <p className="text-[11px] font-medium text-white/50">{desc}</p>
-    </div>
-    <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center border border-white/5">
-      {icon}
-    </div>
-  </div>
-);
-
-const SelectionItem = ({ label, value, icon }: { label: string, value: string, icon: React.ReactNode }) => (
-  <button className="w-full flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl group hover:border-slate-200 transition-all">
-    <div className="flex flex-col items-start gap-0.5">
-      <span className="text-[11px] font-black text-slate-900">{label}</span>
-      <span className="text-[13px] font-medium text-slate-500">{value}</span>
-    </div>
-    <ChevronRight size={18} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
-  </button>
-);
-
 // ─── STEP 2: PACKAGES ───────────────────────────────────────────────
 const PackagesStep = ({ onNext, onBack, onSelect, selectedId, packages, city, localities }: { 
     onNext: () => void, 
@@ -482,26 +465,4 @@ const CartStep = ({ onNext, onBack, pkg, city, isProcessing }: { onNext: () => v
         </button>
     </div>
   </div>
-);
-
-const PaymentOption = ({ icon, title, content, onSelect }: { icon: React.ReactNode, title: string, content?: React.ReactNode, onSelect: () => void }) => (
-  <button 
-    onClick={onSelect}
-    className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col items-start gap-4 hover:border-slate-200 transition-all"
-  >
-    <div className="w-full flex items-center justify-between">
-        <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center">
-                {icon}
-            </div>
-            <span className="text-sm font-black text-slate-900">{title}</span>
-        </div>
-        <ChevronRight size={18} className="text-slate-300" />
-    </div>
-    {content}
-  </button>
-);
-
-const ChevronDownIcon = ({ size, className }: { size: number, className?: string }) => (
-  <ChevronDown size={size} className={className} />
 );

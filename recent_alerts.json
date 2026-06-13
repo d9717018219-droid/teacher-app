@@ -1,0 +1,142 @@
+{
+  "documents": [
+    {
+      "name": "projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts/2kfP3JnkZFG4ktfIHNwG",
+      "fields": {
+        "city": {
+          "stringValue": "all"
+        },
+        "type": {
+          "stringValue": "interest"
+        },
+        "connectionId": {
+          "stringValue": "6eIAaOQHylpFUsqUv3d7"
+        },
+        "targetTutorId": {
+          "stringValue": "11596"
+        },
+        "targetEmail": {
+          "stringValue": "all"
+        },
+        "timestamp": {
+          "timestampValue": "2026-06-13T04:11:32.916Z"
+        },
+        "message": {
+          "stringValue": "⭐ Ram Singh is interested in your profile!"
+        },
+        "targetUserType": {
+          "stringValue": "teacher"
+        },
+        "sender": {
+          "stringValue": "System"
+        }
+      },
+      "createTime": "2026-06-13T04:11:32.960975Z",
+      "updateTime": "2026-06-13T04:11:32.960975Z"
+    },
+    {
+      "name": "projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts/UXZ0HWZnBpVrrajPYmVU",
+      "fields": {
+        "targetTutorId": {
+          "stringValue": "11598"
+        },
+        "sender": {
+          "stringValue": "Booking System"
+        },
+        "type": {
+          "stringValue": "booking"
+        },
+        "message": {
+          "stringValue": "New Booking: Sujata Pandey (ID: #13698)\nClass: 5th Std\nLocation: Ghaziabad (Crossing Republik-Ghaziabad)\nAddress: N/A\nSchedule: ASAP\nPhone: +919911977349"
+        },
+        "timestamp": {
+          "timestampValue": "2026-06-12T12:18:03.645Z"
+        }
+      },
+      "createTime": "2026-06-12T12:18:04.689791Z",
+      "updateTime": "2026-06-12T12:18:04.689791Z"
+    },
+    {
+      "name": "projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts/pllMKmz7ETb6GXEnQLh1",
+      "fields": {
+        "targetTutorId": {
+          "stringValue": "11598"
+        },
+        "sender": {
+          "stringValue": "Booking System"
+        },
+        "type": {
+          "stringValue": "booking"
+        },
+        "message": {
+          "stringValue": "New Booking: Bimlesh Yadav (ID: #23267)\nClass: 8th Std\nLocation: Gurgaon (Sector 23-Gurgaon)\nAddress: N/A\nSchedule: ASAP\nPhone: +919818837743"
+        },
+        "timestamp": {
+          "timestampValue": "2026-06-12T12:15:05.605Z"
+        }
+      },
+      "createTime": "2026-06-12T12:15:05.667807Z",
+      "updateTime": "2026-06-12T12:15:05.667807Z"
+    },
+    {
+      "name": "projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts/gk6CkuijtmYDAk7EYkoP",
+      "fields": {
+        "targetTutorId": {
+          "stringValue": "11596"
+        },
+        "sender": {
+          "stringValue": "Booking System"
+        },
+        "type": {
+          "stringValue": "booking"
+        },
+        "message": {
+          "stringValue": "New Booking: Sheetal Mogre (ID: #23196)\nClass: 5th Std\nLocation: Pune (Wanwadi-Pune)\nAddress: N/A\nSchedule: ASAP\nPhone: +919552664477"
+        },
+        "timestamp": {
+          "timestampValue": "2026-06-12T06:14:12.242Z"
+        }
+      },
+      "createTime": "2026-06-12T06:14:12.288655Z",
+      "updateTime": "2026-06-12T06:14:12.288655Z"
+    },
+    {
+      "name": "projects/doable-india-app-9564b-496310/databases/(default)/documents/alerts/RSIcZAZ0DTbI4uBwk65B",
+      "fields": {
+        "targetUserType": {
+          "stringValue": "all"
+        },
+        "targetClass": {
+          "stringValue": "All"
+        },
+        "sender": {
+          "stringValue": "DoAble | Tuition Alerts"
+        },
+        "targetEmail": {
+          "stringValue": "all"
+        },
+        "message": {
+          "stringValue": "Ghaziabad"
+        },
+        "timestamp": {
+          "timestampValue": "2026-06-12T05:21:43.114Z"
+        },
+        "gender": {
+          "stringValue": "Any"
+        },
+        "localities": {
+          "arrayValue": {}
+        },
+        "type": {
+          "stringValue": "broadcast"
+        },
+        "city": {
+          "stringValue": "Ghaziabad"
+        }
+      },
+      "createTime": "2026-06-12T05:21:43.865391Z",
+      "updateTime": "2026-06-12T05:21:43.865391Z"
+    }
+  ],
+  "nextPageToken": "AFTOeJyM7menkI8RHxOPF1eMvh_NDit9jN5xchv0q-i2uRcDEwJnZRFZwWccMmB3A2Z1Yd_FUivMxJGU5EO3TkC-CJHpe33gBy4vihDBVwYmDDqvlZ5VboFnm13U4PmAL2sDqTkg_vVao3FnNaN7aJA"
+}

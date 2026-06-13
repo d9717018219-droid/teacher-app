@@ -64,7 +64,7 @@ export function useProfileState() {
       userClasses: getSavedJson('userClasses'),
       userSubjects: getSavedJson('userSubjects'),
       userLocalities: getSavedJson('userLocalities'),
-      userPhone: localStorage.getItem('userPhone') || '',
+      userPhone: (localStorage.getItem('userPhone') || '').replace(/\D/g, '').slice(-10),
       userDob: localStorage.getItem('userDob') || '',
       userAge: localStorage.getItem('userAge') || '',
       userQualifications: getSavedJson('userQualifications'),
@@ -74,7 +74,7 @@ export function useProfileState() {
       aboutMe: localStorage.getItem('aboutMe') || '',
       profilePhoto: localStorage.getItem('userPhoto'),
       userBoard: localStorage.getItem('userBoard') || 'CBSE',
-      userMode: localStorage.getItem('userMode') || 'Home Tuition',
+      userMode: localStorage.getItem('userMode') || "At Student's Place",
       userCommunication: localStorage.getItem('userCommunication') || '',
       userAddress: localStorage.getItem('userAddress') || '',
       userDays: localStorage.getItem('userDays') || '',
@@ -91,6 +91,16 @@ export function useProfileState() {
 
   const updateField = useCallback((field: keyof ProfileState, value: any) => {
     setProfile(prev => ({ ...prev, [field]: value }));
+    // Automatic persistence
+    try {
+      if (value === null) {
+        localStorage.removeItem(field);
+      } else {
+        localStorage.setItem(field, typeof value === 'string' ? value : JSON.stringify(value));
+      }
+    } catch (e) {
+      console.warn(`Failed to persist ${field} to localStorage`, e);
+    }
   }, []);
 
   return { profile, setProfile, updateField };

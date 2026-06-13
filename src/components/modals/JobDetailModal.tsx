@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BadgeCheck, X, User as LucideUser, Clock, Calendar, 
-  Navigation, Zap, FileText, ShieldCheck, ArrowRight, MapPin 
+  Navigation, Zap, FileText, ShieldCheck, ArrowRight, MapPin, Heart, Check 
 } from 'lucide-react';
 import { DetailItem } from '../common/DetailItem';
 import { JobLead } from '../../types';
@@ -11,10 +11,34 @@ import { getJobId, formatCurrency, cleanValue } from '../../utils';
 interface JobDetailModalProps {
   job: JobLead | null;
   onClose: () => void;
-  onApply: (job: JobLead) => void;
+  onApply: (job: JobLead) => Promise<void>;
+  playTapSound: () => void;
+  currentUser?: any;
 }
 
-export function JobDetailModal({ job, onClose, onApply }: JobDetailModalProps) {
+export function JobDetailModal({ job, onClose, onApply, playTapSound, currentUser }: JobDetailModalProps) {
+  const [isSending, setIsSending] = React.useState(false);
+  const [isSent, setIsSent] = React.useState(false);
+
+  const handleApplyClick = async () => {
+    if (!job) return;
+    playTapSound();
+    setIsSending(true);
+    try {
+      await onApply(job);
+      setIsSent(true);
+      // Let the success message show briefly before closing
+      setTimeout(() => {
+        onClose();
+        setIsSent(false);
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to apply:', error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       {job && (
@@ -89,7 +113,7 @@ export function JobDetailModal({ job, onClose, onApply }: JobDetailModalProps) {
                   <DetailItem icon={<LucideUser size={12} className="text-indigo-500" />} label="Tutor Gender" value={job.Gender || (job as any).gender || (job as any).preferred_gender || 'Any Preference'} />
                   <DetailItem icon={<Clock size={12} className="text-rose-500" />} label="Preferred Time" value={job.time || (job as any).preferred_time || 'Flexible'} />
                   <DetailItem icon={<Calendar size={12} className="text-amber-500" />} label="Weekly Days" value={job.days || (job as any).weekly_days || (job as any).Days || 'N/A'} />
-                  <DetailItem icon={<Navigation size={12} className="text-blue-500" />} label="Teaching Mode" value={job.mode || (job as any).Mode || 'Home Tuition'} />
+                  <DetailItem icon={<Navigation size={12} className="text-blue-500" />} label="Teaching Mode" value={job.mode || (job as any).Mode || "At Student's Place"} />
                   <DetailItem icon={<Zap size={12} className="text-emerald-500" />} label="Avg. Duration" value={job.duration || (job as any).Duration || (job as any).avg_duration || '1.5 Hours'} />
                   <DetailItem icon={<BadgeCheck size={12} className="text-purple-500" />} label="Lead Status" value={job.status || (job as any).internal_remark || 'Active'} />
                 </div>
@@ -114,13 +138,27 @@ export function JobDetailModal({ job, onClose, onApply }: JobDetailModalProps) {
              </div>
 
              {/* Action Footer */}
-             <div className="p-6 pt-2 border-t border-slate-50 bg-white shrink-0">
-                <button 
-                  onClick={() => onApply(job)}
-                  className="w-full bg-[#191445] text-white h-16 rounded-[24px] font-black text-[13px] uppercase tracking-[0.2em] shadow-2xl shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-3"
-                >
-                  Apply for this Job <ArrowRight size={20} strokeWidth={3} />
-                </button>
+             <div className="p-6 border-t border-slate-100 bg-white shrink-0">
+                {isSent ? (
+                  <div className="w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] flex items-center justify-center gap-3">
+                    Interest Sent <Check size={18} strokeWidth={3} />
+                  </div>
+                ) : !currentUser ? (
+                  <button
+                    onClick={() => { playTapSound(); onClose(); window.dispatchEvent(new CustomEvent('openAuthModal')); }}
+                    className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+                  >
+                    Sign in to Show Interest <ArrowRight size={18} strokeWidth={3} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleApplyClick}
+                    disabled={isSending}
+                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {isSending ? 'Sending...' : 'Show Interest'} <Heart size={18} fill="white" strokeWidth={3} />
+                  </button>
+                )}
                 <p className="text-center text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-4">Mention Order ID: #{getJobId(job)}</p>
              </div>
           </motion.div>

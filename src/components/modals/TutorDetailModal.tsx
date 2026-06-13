@@ -1,10 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  BadgeCheck, X, User as LucideUser, Check, TrendingUp, 
-  GraduationCap, MapPin, BookOpen, Navigation, Calendar, 
-  Clock, Smartphone, FileText, ArrowRight 
+import {
+  BadgeCheck, X, User as LucideUser, Check, TrendingUp,
+  GraduationCap, MapPin, BookOpen, Navigation, Calendar,
+  Clock, Smartphone, FileText, ArrowRight, Heart
 } from 'lucide-react';
+
 import { DetailItem } from '../common/DetailItem';
 import { TutorProfile } from '../../types';
 import { toTitleCase, getTutorId, formatCurrency, openWhatsApp } from '../../utils';
@@ -13,9 +14,41 @@ interface TutorDetailModalProps {
   tutor: TutorProfile | null;
   onClose: () => void;
   playTapSound: () => void;
+  currentUser?: any;
+  parentId?: string | null;
+  sendInterest?: (parent: { id: string, name: string, city: string }, tutor: { id: string, name: string }) => Promise<void>;
 }
 
-export function TutorDetailModal({ tutor, onClose, playTapSound }: TutorDetailModalProps) {
+export function TutorDetailModal({ tutor, onClose, playTapSound, currentUser, parentId, sendInterest }: TutorDetailModalProps) {
+  const [isSending, setIsSending] = React.useState(false);
+  const [isSent, setIsSent] = React.useState(false);
+
+  const handleShowInterest = async () => {
+    const finalParentId = parentId || (currentUser?.email || currentUser?.uid);
+    if (!finalParentId || !tutor || !sendInterest) return;
+    playTapSound();
+    setIsSending(true);
+    try {
+      await sendInterest(
+        { 
+          id: finalParentId, 
+          name: localStorage.getItem('userName') || 'Parent',
+          city: localStorage.getItem('userCity') || 'All'
+        },
+        { id: getTutorId(tutor), name: tutor.name }
+      );
+      setIsSent(true);
+      setTimeout(() => {
+        onClose();
+        window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'messages' }));
+      }, 600);
+    } catch (error) {
+      console.error('Failed to send interest:', error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       {tutor && (
@@ -78,7 +111,7 @@ export function TutorDetailModal({ tutor, onClose, playTapSound }: TutorDetailMo
                     label="Expectation" 
                     value={( /[0-9]/.test((tutor.fee || '').toString()) ? `₹${formatCurrency(tutor.fee || '0')}` : (tutor.fee || '₹0') ) + '/hr'} 
                   />
-                  <DetailItem icon={<Navigation size={12} />} label="Teaching Mode" value={tutor.mode || 'Home Tuition'} />
+                  <DetailItem icon={<Navigation size={12} />} label="Teaching Mode" value={tutor.mode || "At Student's Place"} />
                   <DetailItem icon={<Calendar size={12} />} label="Available Days" value={tutor.days || 'All Days'} />
                   <DetailItem icon={<Clock size={12} />} label="Preferred Time" value={tutor.time || 'Flexible'} />
                   <DetailItem icon={<Smartphone size={12} />} label="Own Vehicle" value={tutor.have_vehicle || 'No'} />
@@ -109,13 +142,28 @@ export function TutorDetailModal({ tutor, onClose, playTapSound }: TutorDetailMo
              </div>
 
              <div className="p-6 border-t border-slate-100 bg-white shrink-0">
-                <button 
-                  onClick={() => { playTapSound(); openWhatsApp(`Hi, I am interested in hiring Tutor ID: #${getTutorId(tutor)} (${tutor.name}). Please share more details.`); }}
-                  className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
-                >
-                  Hire this Tutor <ArrowRight size={18} strokeWidth={3} />
-                </button>
+                {isSent ? (
+                  <div className="w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] flex items-center justify-center gap-3">
+                    Interest Sent <Check size={18} strokeWidth={3} />
+                  </div>
+                ) : !currentUser ? (
+                  <button
+                    onClick={() => { playTapSound(); onClose(); window.dispatchEvent(new CustomEvent('openAuthModal')); }}
+                    className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+                  >
+                    Sign in to Show Interest <ArrowRight size={18} strokeWidth={3} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleShowInterest}
+                    disabled={isSending}
+                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {isSending ? 'Sending...' : 'Show Interest'} <Heart size={18} fill="white" strokeWidth={3} />
+                  </button>
+                )}
              </div>
+
           </motion.div>
         </div>
       )}
