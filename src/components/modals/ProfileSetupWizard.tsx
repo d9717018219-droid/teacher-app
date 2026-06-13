@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Settings, X, LucideUser, Phone, GraduationCap, FileText, ShieldCheck, MapPin, BookOpen, Edit3, Sparkles, Clock, Camera, Trash2, Loader2, LogOut, Check, Mail } from 'lucide-react';
 import { ProfileState } from '../../hooks/useProfileState';
 import { UserType, TutorProfile } from '../../types';
@@ -31,6 +31,14 @@ interface ProfileSetupWizardProps {
   tutors: TutorProfile[];
 }
 
+const debounce = (func: Function, delay: number) => {
+  let timeoutId: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
 export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
   show,
   onClose,
@@ -53,7 +61,15 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
     hasVehicle, userSelfie, profilePhoto, userName, tutorId, email, userEmail
   } = profile;
 
-  const handleSelfieChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const debouncedUpdateField = useMemo(
+    () => debounce((field: string, value: any) => {
+      updateField(field, value);
+      localStorage.setItem(field, typeof value === 'string' ? value : JSON.stringify(value));
+    }, 400),
+    [updateField]
+  );
+
+  const handleSelfieChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -65,13 +81,32 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
         const base64String = reader.result as string;
         updateField('userSelfie', base64String);
         localStorage.setItem('userSelfie', base64String);
-        
         updateField('profilePhoto', base64String);
         localStorage.setItem('userPhoto', base64String);
       };
       reader.readAsDataURL(file);
     }
-  };
+  }, [updateField]);
+
+  const handleFieldChange = useCallback((field: string, value: any) => {
+    debouncedUpdateField(field, value);
+  }, [debouncedUpdateField]);
+
+  const handleTapAndUpdate = useCallback((field: string, value: any) => {
+    playTapSound();
+    handleFieldChange(field, value);
+  }, [playTapSound, handleFieldChange]);
+
+  const subjectOptions = useMemo(() => {
+    if (userClasses.includes('Entrance Exam & Specialization')) {
+      const subjects = SPECIALIZED_SUBJECTS[userBoard];
+      if (!subjects) return [];
+      if (Array.isArray(subjects)) return subjects;
+      return Object.entries(subjects);
+    }
+    const groupName = userClasses[0];
+    return (groupName ? CLASS_SUBJECTS_DATA[groupName] || [] : []).map(s => [s]);
+  }, [userClasses, userBoard]);
 
   if (!show) return null;
 
@@ -109,18 +144,18 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">First Name</label>
-                      <input type="text" value={userFirstName} onChange={(e) => { const val = e.target.value; updateField('userFirstName', val); localStorage.setItem('userFirstName', val); const full = `${val} ${userLastName}`.trim(); updateField('userName', full); localStorage.setItem('userName', full); }} placeholder="Rahul" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                      <input type="text" value={userFirstName} onChange={(e) => { const val = e.target.value; handleFieldChange('userFirstName', val); const full = `${val} ${userLastName}`.trim(); handleFieldChange('userName', full); }} placeholder="Rahul" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Last Name</label>
-                      <input type="text" value={userLastName} onChange={(e) => { const val = e.target.value; updateField('userLastName', val); localStorage.setItem('userLastName', val); const full = `${userFirstName} ${val}`.trim(); updateField('userName', full); localStorage.setItem('userName', full); }} placeholder="Sharma" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                      <input type="text" value={userLastName} onChange={(e) => { const val = e.target.value; handleFieldChange('userLastName', val); const full = `${userFirstName} ${val}`.trim(); handleFieldChange('userName', full); }} placeholder="Sharma" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">WhatsApp Number</label>
                     <div className="flex gap-2">
                       <div className="w-24 relative">
-                        <select value={userCountryCode} onChange={(e) => { updateField('userCountryCode', e.target.value); localStorage.setItem('userCountryCode', e.target.value); }} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-3 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">
+                        <select value={userCountryCode} onChange={(e) => handleFieldChange('userCountryCode', e.target.value)} className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-3 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all appearance-none">
                           <option value="+91">🇮🇳 +91</option>
                           <option value="+1">🇺🇸 +1</option>
                           <option value="+44">🇬🇧 +44</option>
@@ -132,7 +167,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
                       </div>
                       <div className="flex-1 relative">
                         <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                        <input type="tel" value={userPhone || ''} onChange={(e) => { updateField('userPhone', e.target.value); localStorage.setItem('userPhone', e.target.value); }} placeholder="9971XXXXXX" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
+                        <input type="tel" value={userPhone || ''} onChange={(e) => handleFieldChange('userPhone', e.target.value)} placeholder="9971XXXXXX" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-primary transition-all" />
                       </div>
                     </div>
                   </div>
