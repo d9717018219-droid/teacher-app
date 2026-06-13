@@ -74,6 +74,10 @@ const TAP_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-pre
 const tapAudio = new Audio(TAP_SOUND_URL);
 tapAudio.load();
 
+const GO_LIVE_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3';
+const goLiveAudio = new Audio(GO_LIVE_SOUND_URL);
+goLiveAudio.load();
+
 function playTapSound() {
   try {
     if (tapAudio) {
@@ -83,6 +87,19 @@ function playTapSound() {
     }
     if ('vibrate' in navigator) {
       navigator.vibrate(15);
+    }
+  } catch {}
+}
+
+function playGoLiveSound() {
+  try {
+    if (goLiveAudio) {
+      goLiveAudio.currentTime = 0;
+      goLiveAudio.volume = 0.6;
+      goLiveAudio.play().catch(() => {});
+    }
+    if ('vibrate' in navigator) {
+      navigator.vibrate(30);
     }
   } catch {}
 }
@@ -1413,27 +1430,49 @@ City: ${userCity}`;
       // Fix: Never filter Tutors list by email, otherwise 'Featured Tutors' and matching will break
       const TUTORS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_copy_data.php?force_refresh=${ts}` : `/api/tutors?t=${ts}`;
 
-       // console.log('📡 [Network] Fetching Leads from:', LEADS_URL);
+      // Helper for chunked fetching
+      const fetchTutorsInChunks = async (baseUrl: string, isNative: boolean): Promise<any[]> => {
+        let allTutors: any[] = [];
+        let offset = 0;
+        const limit = 1000;
+        let hasMore = true;
+        let safetyCounter = 0;
+        while (hasMore && safetyCounter < 15) {
+          safetyCounter++;
+          const url = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}offset=${offset}&limit=${limit}`;
+          try {
+            let json: any;
+            if (isNative) {
+              const res = await CapacitorHttp.get({ 
+                url,
+                headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
+              });
+              json = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+            } else {
+              const res = await fetch(url);
+              json = await res.json();
+            }
+            if (json && json.status === 'success' && Array.isArray(json.data)) {
+              allTutors = [...allTutors, ...json.data];
+              if (json.data.length < limit) hasMore = false;
+              else offset += limit;
+            } else hasMore = false;
+          } catch (e) { hasMore = false; }
+        }
+        return allTutors;
+      };
 
       if (isNative) {
         // Use native fetch to bypass CORS
-        const [leadsRes, tutorsRes] = await Promise.all([
-          CapacitorHttp.get({ 
-            url: LEADS_URL,
-            headers: { 'Accept': 'application/json' }
-          }),
-          CapacitorHttp.get({ 
-            url: TUTORS_URL,
-            headers: { 
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'application/json'
-            }
-          })
-        ]);
+        const leadsRes = await CapacitorHttp.get({ 
+          url: LEADS_URL,
+          headers: { 'Accept': 'application/json' }
+        });
         
+        const rawTutors = await fetchTutorsInChunks(TUTORS_URL, true);
+
         if (leadsRes.data) {
            const data = typeof leadsRes.data === 'string' ? JSON.parse(leadsRes.data) : leadsRes.data;
-           console.log('📡 RAW LEADS DATA:', data);
            if (data.status === 'success') {
              const normalized = data.data.map(normalizeLead);
              if (normalized.length > 0 || leads.length === 0) {
@@ -1449,47 +1488,28 @@ City: ${userCity}`;
            }
         }
 
-        if (tutorsRes.data) {
-           const data = typeof tutorsRes.data === 'string' ? JSON.parse(tutorsRes.data) : tutorsRes.data;
-           const rawTutors = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+        if (rawTutors.length > 0) {
            const normalized = rawTutors.map(normalizeTutor);
            setTutors(normalized);
            await saveToLargeStorage('cachedTutors', normalized);
         }
       } else {
-        const [leadsRes, tutorsRes] = await Promise.all([
-          fetch(LEADS_URL),
-          fetch(TUTORS_URL)
-        ]);
+        const leadsRes = await fetch(LEADS_URL);
+        const rawTutors = await fetchTutorsInChunks(TUTORS_URL, false);
         
         const leadsText = await leadsRes.text();
-        const tutorsText = await tutorsRes.text();
 
         if (!leadsRes.ok) {
-           console.error("SERVER RAW ERROR (Leads Fetch):", leadsText);
            console.warn(`Leads HTTP Error (${leadsRes.status})`);
-        }
-        if (!tutorsRes.ok) {
-           console.error("SERVER RAW ERROR (Tutors Fetch):", tutorsText);
-           console.warn(`Tutors HTTP Error (${tutorsRes.status})`);
         }
         
         const leadsJson = leadsText ? JSON.parse(leadsText) : { status: 'error', data: [] };
-        const tutorsJson = tutorsText ? JSON.parse(tutorsText) : { status: 'error', data: [] };
         
-        if (userType === 'parent') {
-          console.log('🔍 [Network-Parent-Debug] Raw API Response for Parent:', leadsJson);
-        } else {
-           // console.log('🌐 WEB RAW LEADS DATA:', leadsJson);
-        }
-
         if (leadsJson.status === 'success') {
           if (leadsJson.data && leadsJson.data.length > 0) {
             const normalized = leadsJson.data.map(normalizeLead);
             setLeads(normalized);
             localStorage.setItem('cachedLeads', JSON.stringify(normalized));
-          } else {
-            console.log('⚠️ [Network-Parent-Debug] Empty results from server, keeping existing leads pool.');
           }
         } else if (Array.isArray(leadsJson) && leadsJson.length > 0) {
           const normalized = leadsJson.map(normalizeLead);
@@ -1497,8 +1517,9 @@ City: ${userCity}`;
           localStorage.setItem('cachedLeads', JSON.stringify(normalized));
         }
 
-        if (tutorsJson.status === 'success') {
-          const normalized = tutorsJson.data.map(normalizeTutor);
+        if (rawTutors.length > 0) {
+          console.log('📡 [Tutors-Debug] Total Raw Tutors:', rawTutors.length);
+          const normalized = rawTutors.map(normalizeTutor);
           setTutors(normalized);
           await saveToLargeStorage('cachedTutors', normalized);
         }
@@ -1758,7 +1779,7 @@ City: ${userCity}`;
   }, [leads, firestoreLeads, jobCityFilter, jobSearchQuery, isCityMatch, jobFilterLocalities, jobFilterClasses, jobFilterGender, jobSortBy]);
 
   const finalTutors = useMemo(() => {
-    return rawActiveTutors.filter(t => {
+    const filtered = rawActiveTutors.filter(t => {
       const cityVal = t.city || (t as any).City;
       if (!isCityMatch(cityVal, tutorCityFilter)) return false;
 
@@ -1806,7 +1827,11 @@ City: ${userCity}`;
         if (!(tName.includes(sl) || tID.includes(sl) || subjects.includes(sl))) return false;
       }
       return true;
-    }).sort((a, b) => {
+    });
+
+    console.log(`📡 [Tutors-Debug] City: ${tutorCityFilter}, Found: ${filtered.length} / Total: ${rawActiveTutors.length}`);
+    
+    return filtered.sort((a, b) => {
       if (tutorSortBy === 'verified') {
         const vA = a.verified === 'Yes' ? 1 : 0;
         const vB = b.verified === 'Yes' ? 1 : 0;
@@ -1847,9 +1872,9 @@ City: ${userCity}`;
     return rawActiveTutors.filter(t => userCity === 'All' || isCityMatch(t.city || (t as any).City, userCity));
   }, [rawActiveTutors, userCity, isCityMatch]);
 
-  const [visibleJobsCount, setVisibleJobsCount] = useState(10);
-  const [visibleTutorsCount, setVisibleTutorsCount] = useState(10);
-  const resetCounts = () => { setVisibleJobsCount(10); setVisibleTutorsCount(10); };
+  const [visibleJobsCount, setVisibleJobsCount] = useState(20);
+  const [visibleTutorsCount, setVisibleTutorsCount] = useState(30);
+  const resetCounts = () => { setVisibleJobsCount(20); setVisibleTutorsCount(30); };
 
   const isJobs = activeTab === 'jobs';
   const currentCityFilter = isJobs ? jobCityFilter : tutorCityFilter;
@@ -2158,12 +2183,12 @@ City: ${userCity}`;
             userName={userName} 
             userType={userType} 
             userCity={userCity} 
-            activeLeadsCount={localActiveJobs.length} 
-            activeTutorsCount={localActiveTutors.length} 
+            activeTutorsCount={rawActiveTutors.length} 
+            activeLeadsCount={localActiveJobs.length}
             featuredJobs={localActiveJobs.slice(0, 3)} 
-            featuredTutors={localActiveTutors.slice(0, 3)} 
-            allTutors={localActiveTutors}
-            allJobs={localActiveJobs}
+            featuredTutors={rawActiveTutors.slice(0, 6)} 
+            allTutors={rawActiveTutors}
+            allJobs={rawActiveJobs}
             playTapSound={playTapSound}
             setFormType={setFormType}
             setShowFormModal={setShowFormModal}
@@ -2270,6 +2295,7 @@ City: ${userCity}`;
             }}
             leadVisibility={leadVisibility}
             setLeadVisibility={setLeadVisibility}
+            playGoLiveSound={playGoLiveSound}
           />
         )}
        {activeTab === 'jobs' && (
@@ -2380,9 +2406,9 @@ City: ${userCity}`;
         userFee={userFee}
       />
 
-      <ProfileSetupWizard 
-        show={showProfileSetup} 
-        onClose={() => setShowProfileSetup(false)} 
+      <ProfileSetupWizard
+        show={showProfileSetup}
+        onClose={() => setShowProfileSetup(false)}
         profile={{ ...profile, email: activeUser?.email || '' }}
         updateField={updateField}
         onUpdate={() => handleUpdateProfile()}
@@ -2391,7 +2417,6 @@ City: ${userCity}`;
         isUpdating={isUpdatingProfile}
         isDeleting={isDeletingProfile}
         playTapSound={playTapSound}
-        tutors={tutors}
       />
 
       <JobDetailModal 

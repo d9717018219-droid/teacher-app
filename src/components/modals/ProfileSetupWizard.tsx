@@ -28,7 +28,6 @@ interface ProfileSetupWizardProps {
   isUpdating: boolean;
   isDeleting: boolean;
   playTapSound: () => void;
-  tutors: TutorProfile[];
 }
 
 const debounce = (func: Function, delay: number) => {
@@ -66,8 +65,7 @@ export const ProfileSetupWizard: React.FC<ProfileSetupWizardProps> = ({
   onLogout,
   isUpdating,
   isDeleting,
-  playTapSound,
-  tutors
+  playTapSound
 }) => {
   const {
     userFirstName, userLastName, userCountryCode, userPhone, userGender,
