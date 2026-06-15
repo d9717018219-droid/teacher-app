@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>237759117673-s9ujpmq5o951otqn207i8b3bnbpiof46.apps.googleusercontent.com</string>
+	<string>237759117673-aa4al51mvfjuppld9udkrv161naer8ci.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.237759117673-s9ujpmq5o951otqn207i8b3bnbpiof46</string>
+	<string>com.googleusercontent.apps.237759117673-aa4al51mvfjuppld9udkrv161naer8ci</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>237759117673-1f6i9hqhfp0l3lgqnuve735r5iur9t81.apps.googleusercontent.com</string>
+	<string>237759117673-1dg57uvdnpei10jp4rddvi9plragtn0q.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyBOW8XUGf6Cb6bRwfLupeHUgVjLzJHSfJg</string>
 	<key>GCM_SENDER_ID</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.doableindia</string>
+	<string>com.doableindia.teacher</string>
 	<key>PROJECT_ID</key>
 	<string>doable-india-app-9564b-496310</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:237759117673:ios:0db7c35c97e40d901ce5f8</string>
+	<string>1:237759117673:ios:564393a99dc978b91ce5f8</string>
 </dict>
 </plist>
