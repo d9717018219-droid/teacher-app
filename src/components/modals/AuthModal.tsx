@@ -1,10 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LucideUser, GraduationCap, Loader2, Smartphone } from 'lucide-react';
+import { LucideUser, GraduationCap, Loader2, Smartphone, MapPin, Mail } from 'lucide-react';
 import { useAuthState, AuthMode, AuthStep } from '../../hooks/useAuthState';
 import { AuthHandlers } from '../../services/auth.handlers';
 import { cn } from '../../utils';
 import { UserType } from '../../types';
+import { CITIES_LIST } from '../../utils/constants';
 
 interface AuthModalProps {
   show: boolean;
@@ -36,6 +37,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   email, setEmail,
   phone, setPhone,
   userName: authUserName, setUserName: setAuthUserName,
+  userCity, setUserCity,
+  userEmail, setUserEmail,
   loginMethod, setLoginMethod,
   countryCode, setCountryCode,
   password, setPassword,
@@ -54,35 +57,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   } = authState;
 
   const countryCodes = [
-    { code: '+91', country: 'India', flag: '🇮🇳' },
-    { code: '+977', country: 'Nepal', flag: '🇳🇵' },
-    { code: '+880', country: 'Bangladesh', flag: '🇧🇩' },
-    { code: '+94', country: 'Sri Lanka', flag: '🇱🇰' },
-    { code: '+92', country: 'Pakistan', flag: '🇵🇰' },
-    { code: '+975', country: 'Bhutan', flag: '🇧🇹' },
-    { code: '+95', country: 'Myanmar', flag: '🇲🇲' },
-    { code: '+960', country: 'Maldives', flag: '🇲🇻' },
-    { code: '+93', country: 'Afghanistan', flag: '🇦🇫' },
-    { code: '+971', country: 'UAE', flag: '🇦🇪' },
-    { code: '+1', country: 'USA', flag: '🇺🇸' },
-    { code: '+44', country: 'UK', flag: '🇬🇧' },
+    { code: '+91', country: 'India', flag: '🇮🇳' }
   ];
 
   React.useEffect(() => {
   if (show) {
     if (initialMode) setAuthMode(initialMode);
     if (initialStep) setAuthStep(initialStep);
-
-    // Simple auto-detection
-    const lang = navigator.language.toLowerCase();
-    if (lang.includes('ae')) setCountryCode('+971');
-    else if (lang.includes('us')) setCountryCode('+1');
-    else if (lang.includes('gb')) setCountryCode('+44');
-    else if (lang.includes('ca')) setCountryCode('+1');
-    else if (lang.includes('au')) setCountryCode('+61');
-    else if (lang.includes('sg')) setCountryCode('+65');
-    else if (lang.includes('sa')) setCountryCode('+966');
-    else setCountryCode('+91');
+    setCountryCode('+91');
   }
   }, [show, initialMode, initialStep, setAuthMode, setAuthStep, setCountryCode]);
 
@@ -100,15 +82,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   if (!show) return null;
 
   const handleSuccess = (data: any) => {
-    const userEmail = data.user?.email || (email.includes('@') ? email : (phone ? `${phone}@whatsapp.com` : (email ? `${email}@whatsapp.com` : '')));
-    onSuccess({ ...data, email: userEmail });
+    const finalEmail = data.user?.email || (userEmail ? userEmail : (email.includes('@') ? email : (phone ? `${phone}@whatsapp.com` : (email ? `${email}@whatsapp.com` : ''))));
+    onSuccess({ ...data, email: finalEmail });
   };
 
   const ctx = {
   email, phone, countryCode, password, userType, resetPin, generatedOtp, setGeneratedOtp, newPassword, confirmPassword,
   setIsAuthLoading, setAuthError, setEmailChecked, setEmailExist,
   setAuthMode, setAuthStep, setUserType, onSuccess: handleSuccess, setActiveToast, playTapSound, setPhone, 
-  setUserName: setAuthUserName, isEmailExist
+  userName: authUserName, setUserName: setAuthUserName, userCity, setUserCity, userEmail, setUserEmail, isEmailExist
   };
 
   const handleAction = () => {
@@ -116,6 +98,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       AuthHandlers.handleEmailProceed(ctx);
     } else if (authStep === 'otp') {
       AuthHandlers.handleVerifyOTP(ctx);
+    } else if (authStep === 'auth') {
+      AuthHandlers.handleRegistration(ctx);
     }
   };
 
@@ -148,7 +132,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     className="appearance-none bg-transparent text-[17px] font-bold text-slate-700 outline-none pr-1 cursor-pointer"
                   >
                     {countryCodes.map(c => (
-                      <option key={`${c.country}-${c.code}`} value={c.code}>{c.flag} {c.code}</option>
+                      <option key={`${c.country}-${c.code}`} value={c.code}>{c.code}</option>
                     ))}
                   </select>
                 </div>
@@ -233,7 +217,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   onClick={() => { 
                     playTapSound(); 
                     setUserType('teacher'); 
-                    handleSuccess({ status: 'success', user: { email: `${phone}@whatsapp.com`, phone, userType: 'teacher' } }); 
+                    setEmail(''); // Clear for name input
+                    setAuthStep('auth');
                   }}
                   className="group relative flex flex-col items-center p-6 bg-white border-2 border-slate-100 rounded-2xl hover:border-[#C82333] transition-all"
                 >
@@ -266,6 +251,74 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               >
                 Back to Login
               </button>
+            </motion.div>
+          ) : authStep === 'auth' ? (
+            <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex flex-col items-center space-y-8">
+              <div className="text-center space-y-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] bg-rose-50 text-[#C82333] px-3 py-1 rounded-full">New Teacher Profile ✨</span>
+                <h3 className="text-[20px] font-bold text-black pt-2">Complete your profile</h3>
+                <p className="text-slate-500 text-[12px] font-medium">To start exploring jobs</p>
+              </div>
+
+              <div className="w-full space-y-4">
+                {/* Name Input */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Full Name</label>
+                  <div className="relative flex items-center bg-slate-100/60 rounded-2xl px-5 focus-within:bg-white focus-within:ring-4 focus-within:ring-rose-50/50 transition-all duration-300 shadow-sm">
+                    <LucideUser className="mr-4 text-slate-400" size={18} />
+                    <input 
+                      type="text"
+                      value={authUserName} 
+                      onChange={(e) => setAuthUserName(e.target.value)} 
+                      placeholder="Enter your full name" 
+                      className="w-full py-5 text-[15px] font-semibold text-slate-800 outline-none bg-transparent placeholder:text-slate-400/50" 
+                    />
+                  </div>
+                </div>
+
+                {/* Email Input */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Email Address</label>
+                  <div className="relative flex items-center bg-slate-100/60 rounded-2xl px-5 focus-within:bg-white focus-within:ring-4 focus-within:ring-rose-50/50 transition-all duration-300 shadow-sm">
+                    <Mail className="mr-4 text-slate-400" size={18} />
+                    <input 
+                      type="email"
+                      value={userEmail} 
+                      onChange={(e) => setUserEmail(e.target.value)} 
+                      placeholder="Enter your email address" 
+                      className="w-full py-5 text-[15px] font-semibold text-slate-800 outline-none bg-transparent placeholder:text-slate-400/50" 
+                    />
+                  </div>
+                </div>
+
+                {/* City Selection */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Select City</label>
+                  <div className="relative flex items-center bg-slate-100/60 rounded-2xl px-5 focus-within:bg-white focus-within:ring-4 focus-within:ring-rose-50/50 transition-all duration-300 shadow-sm">
+                    <MapPin className="mr-4 text-slate-400" size={18} />
+                    <select 
+                      value={userCity} 
+                      onChange={(e) => setUserCity(e.target.value)}
+                      className="w-full py-5 text-[15px] font-semibold text-slate-800 outline-none bg-transparent appearance-none"
+                    >
+                      <option value="">Select your city</option>
+                      {CITIES_LIST.map(city => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {authError && <div className="text-rose-500 text-[11px] font-medium text-center">{authError}</div>}
+
+                <button 
+                  onClick={handleAction}
+                  disabled={isAuthLoading}
+                  className="w-full bg-linear-to-r from-[#C82333] to-[#2563EB] text-white py-4 rounded-xl font-bold text-[14px] uppercase tracking-wider shadow-md active:scale-[0.98] transition-all flex items-center justify-center"
+                >
+                  {isAuthLoading ? <Loader2 size={18} className="animate-spin" /> : 'Explore Jobs'}
+                </button>
+              </div>
             </motion.div>
           ) : (
             <div className="w-full pt-8">

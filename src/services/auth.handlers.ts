@@ -23,6 +23,10 @@ export interface AuthHandlerContext {
   playTapSound: () => void;
   setPhone?: (phone: string) => void;
   setUserName?: (name: string) => void;
+  userCity?: string;
+  setUserCity?: (city: string) => void;
+  userEmail?: string;
+  setUserEmail?: (email: string) => void;
   isEmailExist?: boolean;
 }
 
@@ -30,8 +34,8 @@ export const AuthHandlers = {
   handleEmailProceed: async (ctx: AuthHandlerContext) => {
     const { email, countryCode, userType, setIsAuthLoading, setAuthError, setEmailChecked, setEmailExist, setAuthMode, setAuthStep, setActiveToast, playTapSound, setPhone, setUserName, setGeneratedOtp } = ctx;
     
-    // Check if input is a phone number (now also considering country code from ctx)
-    const isPhone = /^\d{7,15}$/.test(email.replace(/\D/g, ''));
+    // Check if input is a phone number
+    const isPhone = /^\d{10}$/.test(email.replace(/\D/g, ''));
     
     if (isPhone) {
       const cleanPhone = email.replace(/\D/g, '');
@@ -43,44 +47,34 @@ export const AuthHandlers = {
       
       try {
         console.log(`[Phone-Auth] Checking if phone exists in DB: ${fullPhone}`);
-        // 1. Check if Phone Exists in DB
-        const responseData = await AuthService.checkPhoneExists(fullPhone, userType || 'teacher');
+        const responseData = await AuthService.checkPhoneExists(fullPhone, 'teacher'); // Default to teacher for check
         console.log(`[Phone-Auth] DB Response:`, responseData);
         
         if (responseData.status === 'success') {
           if (responseData.data?.exists) {
             console.log(`[Phone-Auth] Profile found in DB:`, responseData.data);
-            // EXISTING PHONE USER
             if (setEmailChecked) setEmailChecked(true);
             if (setEmailExist) setEmailExist(true);
             if (setAuthMode) setAuthMode('signin');
             
-            // Set user name if available
             if (setUserName && responseData.data.name) {
               setUserName(responseData.data.name);
             }
             
-            // PRIORITY: If CRM says parent, they are a parent.
             if (ctx.setUserType && responseData.data.user_type) {
-              const detectedType = responseData.data.user_type === 'parent' ? 'parent' : 'teacher';
-              ctx.setUserType(detectedType);
-              console.log(`[Phone-Auth] Setting UserType to: ${detectedType}`);
+              ctx.setUserType(responseData.data.user_type);
             }
           } else {
-            console.log(`[Phone-Auth] New user (or not found). Marking as signup.`);
-            // NEW PHONE USER
+            console.log(`[Phone-Auth] New user. Marking as signup.`);
             if (setAuthMode) setAuthMode('signup');
             if (setEmailExist) setEmailExist(false);
           }
         } else {
-          console.error(`[Phone-Auth] DB Error:`, responseData.message);
           setAuthError(responseData.message || 'Database check failed. Please try again.');
           setIsAuthLoading(false);
           return;
         }
 
-        console.log(`[Phone-Auth] Sending WhatsApp OTP to: ${fullPhone}`);
-        // 2. Send OTP
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         const res = await AuthService.sendWhatsAppOTP(fullPhone, otp);
         
@@ -89,7 +83,7 @@ export const AuthHandlers = {
           if (setAuthStep) setAuthStep('otp');
           setActiveToast({ title: 'OTP Sent! 📱', body: 'Check your WhatsApp for the login code.' });
         } else {
-          setAuthError(res.message || 'Failed to send WhatsApp OTP. Please try Email.');
+          setAuthError(res.message || 'Failed to send WhatsApp OTP.');
         }
       } catch (err) {
         setAuthError('Connection error while sending OTP.');
@@ -116,17 +110,15 @@ export const AuthHandlers = {
 
     setIsAuthLoading(true);
     
-    // Simulate verification
     setTimeout(async () => {
       if (resetPin === generatedOtp) {
         playTapSound();
         
         if (isEmailExist) {
-          // EXISTING USER -> Login immediately
           const mockResponse = {
             status: 'success',
             user: {
-              email: `${phone}@whatsapp.com`, // Use phone as email identifier
+              email: `${phone}@whatsapp.com`,
               phone: phone,
               userType: userType || 'teacher'
             }
@@ -134,14 +126,85 @@ export const AuthHandlers = {
           onSuccess(mockResponse);
           setActiveToast({ title: 'Verified! 🎉', body: 'Login successful via WhatsApp.' });
         } else {
-          // NEW USER -> Must select role
-          if (setAuthStep) setAuthStep('selection');
-          setActiveToast({ title: 'Phone Verified! ✅', body: 'Please select your role to continue.' });
+          // Bypass selection step and force teacher role
+          if (ctx.setUserType) ctx.setUserType('teacher');
+          if (setAuthStep) setAuthStep('auth');
+          setActiveToast({ title: 'Phone Verified! ✅', body: 'Please complete your profile to continue.' });
         }
       } else {
         setAuthError('Invalid OTP code. Please check your WhatsApp.');
       }
       setIsAuthLoading(false);
     }, 1000);
+  },
+
+  handleRegistration: async (ctx: AuthHandlerContext) => {
+    const { phone, countryCode, userType, userCity, userEmail, setIsAuthLoading, setAuthError, onSuccess, setActiveToast, playTapSound, userName: fullName } = ctx;
+
+    if (!fullName || fullName.length < 3) {
+      setAuthError('Please enter your full name.');
+      return;
+    }
+
+    if (!userEmail || !/^\S+@\S+\.\S+$/.test(userEmail)) {
+      setAuthError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!userCity) {
+      setAuthError('Please select your city.');
+      return;
+    }
+
+    setIsAuthLoading(true);
+
+    try {
+      const fullPhone = `${countryCode || '+91'}${phone}`;
+      
+      // 1. Update Profile in DB
+      const profileData = {
+        email: userEmail,
+        userPhone: phone,
+        userName: fullName,
+        userFirstName: fullName.split(' ')[0],
+        userLastName: fullName.split(' ').slice(1).join(' '),
+        userCity: userCity,
+        userGender: 'Male', // Default or could be asked
+        userQualifications: [],
+        userExperience: 'Fresher',
+        userClasses: [],
+        userSubjects: [],
+        userLocalities: [],
+        userResidency: '',
+        userAddress: '',
+        userMode: 'Online',
+        userFee: '',
+        userAadhar: '',
+        aboutMe: 'New Teacher registered via App.',
+        tutorId: 'NEW'
+      };
+
+      const response = await AuthService.updateProfile(profileData, 'teacher');
+      console.log('[Registration] Profile Sync Response:', response);
+
+      // 2. Complete Login
+      const mockResponse = {
+        status: 'success',
+        user: {
+          email: userEmail,
+          phone: phone,
+          name: fullName,
+          userType: 'teacher',
+          city: userCity
+        }
+      };
+      
+      onSuccess(mockResponse);
+      setActiveToast({ title: 'Welcome! 🎊', body: 'Your profile has been created successfully.' });
+    } catch (err) {
+      setAuthError('Failed to save profile. Please try again.');
+    } finally {
+      setIsAuthLoading(false);
+    }
   }
 };

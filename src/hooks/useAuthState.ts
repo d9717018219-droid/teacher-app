@@ -15,6 +15,8 @@ export function useAuthState() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setRetypePassword] = useState('');
   const [userName, setUserName] = useState('');
+  const [userCity, setUserCity] = useState('');
+  const [userEmail, setUserEmail] = useState('');
   const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('phone');
   
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
@@ -34,6 +36,8 @@ export function useAuthState() {
     setNewPassword('');
     setRetypePassword('');
     setUserName('');
+    setUserCity('');
+    setUserEmail('');
     setLoginMethod('phone');
     setEmailChecked(false);
     setEmailExist(false);
@@ -53,6 +57,8 @@ export function useAuthState() {
     newPassword, setNewPassword,
     confirmPassword, setRetypePassword,
     userName, setUserName,
+    userCity, setUserCity,
+    userEmail, setUserEmail,
     loginMethod, setLoginMethod,
     authMode, setAuthMode,
     authStep, setAuthStep,

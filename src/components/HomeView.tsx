@@ -29,7 +29,8 @@ import {
   Navigation,
   Laptop,
   Monitor,
-  Trophy
+  Trophy,
+  Bell
 } from 'lucide-react';
 import { JobLead, TutorProfile, UserType } from '../types';
 import { cn, formatCurrency, getJobId, getTutorId, toTitleCase } from '../utils';
@@ -301,8 +302,8 @@ export const HomeView = React.memo(({
           
           {(userType === 'parent' || userType === 'teacher') && (
             <div className="flex items-center gap-2 shrink-0 ml-2">
-              <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest text-right leading-none">
-                {userType === 'teacher' ? 'Get\nJobs' : 'Get\nTutors'}
+              <span className="text-[7.5px] font-black text-slate-400 tracking-widest text-right leading-none">
+                {userType === 'teacher' ? 'Live\nProfile' : 'Get\nTutors'}
               </span>
               <div className="relative">
                 <AnimatePresence>
@@ -419,8 +420,9 @@ export const HomeView = React.memo(({
         
         <div className="flex justify-between gap-1.5 overflow-hidden">
           <ExploreCard icon={<Briefcase size={14} fill="white" className="text-white" />} label="Jobs" sub="Live" onClick={() => setActiveTab('jobs')} iconBg="bg-purple-500" />
+          <ExploreCard icon={<User size={14} fill="white" className="text-white" />} label="Profile" sub="Edit" onClick={() => setShowProfileSetup(true)} iconBg="bg-blue-500" />
+          <ExploreCard icon={<Bell size={14} fill="white" className="text-white" />} label="Alerts" sub="Inbox" onClick={() => setActiveTab('alerts')} iconBg="bg-rose-500" />
           <ExploreCard icon={<CreditCard size={14} fill="white" className="text-white" />} label="Pay" sub="Now" onClick={() => { playTapSound(); window.open("https://zohosecurepay.in/checkout/i9db4wt2-verz1l6gn6ogo/Make-a-secure-payment-now", "_system"); }} iconBg="bg-orange-500" />
-          <ExploreCard icon={<Calendar size={14} fill="white" className="text-white" />} label="Trial" sub="Book" onClick={() => { setFormType('parent'); setShowFormModal(true); }} iconBg="bg-pink-500" />
           <ExploreCard icon={<MessageCircle size={14} fill="white" className="text-white" />} label="Help" sub="Care" onClick={() => setActiveTab('support')} iconBg="bg-[#347475]" />
         </div>
       </section>
