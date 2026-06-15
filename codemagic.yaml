@@ -1,10 +1,11 @@
+build_numbering:
+  next: 381
+
 workflows:
   ios-build:
     name: DoAble India iOS Build
     max_build_duration: 90
     instance_type: mac_mini_m2
-    build_numbering:
-      next: 381
     integrations:
       app_store_connect: "DoAble Apple Key"
     environment:
