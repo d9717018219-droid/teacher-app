@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.doableindia"
+    namespace = "com.doableindia.teacher"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.doableindia"
+        applicationId "com.doableindia.teacher"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 373

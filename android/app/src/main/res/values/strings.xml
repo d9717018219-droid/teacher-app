@@ -2,8 +2,8 @@
 <resources>
     <string name="app_name">DoAble India</string>
     <string name="title_activity_main">DoAble India</string>
-    <string name="package_name">com.doableindia</string>
-    <string name="custom_url_scheme">com.doableindia</string>
+    <string name="package_name">com.doableindia.teacher</string>
+    <string name="custom_url_scheme">com.doableindia.teacher</string>
     <string name="server_client_id">237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com</string>
     <string name="google_web_client_id">237759117673-t8sj47mgt7c982rdvjhmqlp5n676o0u8.apps.googleusercontent.com</string>
 </resources>

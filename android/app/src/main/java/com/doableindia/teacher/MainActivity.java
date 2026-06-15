@@ -1,4 +1,4 @@
-package com.doableindia;
+package com.doableindia.teacher;
 
 import android.os.Bundle;
 import android.util.Log;
