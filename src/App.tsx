@@ -295,14 +295,14 @@ export default function App() {
 
   const handleAuthSuccess = (data: any) => {
     const isSignup = !!data.userId;
-    // CRITICAL FIX: Prioritize the type detected by the server during login
-    const serverDetectedType = data.data?.user_type || data.user?.userType || data.userType;
-    let finalUserType = serverDetectedType || userType || 'teacher';
+    // CRITICAL FIX: Force userType to teacher for the Teacher App
+    const serverDetectedType = 'teacher';
+    let finalUserType = 'teacher';
     
     const finalEmail = (data.user?.email || data.email || '').toLowerCase().trim();
     const finalPhone = (data.user?.phone || data.phone || '').replace(/\D/g, '').slice(-10);
     
-    console.log(`[Auth-Success] Server Detected Type: ${serverDetectedType}, Current State Type: ${userType}`);
+    console.log(`[Teacher-App] Forced userType to teacher`);
     console.log(`[Auth-Logic] Pool Sizes - Tutors: ${tutors.length}, Leads: ${leads.length}, FirestoreLeads: ${firestoreLeads.length}`);
 
     // Robust Type Cross-Check
@@ -1243,6 +1243,43 @@ export default function App() {
 
   const [selectedJob, setSelectedJob] = useState<JobLead | null>(null);
   const [selectedTutor, setSelectedTutor] = useState<TutorProfile | null>(null);
+
+  const currentTutorProfile = useMemo(() => {
+    const found = tutors.find(t => {
+      const tEmail = (t.email || '').toLowerCase().trim();
+      const aEmail = (activeUser?.email || '').toLowerCase().trim();
+      return tEmail === aEmail || (aEmail.includes(tEmail) && tEmail.length > 5);
+    });
+    
+    if (found) return found;
+    
+    if (activeUser && userType === 'teacher') {
+       return {
+         tutor_id: profile.tutorId || 'N/A',
+         name: profile.userName || 'Educator',
+         email: activeUser.email || '',
+         phone: profile.userPhone,
+         gender: profile.userGender,
+         city: profile.userCity,
+         verified: 'No',
+         active_tuitions: 0,
+         monthly_earnings: 0,
+         qualification: profile.userQualifications,
+         experience: profile.userExperience,
+         school_teacher: profile.isSchoolTeacher,
+         have_vehicle: profile.hasVehicle,
+         class_group: profile.userClasses,
+         subjects: profile.userSubjects,
+         location: profile.userLocalities,
+         mode: profile.userMode,
+         fee: profile.userFee,
+         about: profile.aboutMe,
+         photo: profile.profilePhoto,
+         status: 'Registered'
+       } as TutorProfile;
+    }
+    return null;
+  }, [tutors, activeUser, userType, profile]);
 
   const normalizeTutor = (t: any) => {
     // Helper to get value with case-insensitive key search
@@ -2385,11 +2422,7 @@ export default function App() {
         )}
        {activeTab === 'earnings' && (
           <EarningsView 
-            tutorProfile={tutors.find(t => {
-              const tEmail = (t.email || '').toLowerCase().trim();
-              const aEmail = (activeUser?.email || '').toLowerCase().trim();
-              return tEmail === aEmail || (aEmail.includes(tEmail) && tEmail.length > 5);
-            })}
+            tutorProfile={currentTutorProfile}
             allTutors={tutors}
             userCity={userCity}
             profilePhoto={profilePhoto}

@@ -419,7 +419,6 @@ export const HomeView = React.memo(({
         
         <div className="flex justify-between gap-1.5 overflow-hidden">
           <ExploreCard icon={<Briefcase size={14} fill="white" className="text-white" />} label="Jobs" sub="Live" onClick={() => setActiveTab('jobs')} iconBg="bg-purple-500" />
-          <ExploreCard icon={<GraduationCap size={14} fill="white" className="text-white" />} label="Tutors" sub="Elite" onClick={() => setActiveTab('tutors')} iconBg="bg-emerald-500" />
           <ExploreCard icon={<CreditCard size={14} fill="white" className="text-white" />} label="Pay" sub="Now" onClick={() => { playTapSound(); window.open("https://zohosecurepay.in/checkout/i9db4wt2-verz1l6gn6ogo/Make-a-secure-payment-now", "_system"); }} iconBg="bg-orange-500" />
           <ExploreCard icon={<Calendar size={14} fill="white" className="text-white" />} label="Trial" sub="Book" onClick={() => { setFormType('parent'); setShowFormModal(true); }} iconBg="bg-pink-500" />
           <ExploreCard icon={<MessageCircle size={14} fill="white" className="text-white" />} label="Help" sub="Care" onClick={() => setActiveTab('support')} iconBg="bg-[#347475]" />

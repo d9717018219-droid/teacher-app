@@ -5,7 +5,7 @@ import { getFunctions } from 'firebase/functions';
 import { Capacitor } from '@capacitor/core';
 
 const webConfig = {
-  apiKey: "AIzaSyD5espRj-NwGzzbnhGnPKP4uvO0zjt8y7s",
+  apiKey: "AIzaSyDURPKldQ7cxmoB-zltg8HHj8SW8FlIpa4",
   authDomain: "doable-india-app-9564b-496310.firebaseapp.com",
   projectId: "doable-india-app-9564b-496310",
   storageBucket: "doable-india-app-9564b-496310.firebasestorage.app",
@@ -14,7 +14,7 @@ const webConfig = {
 };
 
 const iosConfig = {
-  apiKey: "AIzaSyBOW8XUGf6Cb6bRwfLupeHUgVjLzJHSfJg",
+  apiKey: "AIzaSyDURPKldQ7cxmoB-zltg8HHj8SW8FlIpa4",
   authDomain: "doable-india-app-9564b-496310.firebaseapp.com",
   projectId: "doable-india-app-9564b-496310",
   storageBucket: "doable-india-app-9564b-496310.firebasestorage.app",

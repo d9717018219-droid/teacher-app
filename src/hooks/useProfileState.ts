@@ -60,7 +60,7 @@ export function useProfileState() {
       userCountryCode: localStorage.getItem('userCountryCode') || '+91',
       tutorId: localStorage.getItem('tutorId'),
       userGender: localStorage.getItem('userGender') || 'All',
-      userType: localStorage.getItem('userType') as UserType,
+      userType: 'teacher' as UserType,
       userClasses: getSavedJson('userClasses'),
       userSubjects: getSavedJson('userSubjects'),
       userLocalities: getSavedJson('userLocalities'),
