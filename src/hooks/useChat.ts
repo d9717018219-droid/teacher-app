@@ -23,7 +23,9 @@ export const useChat = (userId: string | null) => {
 
   // Listen to active connections (accepted)
   useEffect(() => {
+    console.log(`[useChat] Initializing for userId: ${userId}`);
     if (!userId) {
+      console.log(`[useChat] No userId provided, clearing connections.`);
       setConnections([]);
       setLoading(false);
       return;
@@ -34,11 +36,14 @@ export const useChat = (userId: string | null) => {
       where('members', 'array-contains', userId)
     );
 
+    console.log(`[useChat] Subscribing to connections query for userId: ${userId}`);
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log(`[useChat] Snapshot received. Docs count: ${snapshot.docs.length}`);
       const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ConnectionRequest));
       
       // Deduplicate connections (in case of legacy duplicate data)
       const uniqueDocs = Array.from(new Map(docs.map(item => [item.parentId + '-' + item.tutorId, item])).values());
+      console.log(`[useChat] Unique connections after deduplication: ${uniqueDocs.length}`);
 
       // Sort in memory to avoid needing a composite index
       uniqueDocs.sort((a, b) => {
@@ -48,9 +53,15 @@ export const useChat = (userId: string | null) => {
       });
       setConnections(uniqueDocs);
       setLoading(false);
+    }, (error) => {
+      console.error(`[useChat] Firestore listener error:`, error);
+      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log(`[useChat] Unsubscribing for userId: ${userId}`);
+      unsubscribe();
+    };
   }, [userId]);
 
   const sendInterest = async (
