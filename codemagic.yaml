@@ -1,5 +1,5 @@
 build_numbering:
-  next: 395
+  next: 400
 
 workflows:
   ios-build:
@@ -16,8 +16,8 @@ workflows:
         BUNDLE_ID: "com.doableindia"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
-        FORCE_VERSION: "395"
-        FORCE_MARKETING_VERSION: "345.2.16"
+        FORCE_VERSION: "400"
+        FORCE_MARKETING_VERSION: "345.2.20"
       node: 22.14.0
       xcode: latest
     scripts:
