@@ -1,3 +1,6 @@
+build_numbering:
+  next: 400
+
 workflows:
   ios-build:
     name: DoAble India iOS Build
@@ -13,9 +16,16 @@ workflows:
         BUNDLE_ID: "com.doableindia"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
+        FORCE_VERSION: "400"
+        FORCE_MARKETING_VERSION: "345.2.20"
       node: 22.14.0
       xcode: latest
     scripts:
+      - name: Force versioning in project
+        script: |
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $FORCE_VERSION;/g" $XCODE_PROJECT/project.pbxproj
+          sed -i '' "s/MARKETING_VERSION = [0-9.]*;/MARKETING_VERSION = $FORCE_MARKETING_VERSION;/g" $XCODE_PROJECT/project.pbxproj
+          echo "Forced version to $FORCE_VERSION and marketing version to $FORCE_MARKETING_VERSION"
       - name: Build web assets and sync
         script: |
           npm install --legacy-peer-deps
@@ -23,7 +33,6 @@ workflows:
           npx cap sync ios
       - name: Setup Firebase iOS (Optional)
         script: |
-          # If GOOGLE_SERVICE_INFO is set in environment, write it to the file
           if [ ! -z "$GOOGLE_SERVICE_INFO" ]; then
             echo "$GOOGLE_SERVICE_INFO" > ios/App/App/GoogleService-Info.plist
           fi

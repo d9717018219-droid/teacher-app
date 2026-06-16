@@ -81,7 +81,8 @@ export default function MessagesView({ connections, loading, currentUserId, play
   }, [connections]);
 
   const filteredConnections = connections.filter(c => {
-    const name = (currentUserId === c.parentId ? c.tutorName : c.parentName).toLowerCase();
+    const rawName = currentUserId === c.parentId ? c.tutorName : c.parentName;
+    const name = (rawName || '').toLowerCase();
     return name.includes(searchQuery.toLowerCase());
   });
 
@@ -103,6 +104,14 @@ export default function MessagesView({ connections, loading, currentUserId, play
       <div className="flex flex-col gap-1">
         <h2 className="text-[24px] font-[1000] text-slate-900 tracking-tighter">Messages</h2>
         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Safe & Private Chats</p>
+      </div>
+
+      {/* DEBUG BANNER FOR IOS */}
+      <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-[10px] text-rose-800 font-mono">
+        <p>Debug ID: {currentUserId || 'NULL'}</p>
+        <p>Raw Connections: {connections.length}</p>
+        <p>Filtered: {filteredConnections.length}</p>
+        <p>Loading: {loading ? 'True' : 'False'}</p>
       </div>
 
       <div className="relative">

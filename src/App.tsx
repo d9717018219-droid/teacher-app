@@ -1032,6 +1032,7 @@ export default function App() {
   
   // Use tutorId (tutor_id for teachers, order_id for parents) as primary chat identifier
   const chatIdentifier = tutorId || (activeUser?.email || activeUser?.uid || null);
+  console.log(`[App] Chat Identifier resolved to:`, { chatIdentifier, tutorId, email: activeUser?.email, uid: activeUser?.uid });
   const { connections, sendInterest, handleConnection, reportUser } = useChat(chatIdentifier);
 
   useEffect(() => {
