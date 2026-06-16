@@ -46,47 +46,59 @@ export const AuthHandlers = {
       setAuthError(null);
       
       try {
-        console.log(`[Phone-Auth] Checking if phone exists in DB: ${fullPhone}`);
-        const responseData = await AuthService.checkPhoneExists(fullPhone, 'teacher'); // Default to teacher for check
-        console.log(`[Phone-Auth] DB Response:`, responseData);
+        console.log(`[Phone-Auth] STRICT VALIDATION for Teacher App: ${fullPhone}`);
         
-        if (responseData.status === 'success') {
-          if (responseData.data?.exists) {
-            console.log(`[Phone-Auth] Profile found in DB:`, responseData.data);
-            if (setEmailChecked) setEmailChecked(true);
-            if (setEmailExist) setEmailExist(true);
-            if (setAuthMode) setAuthMode('signin');
-            
-            if (setUserName && responseData.data.name) {
-              setUserName(responseData.data.name);
-            }
-            
-            if (ctx.setUserType && responseData.data.user_type) {
-              ctx.setUserType(responseData.data.user_type);
-            }
-          } else {
-            console.log(`[Phone-Auth] New user. Marking as signup.`);
-            if (setAuthMode) setAuthMode('signup');
-            if (setEmailExist) setEmailExist(false);
-          }
-        } else {
-          setAuthError(responseData.message || 'Database check failed. Please try again.');
+        // 1. Check if they exist in PARENT DB first (to block them)
+        const parentCheck = await AuthService.checkPhoneExists(fullPhone, 'parent');
+        console.log(`[Phone-Auth] Parent DB Check:`, parentCheck);
+        
+        if (parentCheck.status === 'success' && parentCheck.data?.exists) {
+          // BLOQUED: This is a Parent trying to use the Teacher app
+          setAuthError('This number is registered in our Parents database. Please use the "DoAble India for Parents" app or contact support.');
           setIsAuthLoading(false);
           return;
         }
 
-        const otp = Math.floor(1000 + Math.random() * 9000).toString();
-        const res = await AuthService.sendWhatsAppOTP(fullPhone, otp);
+        // 2. Check if they exist in TEACHER DB
+        const teacherCheck = await AuthService.checkPhoneExists(fullPhone, 'teacher');
+        console.log(`[Phone-Auth] Teacher DB Check:`, teacherCheck);
         
-        if (res.result || res.status === 'success') {
-          if (setGeneratedOtp) setGeneratedOtp(otp);
-          if (setAuthStep) setAuthStep('otp');
-          setActiveToast({ title: 'OTP Sent! 📱', body: 'Check your WhatsApp for the login code.' });
+        if (teacherCheck.status === 'success') {
+          if (teacherCheck.data?.exists) {
+            console.log(`[Phone-Auth] Teacher Profile found. Marking as signin.`);
+            if (setEmailChecked) setEmailChecked(true);
+            if (setEmailExist) setEmailExist(true);
+            if (setAuthMode) setAuthMode('signin');
+            
+            if (setUserName && teacherCheck.data.name) {
+              setUserName(teacherCheck.data.name);
+            }
+          } else {
+            console.log(`[Phone-Auth] New Teacher user. Marking as signup.`);
+            if (setAuthMode) setAuthMode('signup');
+            if (setEmailExist) setEmailExist(false);
+          }
+          
+          // Force userType to teacher for this app context
+          if (ctx.setUserType) ctx.setUserType('teacher');
+
+          // 3. Send OTP only after validation passes
+          const otp = Math.floor(1000 + Math.random() * 9000).toString();
+          const res = await AuthService.sendWhatsAppOTP(fullPhone, otp);
+          
+          if (res.result || res.status === 'success') {
+            if (setGeneratedOtp) setGeneratedOtp(otp);
+            if (setAuthStep) setAuthStep('otp');
+            setActiveToast({ title: 'OTP Sent! 📱', body: 'Check your WhatsApp for the login code.' });
+          } else {
+            setAuthError(res.message || 'Failed to send WhatsApp OTP.');
+          }
         } else {
-          setAuthError(res.message || 'Failed to send WhatsApp OTP.');
+          setAuthError(teacherCheck.message || 'Database check failed. Please try again.');
         }
       } catch (err) {
-        setAuthError('Connection error while sending OTP.');
+        console.error('[Phone-Auth] Error:', err);
+        setAuthError('Connection error while validating account.');
       } finally {
         setIsAuthLoading(false);
       }

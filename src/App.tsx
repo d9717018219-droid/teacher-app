@@ -1282,15 +1282,25 @@ export default function App() {
   }, [tutors, activeUser, userType, profile]);
 
   const normalizeTutor = (t: any) => {
-    // Helper to get value with case-insensitive key search
+    // Optimization: Pre-calculate normalized keys once per object to avoid O(N^2) lookups
+    const keyMap: Record<string, string> = {};
+    for (const k in t) {
+      keyMap[k.toLowerCase().replace(/[^a-z0-9]/g, '')] = k;
+    }
+
     const getSafe = (keys: string[], fallback: any = '') => {
-      const objKeys = Object.keys(t);
       for (const searchKey of keys) {
-        // 1. Try exact match
-        if (t[searchKey] !== undefined && t[searchKey] !== null && t[searchKey] !== '' && t[searchKey] !== 'undefined') return t[searchKey];
-        // 2. Try case-insensitive fuzzy match
-        const foundKey = objKeys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === searchKey.toLowerCase().replace(/[^a-z0-9]/g, ''));
-        if (foundKey && t[foundKey] !== undefined && t[foundKey] !== null && t[foundKey] !== '' && t[foundKey] !== 'undefined') return t[foundKey];
+        // 1. Try exact match (Fastest)
+        const val = t[searchKey];
+        if (val !== undefined && val !== null && val !== '' && val !== 'undefined') return val;
+        
+        // 2. Try normalized match (Fast)
+        const normSearchKey = searchKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const actualKey = keyMap[normSearchKey];
+        if (actualKey) {
+          const val2 = t[actualKey];
+          if (val2 !== undefined && val2 !== null && val2 !== '' && val2 !== 'undefined') return val2;
+        }
       }
       return fallback;
     };
@@ -1480,8 +1490,11 @@ export default function App() {
     }
   };
 
+  const isLoadingData = useRef(false);
   const loadData = async () => {
      // console.log('🚀 [Data-Loader] STARTING Version: 2.5.0 (Parent-Fix)');
+    if (isLoadingData.current) return;
+    isLoadingData.current = true;
     try {
       // Cleanup old bulky localStorage cache if it exists
       if (localStorage.getItem('cachedTutors')) {
@@ -1503,14 +1516,40 @@ export default function App() {
       const isNative = Capacitor.isNativePlatform();
       const ts = Date.now();
       
-      // Fix: Tutors see ALL jobs, Parents see only THEIR jobs
+      // Fix: Tutors see only THEIR data (or limited), Parents see all for discovery
       const leadsEmailParam = (userType === 'parent' && activeUser?.email) ? `&email=${encodeURIComponent(activeUser.email.toLowerCase().replace(/\s+/g, ''))}` : '';
       const leadsPhoneParam = (userType === 'parent' && userPhone) ? `&phone=${encodeURIComponent(userPhone.replace(/\s+/g, '').replace(/^\+91/, ''))}` : '';
       
       const LEADS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_data.php?t=${ts}${leadsEmailParam}${leadsPhoneParam}` : `/api/leads?t=${ts}${leadsEmailParam}${leadsPhoneParam}`;
       
-      // Fix: Never filter Tutors list by email, otherwise 'Featured Tutors' and matching will break
-      const TUTORS_URL = Capacitor.isNativePlatform() ? `https://doableindia.com/app-sys/api_copy_data.php?force_refresh=${ts}` : `/api/tutors?t=${ts}`;
+      // Optimization: If teacher, only fetch their specific profile to avoid 7000+ records
+      let tutorsFilterParam = '';
+      if (userType === 'teacher') {
+        let phone = userPhone || (activeUser as any)?.phone;
+        const tid = tutorId;
+        
+        // Fallback: extract phone from whatsapp email if missing
+        if (!phone && activeUser?.email?.endsWith('@whatsapp.com')) {
+          phone = activeUser.email.split('@')[0];
+        }
+
+        if (tid && tid !== 'N/A' && tid !== 'NEW') {
+          tutorsFilterParam = `&tutor_id=${encodeURIComponent(tid)}`;
+        } else if (phone) {
+          const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+          if (cleanPhone) tutorsFilterParam = `&phone=${encodeURIComponent(cleanPhone)}`;
+        } else if (activeUser?.email) {
+          tutorsFilterParam = `&email=${encodeURIComponent(activeUser.email.toLowerCase().trim())}`;
+        }
+      }
+      
+      if (tutorsFilterParam) {
+        console.log(`📡 [Data-Loader] Applying Tutor Filter: ${tutorsFilterParam}`);
+      }
+      
+      const TUTORS_URL = Capacitor.isNativePlatform() 
+        ? `https://doableindia.com/app-sys/api_copy_data.php?force_refresh=${ts}${tutorsFilterParam}` 
+        : `/api/tutors?t=${ts}${tutorsFilterParam}`;
 
       // Helper for chunked fetching
       const fetchTutorsInChunks = async (baseUrl: string, isNative: boolean): Promise<any[]> => {
@@ -1609,15 +1648,14 @@ export default function App() {
     } catch (err) {
       console.error('❌ Error loading data:', err);
     } finally {
+      isLoadingData.current = false;
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeUser?.email) {
-      console.log('🔄 [Auth] Triggering data refresh for:', activeUser.email, 'UserType:', userType);
-      loadData();
-    }
+    console.log('🔄 [Auth] Triggering data refresh for:', activeUser?.email || 'Guest', 'UserType:', userType);
+    loadData();
   }, [activeUser?.email, userType]);
 
   useEffect(() => {
@@ -1630,7 +1668,7 @@ export default function App() {
         scopes: ['profile', 'email'],
       });
     }
-    loadData();
+    
     const qLeads = query(collection(db, 'leads'), orderBy('Updated Time', 'desc'), limit(50));
     const unsubscribeLeads = onSnapshot(qLeads, (snapshot) => {
       setDbStatus('Connected');
@@ -1861,52 +1899,56 @@ export default function App() {
   }, [leads, firestoreLeads, jobCityFilter, jobSearchQuery, isCityMatch, jobFilterLocalities, jobFilterClasses, jobFilterGender, jobSortBy]);
 
   const finalTutors = useMemo(() => {
+    const lSearchQuery = tutorSearchQuery?.toLowerCase();
+    const lFilterLocalities = tutorFilterLocalities.map(loc => loc.toLowerCase());
+    const lFilterClasses = tutorFilterClasses.map(cls => cls.toLowerCase());
+    const lFilterGender = tutorFilterGender.toLowerCase().trim();
+
     const filtered = rawActiveTutors.filter(t => {
       const cityVal = t.city || (t as any).City;
       if (!isCityMatch(cityVal, tutorCityFilter)) return false;
 
       // Localities Filter
-      if (tutorFilterLocalities.length > 0) {
+      if (lFilterLocalities.length > 0) {
         const tutorLocs = (Array.isArray(t.location) ? t.location.join(', ') : (t.location || '')).toString().toLowerCase();
-        const hasMatch = tutorFilterLocalities.some(loc => tutorLocs.includes(loc.toLowerCase()));
+        const hasMatch = lFilterLocalities.some(loc => tutorLocs.includes(loc));
         if (!hasMatch) return false;
       }
 
       // Classes Filter
-      if (tutorFilterClasses.length > 0) {
-        const tutorClassArr = t.class_group || (t as any).classes || [];
-        const tutorClassStr = JSON.stringify(tutorClassArr).toLowerCase();
+      if (lFilterClasses.length > 0) {
+        const tutorClassArr = (t.class_group || (t as any).classes || []).map((c: any) => String(c).toLowerCase());
         
-        const matchesClass = tutorFilterClasses.some(cls => {
+        const matchesClass = lFilterClasses.some((lcls, idx) => {
           // Direct match in array
-          if (tutorClassStr.includes(cls.toLowerCase())) return true;
+          if (tutorClassArr.some(tc => tc.includes(lcls))) return true;
           // Group mapping match
-          const mappedClasses = CLASS_GROUP_MAPPING[cls];
-          if (mappedClasses && mappedClasses.some(m => tutorClassStr.includes(m.toLowerCase()))) return true;
+          const originalCls = tutorFilterClasses[idx];
+          const mappedClasses = CLASS_GROUP_MAPPING[originalCls];
+          if (mappedClasses && mappedClasses.some(m => {
+            const lm = m.toLowerCase();
+            return tutorClassArr.some(tc => tc.includes(lm));
+          })) return true;
           return false;
         });
         if (!matchesClass) return false;
       }
 
-      // Gender Filter (Handles 'Any', 'Both', 'Male/Female')
+      // Gender Filter
       if (tutorFilterGender !== 'All') {
         const tGender = (t.gender || (t as any).Gender || '').toLowerCase().trim();
-        const fGender = tutorFilterGender.toLowerCase().trim();
-        
         if (tGender !== '') {
           const isAny = tGender.includes('any') || tGender.includes('both') || tGender.includes('/');
-          const isExactMatch = tGender === fGender;
-          
-          if (!isAny && !isExactMatch) return false;
+          if (!isAny && tGender !== lFilterGender) return false;
         }
       }
 
-      if (tutorSearchQuery) {
-        const sl = tutorSearchQuery.toLowerCase();
+      if (lSearchQuery) {
         const tName = (t.name || '').toLowerCase();
         const tID = (t.tutor_id || (t as any).id || '').toString().toLowerCase();
-        const subjects = JSON.stringify(t.subjects || []).toLowerCase();
-        if (!(tName.includes(sl) || tID.includes(sl) || subjects.includes(sl))) return false;
+        const tutorSubjects = (t.subjects || []).map((s: any) => String(s).toLowerCase());
+        const hasSubject = tutorSubjects.some(ts => ts.includes(lSearchQuery));
+        if (!(tName.includes(lSearchQuery) || tID.includes(lSearchQuery) || hasSubject)) return false;
       }
       return true;
     });
